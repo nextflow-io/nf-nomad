@@ -1,8 +1,6 @@
 # nf-nomad plugin
 
-This project shows how to implement a simple Nextflow plugin named `nf-nomad` which intercepts workflow execution events to print a message when the execution starts and on workflow completion.
-
-The `nf-nomad` plugin also enriches the `channel` object with a `producer` and `consumer` method (`sayNomad` and `goodbye`) which can be used in a pipeline script.
+This plugin implements a Nextflow executor for [Hashicorp Nomad](https://www.nomadproject.io)
 
 ## Plugin Assets
 
@@ -37,13 +35,6 @@ The `nf-nomad` plugin also enriches the `channel` object with a `producer` and `
 ## `ExtensionPoint`s
 
 `ExtensionPoint` is the basic interface which uses nextflow-core to integrate plugins into it. It's only a basic interface and serves as starting point for more specialized extensions.
-
-Among others, nextflow-core integrates the following sub `ExtensionPoint`s:
-
-- `TraceObserverFactory` to provide a list of `TraceObserver`s
-- `ChannelExtensionPoint` to enrich the `channel` object with custom methods
-
-In this plugin you can find an example for each of these types.
 
 ## Unit testing
 
@@ -80,7 +71,7 @@ To run and test the plugin in a development environment, configure a local Nextf
 4. Run Nextflow with the plugin, using `./launch.sh` as a drop-in replacement for the `nextflow` command, and adding the option `-plugins nf-nomad` to load the plugin:
 
     ```bash
-    ./launch.sh run nextflow-io/Nomad -plugins nf-nomad
+    ./launch.sh run CenterForMedicalGeneticsGhent/nf-nomad -plugins nf-nomad
     ```
 
 ## Package, upload and publish
