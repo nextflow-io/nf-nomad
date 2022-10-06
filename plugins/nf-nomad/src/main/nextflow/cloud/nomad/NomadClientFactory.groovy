@@ -15,26 +15,30 @@
  * limitations under the License.
  */
 
-package nextflow.nomad
+package nextflow.cloud.nomad
 
-import com.hashicorp.nomad.javasdk.NomadApiClient
-import com.hashicorp.nomad.javasdk.NomadApiConfiguration
-import groovy.transform.CompileStatic
-import groovy.util.logging.Slf4j
-import nextflow.Global
-import nextflow.exception.AbortOperationException
+import com.hashicorp.nomad.javasdk.NomadApiClient;
+import com.hashicorp.nomad.javasdk.NomadApiConfiguration;
+import java.util.HashMap;
+import java.util.Map;
 
 /**
- *
- * @author matthdsm <matthias.desmet@ugent.be>
+ * @author jfulton
  */
-@Slf4j
-@CompileStatic
-class NomadClientFactory {
-    NomadApiConfiguration config =
-        new NomadApiConfiguration.Builder()
-                .setAddress("http://192.168.100.100:4646")
-                .build();
+public class NomadClientFactory {
 
-    NomadApiClient apiClient = new NomadApiClient(config);
+    private static final Map<String, NomadApiClient> clients = new HashMap<>();
+
+    public static NomadApiClient getClient(String url) {
+        return clients.computeIfAbsent(url, s -> {
+            NomadApiConfiguration config =
+                new NomadApiConfiguration.Builder()
+                    .setAddress(s)
+                    // Determine how to store auth token and CA path
+                    //.setTlsCaFile(/* filePath */)
+                    .setTlsSkipVerify(true)
+                    .build();
+            return new NomadApiClient(config);
+        });
+    }
 }
