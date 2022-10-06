@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package nextflow.cloud.nomad
+package nextflow.nomad
 
 import com.hashicorp.nomad.javasdk.NomadApiClient;
 import com.hashicorp.nomad.javasdk.NomadApiConfiguration;
