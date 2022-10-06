@@ -1,4 +1,4 @@
-package nextflow.cloud.nomad;
+package nextflow.nomad;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.google.common.net.HostAndPort;

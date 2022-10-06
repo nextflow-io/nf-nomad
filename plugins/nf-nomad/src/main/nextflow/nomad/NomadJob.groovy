@@ -1,4 +1,4 @@
-package nextflow.cloud.nomad;
+package nextflow.nomad;
 
 import static java.util.function.Function.identity;
 import static java.util.stream.Collectors.toList;

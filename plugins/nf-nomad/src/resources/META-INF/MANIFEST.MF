@@ -1,0 +1,7 @@
+Manifest-Version: 1.0
+Plugin-Id: nf-nomad
+Plugin-Version: 0.1.0
+Plugin-Class: nextflow.nomad.NomadPlugin
+Plugin-Provider: nextflow
+Plugin-Requires: >=22.09.2-edge
+

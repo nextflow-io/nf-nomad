@@ -1,5 +1,4 @@
-
-package nextflow.cloud.nomad;
+package nextflow.nomad;
 
 /**
  * @author matthdsm
