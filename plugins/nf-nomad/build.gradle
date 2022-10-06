@@ -55,7 +55,7 @@ sourceSets {
 }
 
 ext{
-    nextflowVersion = '22.08.1-edge'
+    nextflowVersion = '22.09.7-edge'
 }
 
 dependencies {
@@ -63,18 +63,34 @@ dependencies {
     compileOnly "io.nextflow:nextflow:$nextflowVersion"
     compileOnly 'org.slf4j:slf4j-api:1.7.10'
     compileOnly 'org.pf4j:pf4j:3.4.1'
+
     // add here plugins depepencies
+
+    // source the locally built nomad-openapi based client
+    compileOnly "io.nomadproject:nomad-openapi-java-client:1.1.4"
+
+    //TODO: Build a shadowjar and source it locally
+    //    implementation fileTree(dir: '_resources/nomad-openapi/clients/java/v1/targets/libs', include: '*.jar')
+    //    implementation files('_resources/nomad-openapi/clients/java/v1/target/nomad-openapi-java-client-1.1.4.jar', '_resources/nomad-openapi/clients/java/v1/target/nomad-openapi-java-client-1.1.4-sources.jar')
+    //    dependencies { implementation name: 'io.nomadproject:nomad-openapi-java-client:1.1.4' }
+
 
     // test configuration
     testImplementation "org.codehaus.groovy:groovy:3.0.8"
     testImplementation "org.codehaus.groovy:groovy-nio:3.0.8"
     testImplementation "io.nextflow:nextflow:$nextflowVersion"
-    testImplementation ("org.codehaus.groovy:groovy-test:3.0.8") { exclude group: 'org.codehaus.groovy' }
-    testImplementation ("cglib:cglib-nodep:3.3.0")
-    testImplementation ("org.objenesis:objenesis:3.1")
-    testImplementation ("org.spockframework:spock-core:2.0-M3-groovy-3.0") { exclude group: 'org.codehaus.groovy'; exclude group: 'net.bytebuddy' }
-    testImplementation ('org.spockframework:spock-junit4:2.0-M3-groovy-3.0') { exclude group: 'org.codehaus.groovy'; exclude group: 'net.bytebuddy' }
-    testImplementation ('com.google.jimfs:jimfs:1.1')
+    testImplementation("org.codehaus.groovy:groovy-test:3.0.8") { exclude group: 'org.codehaus.groovy' }
+    testImplementation("cglib:cglib-nodep:3.3.0")
+    testImplementation("org.objenesis:objenesis:3.1")
+    testImplementation("org.spockframework:spock-core:2.0-M3-groovy-3.0") {
+        exclude group: 'org.codehaus.groovy';
+        exclude group: 'net.bytebuddy'
+    }
+    testImplementation('org.spockframework:spock-junit4:2.0-M3-groovy-3.0') {
+        exclude group: 'org.codehaus.groovy';
+        exclude group: 'net.bytebuddy'
+    }
+    testImplementation('com.google.jimfs:jimfs:1.1')
 
     testImplementation(testFixtures("io.nextflow:nextflow:$nextflowVersion"))
     testImplementation(testFixtures("io.nextflow:nf-commons:$nextflowVersion"))

@@ -1,4 +1,5 @@
-package nextflow.nomad;
+package nextflow.nomad.executor
+
 
 import static java.util.function.Function.identity;
 import static java.util.stream.Collectors.toList;
@@ -14,13 +15,9 @@ import com.hashicorp.nomad.javasdk.EvaluationResponse;
 import com.hashicorp.nomad.javasdk.NomadApiClient;
 import com.hashicorp.nomad.javasdk.NomadException;
 import com.ripple.topology.elements.AbstractElementGroup;
-import com.ripple.topology.utils.HealthUtils;
-import java.io.IOException;
-import java.time.Duration;
-import java.util.HashMap;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
+import com.ripple.topology.utils.HealthUtils
+
+import java.time.Duration
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executor;
