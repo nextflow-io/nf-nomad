@@ -1,4 +1,4 @@
-package nextflow.nomad;
+package nextflow.nomad.executor;
 
 import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 import java.util.Objects;
@@ -7,7 +7,7 @@ import java.util.Objects;
  * @author matthdsm
  * Sourced from https://github.com/ripple/ripple-topology/blob/master/ripple-topology-elements-nomad/src/main/java/com/ripple/topology/NomadTaskArtifact.java
  */
-@JsonPropertyOrder({"source", "destination"})
+@JsonPropertyOrder({ "source" , "destination" })
 public class NomadTaskArtifact {
 
     private String mode = null;

@@ -1,4 +1,4 @@
-package nextflow.nomad;
+package nextflow.nomad.executor;
 
 /**
  * @author matthdsm

@@ -1,4 +1,4 @@
-package nextflow.nomad;
+package nextflow.nomad.executor;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.google.common.net.HostAndPort;
@@ -13,11 +13,7 @@ import com.hashicorp.nomad.apimodel.TaskGroup;
 import com.hashicorp.nomad.apimodel.Template;
 import com.ripple.topology.elements.AbstractPropertiesAndEnvironmentAwareResource;
 import com.ripple.topology.elements.HostAndPortResource;
-import com.ripple.topology.elements.HttpUrlResource;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.List;
+import com.ripple.topology.elements.HttpUrlResource
 import okhttp3.HttpUrl;
 
 /**
@@ -145,7 +141,7 @@ public class NomadTask extends AbstractPropertiesAndEnvironmentAwareResource<Nom
             httpCheck.setTimeout(2000000000L);
             service.addChecks(httpCheck);
         }
-        
+
         if (getTags().size() > 0) {
             for (String tag : getTags()) {
                 service.addTags(tag);
