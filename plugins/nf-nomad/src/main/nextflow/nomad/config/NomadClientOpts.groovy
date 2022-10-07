@@ -17,38 +17,39 @@
 package nextflow.nomad.config
 
 import groovy.transform.CompileStatic
-import nextflow.Global
-import nextflow.Session
 
 /**
  * Model Nomad job settings defined in the nextflow.config file
  *
  * @author Abhinav Sharma <abhi18av@outlook.com>
  */
-
 @CompileStatic
-class NomadConfig {
+class NomadClientOpts {
 
-    private NomadJobOpts jobOpts
-    private NomadClientOpts clientOpts
+    static public final String DEFAULT_BASE_PATH = "http://127.0.0.1:4646/v1"
+    static public final String DEFAULT_API_KEY = "NONE"
+    static public final String DEFAULT_NAMESPACE = "NONE"
+    static public final String DEFAULT_REGION = "NONE"
 
-    NomadConfig(Map nomad) {
-        this.jobOpts = new NomadJobOpts((Map) nomad.job ?: Collections.emptyMap())
-        this.clientOpts = new NomadClientOpts((Map) nomad.client ?: Collections.emptyMap())
+    String basePath
+    String apiKey
+    String namespace
+    String region
+
+    NomadClientOpts() {
+        this.basePath = DEFAULT_BASE_PATH
+        this.apiKey = DEFAULT_API_KEY
+        this.namespace = DEFAULT_NAMESPACE
+        this.region = DEFAULT_REGION
     }
 
-    NomadJobOpts job() { jobOpts }
-
-    NomadClientOpts client() { clientOpts }
-
-    static NomadConfig getConfig(Session session) {
-        if (!session)
-            throw new IllegalStateException("Missing Nextflow session")
-
-        new NomadConfig((Map) session.config.nomad ?: Collections.emptyMap())
+    NomadClientOpts(Map config) {
+        assert config != null
+        this.basePath = config.basePath ?: DEFAULT_BASE_PATH
+        this.apiKey = config.apiKey ?: DEFAULT_API_KEY
+        this.namespace = config.namespace ?: DEFAULT_NAMESPACE
+        this.region = config.region ?: DEFAULT_REGION
     }
 
-    static NomadConfig getConfig() {
-        getConfig(Global.session as Session)
-    }
+
 }

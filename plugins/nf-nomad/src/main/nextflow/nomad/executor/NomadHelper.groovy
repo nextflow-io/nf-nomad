@@ -16,21 +16,11 @@
 
 package nextflow.nomad.executor
 
-import groovy.transform.CompileStatic
-import io.nomadproject.client.Configuration
-import nextflow.nomad.config.NomadClientOpts
-
 /**
- * Nomad API client
+ * Nomad API Helper methods
  *
  * @author Abhinav Sharma <abhi18av@outlook.com>
  */
 
-@CompileStatic
-class NomadClient {
-    NomadClient(NomadClientOpts clientOpts) {
-        Configuration.getDefaultApiClient()
-                .setBasePath(clientOpts.basePath)
-                .getAuthentication("X-Nomad-Token")
-    }
+class NomadHelper {
 }
