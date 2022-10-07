@@ -30,17 +30,20 @@ class NomadClientOpts {
     static public final String DEFAULT_API_KEY = "NONE"
     static public final String DEFAULT_NAMESPACE = "NONE"
     static public final String DEFAULT_REGION = "NONE"
+    static public final String DEFAULT_AUTH_NAME = "X-Nomad-Token"
 
     String basePath
     String apiKey
     String namespace
     String region
+    String authName
 
     NomadClientOpts() {
         this.basePath = DEFAULT_BASE_PATH
         this.apiKey = DEFAULT_API_KEY
         this.namespace = DEFAULT_NAMESPACE
         this.region = DEFAULT_REGION
+        this.authName = DEFAULT_AUTH_NAME
     }
 
     NomadClientOpts(Map config) {
@@ -49,7 +52,7 @@ class NomadClientOpts {
         this.apiKey = config.apiKey ?: DEFAULT_API_KEY
         this.namespace = config.namespace ?: DEFAULT_NAMESPACE
         this.region = config.region ?: DEFAULT_REGION
+        this.authName = config.authName ?: DEFAULT_AUTH_NAME
     }
-
 
 }

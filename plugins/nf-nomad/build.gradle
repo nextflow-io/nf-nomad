@@ -67,7 +67,7 @@ dependencies {
     // add here plugins depepencies
 
     // source the locally built nomad-openapi based client
-    compileOnly "io.nomadproject:nomad-openapi-java-client:1.1.4"
+    implementation "io.nomadproject:nomad-openapi-java-client:1.1.4"
 
     //TODO: Build a shadowjar and source it locally
     //    implementation fileTree(dir: '_resources/nomad-openapi/clients/java/v1/targets/libs', include: '*.jar')

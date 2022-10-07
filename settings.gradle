@@ -17,3 +17,5 @@
 rootProject.name = 'nf-nomad'
 include 'plugins'
 include('plugins:nf-nomad')
+
+includeBuild('_resources/nextflow')

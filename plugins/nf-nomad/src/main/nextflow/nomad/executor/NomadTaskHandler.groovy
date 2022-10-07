@@ -77,92 +77,22 @@ class NomadTaskHandler extends TaskHandler {
         }
     }
 
-    protected BashWrapperBuilder createBashWrapper() {
-        new NomadScriptLauncher(taskBean, executor)
-    }
-
     @Override
     void submit() {
-        log.debug "[NOMAD BATCH] Submitting task $task.name - work-dir=${task.workDirStr}"
-        createBashWrapper().build()
-        // submit the task execution
-        this.taskKey = batchService.submitTask(task)
-        log.debug "[NOMAD BATCH] Submitted task $task.name with taskId=$taskKey"
-        // update the status
-        this.status = TaskStatus.SUBMITTED
     }
 
     @Override
     boolean checkIfRunning() {
-        if (!taskKey || !isSubmitted())
-            return false
-        final state = taskState0(taskKey)
-        // note, include complete status otherwise it hangs if the task
-        // completes before reaching this check
-        final running = state == TaskState.RUNNING || state == TaskState.COMPLETED
-        log.debug "[NOMAD BATCH] Task status $task.name taskId=$taskKey; running=$running"
-        if (running)
-            this.status = TaskStatus.RUNNING
-        return running
     }
 
     @Override
     boolean checkIfCompleted() {
-        assert taskKey
-        if (!isRunning())
-            return false
-        final done = taskState0(taskKey) == TaskState.COMPLETED
-        if (done) {
-            // finalize the task
-            task.exitStatus = readExitFile()
-            task.stdout = outputFile
-            task.stderr = errorFile
-            status = TaskStatus.COMPLETED
-            TaskExecutionInformation info = batchService.getTask(taskKey).executionInfo()
-            if (info.result() == TaskExecutionResult.FAILURE)
-                task.error = new ProcessUnrecoverableException(info.failureInfo().message())
-            deleteTask(taskKey, task)
-            return true
-        }
-        return false
-    }
-
-    private Boolean shouldDelete() {
-        executor.config.batch().deleteJobsOnCompletion
-    }
-
-    protected void deleteTask(AzTaskKey taskKey, TaskRun task) {
-        if (!taskKey || shouldDelete() == Boolean.FALSE)
-            return
-
-        if (!task.isSuccess() && shouldDelete() == null) {
-            // do not delete successfully executed pods for debugging purpose
-            return
-        }
-
-        try {
-            batchService.deleteTask(taskKey)
-        }
-        catch (Exception e) {
-            log.warn "Unable to cleanup batch task: $taskKey -- see the log file for details", e
-        }
     }
 
     /**
      * @return Retrieve the task status caching the result for at lest one second
      */
-    protected TaskState taskState0(AzTaskKey key) {
-        final now = System.currentTimeMillis()
-        final delta = now - timestamp;
-        if (!taskState || delta >= 1_000) {
-            def newState = batchService.getTask(key).state()
-            log.trace "[NOMAD BATCH] Task: $key state=$newState"
-            if (newState) {
-                taskState = newState
-                timestamp = now
-            }
-        }
-        return taskState
+    protected TaskState taskState0(key) {
     }
 
     protected int readExitFile() {
@@ -170,26 +100,17 @@ class NomadTaskHandler extends TaskHandler {
             exitFile.text as Integer
         }
         catch (Exception e) {
-            log.debug "[NOMAD BATCH] Cannot read exit status for task: `$task.name` | ${e.message}"
+            log.debug "[NOMAD] Cannot read exit status for task: `$task.name` | ${e.message}"
             return Integer.MAX_VALUE
         }
     }
 
     @Override
     void kill() {
-        if (!taskKey)
-            return
-        batchService.terminate(taskKey)
     }
 
     @Override
     TraceRecord getTraceRecord() {
-        def result = super.getTraceRecord()
-        if (taskKey) {
-            result.put('native_id', taskKey.keyPair())
-            result.machineInfo = getMachineInfo()
-        }
-        return result
     }
 
 
