@@ -51,7 +51,7 @@ class NomadExecutor extends Executor implements ExtensionPoint {
 
     @Override
     Path getWorkDir() {
-        session.bucketDir ?: session.workDir
+        session.workDir
     }
 
     protected void validateWorkDir() {
@@ -91,7 +91,7 @@ class NomadExecutor extends Executor implements ExtensionPoint {
     }
 
     /**
-     * Initialise the Azure Batch executor.
+     * Initialise the Nomad executor.
      */
     @Override
     protected void register() {
