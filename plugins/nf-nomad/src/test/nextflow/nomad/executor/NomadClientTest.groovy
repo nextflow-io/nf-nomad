@@ -17,26 +17,11 @@
 package nextflow.nomad.executor
 
 import io.nomadproject.client.Configuration
-import io.nomadproject.client.api.AclApi
 import io.nomadproject.client.api.JobsApi
-import io.nomadproject.client.api.NodesApi
-import io.nomadproject.client.auth.ApiKeyAuth
 import io.nomadproject.client.models.Job
-import io.nomadproject.client.models.JobPlanRequest
 import io.nomadproject.client.models.JobRegisterRequest
-import io.nomadproject.client.models.JobValidateRequest
-import io.nomadproject.client.models.JobsParseRequest
 import io.nomadproject.client.models.Task
 import io.nomadproject.client.models.TaskGroup
-import nextflow.nomad.config.NomadClientOpts
-import nextflow.nomad.config.NomadConfig
-
-import java.util.function.Predicate
-import com.google.common.hash.HashCode
-import nextflow.processor.TaskConfig
-import nextflow.processor.TaskProcessor
-import nextflow.processor.TaskRun
-import nextflow.util.MemoryUnit
 import spock.lang.Specification
 
 /**
@@ -44,15 +29,17 @@ import spock.lang.Specification
  * @author Abhinav Sharma <abhi18av@outlook.com>
  */
 class NomadClientTest extends Specification {
-    def DEV_TOKEN_ACCESSOR = "c7dcbc2f-8384-6990-f3aa-095336dada7a";
-    def DEV_TOKEN_SECRET = "85a3fce7-52f4-18c6-1045-5a40be79ed20";
 
-    def 'should create a client and check status'() {
+    def DEV_NOMAD_TOKEN_ACCESSOR = System.getenv("DEV_NOMAD_TOKEN_ACCESSOR")
+    def DEV_NOMAD_TOKEN_SECRET = System.getenv("DEV_NOMAD_TOKEN_SECRET")
+    def DEV_NOMAD_BASE_PATH = System.getenv("DEV_NOMAD_BASE_PATH")
+
+    def 'should create a client and submit a job'() {
 
         given:
         def defaultClient = Configuration
                 .getDefaultApiClient()
-                .setBasePath(NomadClientOpts.DEFAULT_BASE_PATH)
+                .setBasePath(DEV_NOMAD_BASE_PATH)
 
 
         def region = "";
@@ -61,27 +48,17 @@ class NomadClientTest extends Specification {
         def wait = "";
         def stale = "";
         def prefix = "";
-        def tokenAccessor = DEV_TOKEN_ACCESSOR
-        def xNomadToken = DEV_TOKEN_SECRET
+        def tokenAccessor = DEV_NOMAD_TOKEN_ACCESSOR
+        def xNomadToken = DEV_NOMAD_TOKEN_SECRET
         def perPage = 56;
         def nextToken = "";
         def idempotencyToken = ""
         def result
 
-//        def apiInstance = new AclApi(defaultClient);
-//        def result = apiInstance.getACLToken(tokenAccessor, region, namespace, index, wait, stale, prefix, xNomadToken, perPage, nextToken);
-
-//        def apiInstance = new NodesApi(defaultClient);
-//        def result = apiInstance.getNodes(region, namespace, index, wait, stale, prefix, xNomadToken, perPage, nextToken, true);
-
-
-//        def apiInstance = new JobsApi(defaultClient);
-//        def result = apiInstance.getJobs(region, namespace, index, wait, stale, prefix, xNomadToken, perPage, nextToken);
-
-
+        and:
         def taskDef = new Task()
                 .driver("exec")
-                .config(["command": "/bin/http-echo"])
+                .config(["command": "/bin/echo", "args": ["hello-nomad"]])
                 .name("task-name")
 
         def taskGroup = new TaskGroup()
@@ -89,39 +66,26 @@ class NomadClientTest extends Specification {
                 .name("task-group")
 
         def jobDef = new Job()
+                .taskGroups([taskGroup])
                 .type("batch")
                 .datacenters(["dc1"])
-                .name("http-echo")
-                .taskGroups([taskGroup])
-                .ID("temp-job-id")
+                .name("hello-nomad")
+                .ID("hello-nomad")
+
+        def jobRegisterRequest = new JobRegisterRequest()
+                .job(jobDef)
+                .enforceIndex(false)
+                .evalPriority(10)
+                .jobModifyIndex(1)
+                .namespace("")
+                .policyOverride(true)
+                .preserveCounts(false)
+                .region("")
+                .secretID(xNomadToken)
+
 
         def apiInstance = new JobsApi(defaultClient);
-
-        def jobValidateRequest = new JobValidateRequest()
-                .job(jobDef)
-                .namespace(namespace)
-                .secretID(DEV_TOKEN_ACCESSOR)
-                .region(region)
-
-
-        result = apiInstance.postJobValidateRequest(jobValidateRequest, region, namespace, xNomadToken, idempotencyToken);
-        println(result);
-
-//        def jobRegisterRequest = new JobRegisterRequest()
-//                .job(jobDef)
-//                .region(region)
-//                .namespace(namespace)
-//                .secretID(DEV_TOKEN_SECRET)
-//
-//        result = apiInstance.postJob(jobDef.name, jobRegisterRequest, region, namespace, xNomadToken, idempotencyToken)
-
-
-//        def jobPlan = new JobPlanRequest()
-//                .secretID(DEV_TOKEN_SECRET)
-//                .job(jobDef)
-//
-//        result = apiInstance.postJobPlan(jobDef.name, jobPlan, region, namespace, xNomadToken, idempotencyToken)
-
+        result = apiInstance.postJob("hello-nomad", jobRegisterRequest, region, namespace, xNomadToken, idempotencyToken)
 
         println(result);
 
