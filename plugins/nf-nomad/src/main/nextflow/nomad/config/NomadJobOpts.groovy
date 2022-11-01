@@ -23,4 +23,8 @@ package nextflow.nomad.config
  */
 
 class NomadJobOpts {
+
+    NomadJobOpts(Map config) {
+    }
+
 }

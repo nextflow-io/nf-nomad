@@ -28,9 +28,15 @@ import nextflow.nomad.config.NomadClientOpts
 
 @CompileStatic
 class NomadClient {
+    NomadClient() {
+        Configuration.getDefaultApiClient()
+                .setBasePath(NomadClientOpts.DEFAULT_BASE_PATH)
+                .getAuthentication(NomadClientOpts.DEFAULT_AUTH_NAME)
+    }
+
     NomadClient(NomadClientOpts clientOpts) {
         Configuration.getDefaultApiClient()
                 .setBasePath(clientOpts.basePath)
-                .getAuthentication("X-Nomad-Token")
+                .getAuthentication(clientOpts.authName)
     }
 }
