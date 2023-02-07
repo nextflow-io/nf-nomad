@@ -51,7 +51,7 @@ To run and test the plugin in a development environment, configure a local Nextf
 1. Clone the Nextflow repository in your computer into a sibling directory:
 
     ```bash
-    git clone --depth 1 https://github.com/nextflow-io/nextflow _resources/ nextflow
+    git clone --depth 1 https://github.com/nextflow-io/nextflow _resources/nextflow
     ```
 
 2. Generate the nextflow class path
