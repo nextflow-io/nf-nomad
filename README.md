@@ -51,27 +51,25 @@ To run and test the plugin in a development environment, configure a local Nextf
 1. Clone the Nextflow repository in your computer into a sibling directory:
 
     ```bash
-    git clone --depth 1 https://github.com/nextflow-io/nextflow ../nextflow
+    git clone --depth 1 https://github.com/nextflow-io/nextflow _resources/ nextflow
     ```
-  
-2. Configure the plugin build to use the local Nextflow code:
+
+2. Generate the nextflow class path
 
     ```bash
-    echo "includeBuild('../nextflow')" >> settings.gradle
+    cd _resources/nextflow && ./gradlew exportClasspath
     ```
-  
-   (Make sure to not add it more than once!)
 
 3. Compile the plugin alongside the Nextflow code:
 
     ```bash
-    ./gradlew compileGroovy
+    cd ../../ && ./gradlew compileGroovy
     ```
 
 4. Run Nextflow with the plugin, using `./launch.sh` as a drop-in replacement for the `nextflow` command, and adding the option `-plugins nf-nomad` to load the plugin:
 
     ```bash
-    ./launch.sh run CenterForMedicalGeneticsGhent/nf-nomad -plugins nf-nomad
+    ./launch.sh run main.nf -plugins nf-nomad
     ```
 
 ## Package, upload and publish

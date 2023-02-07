@@ -24,6 +24,7 @@ import nextflow.nomad.config.NomadConfig
 import nextflow.processor.TaskHandler
 import nextflow.processor.TaskMonitor
 import nextflow.processor.TaskRun
+import nextflow.util.ServiceName
 import org.pf4j.ExtensionPoint
 
 import java.nio.file.Path
@@ -34,6 +35,7 @@ import java.nio.file.Path
  * @author Abhinav Sharma <abhi18av@outlook.com>
  */
 
+@ServiceName('nomad')
 class NomadExecutor extends Executor implements ExtensionPoint {
 
     private Path remoteBinDir
@@ -47,6 +49,11 @@ class NomadExecutor extends Executor implements ExtensionPoint {
      */
     final boolean isContainerNative() {
         return true
+    }
+
+    @Override
+    String containerConfigEngine() {
+        return 'docker'
     }
 
     @Override
