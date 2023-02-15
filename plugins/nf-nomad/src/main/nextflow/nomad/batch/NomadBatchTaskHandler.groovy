@@ -94,7 +94,7 @@ class NomadBatchTaskHandler extends TaskHandler {
     }
 
     private Boolean shouldDelete() {
-        executor.config.batch().deleteJobsOnCompletion
+        //executor.config.batch().deleteJobsOnCompletion
     }
 
     protected void deleteTask(NomadTaskKey taskKey, TaskRun task) {
@@ -141,7 +141,7 @@ class NomadBatchTaskHandler extends TaskHandler {
         def result = super.getTraceRecord()
         if( taskKey ) {
             result.put('native_id', taskKey.keyPair())
-            result.machineInfo = getMachineInfo()
+            //result.machineInfo = getMachineInfo()
         }
         return result
     }
