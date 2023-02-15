@@ -137,7 +137,7 @@ class NomadBatchExecutor extends Executor implements ExtensionPoint {
     }
 
     NomadBatchExecutor getNomadBatchExecutor() {
-        return nomaBatchdExecutor
+        return nomadBatchExecutor
     }
 
     Path getRemoteBinDir() { return remoteBinDir }
