@@ -14,28 +14,36 @@
  * limitations under the License.
  */
 
-package nextflow.nomad.executor
+package nextflow.nomad.batch
 
+import groovy.transform.CompileStatic
 import groovy.transform.PackageScope
+import groovy.util.logging.Slf4j
 import io.nomadproject.client.ApiClient
+import java.nio.file.Path
+import nextflow.Global
 import nextflow.exception.AbortOperationException
 import nextflow.executor.Executor
+import nextflow.extension.FilesEx
 import nextflow.nomad.config.NomadConfig
 import nextflow.processor.TaskHandler
 import nextflow.processor.TaskMonitor
+import nextflow.processor.TaskPollingMonitor
 import nextflow.processor.TaskRun
+import nextflow.util.Duration
 import nextflow.util.ServiceName
 import org.pf4j.ExtensionPoint
 
-import java.nio.file.Path
-
 /**
- * Nextflow executor for Nomad
+ * Nextflow executor for Nomad batch
  *
  * @author Abhinav Sharma <abhi18av@outlook.com>
+ * @author matthdsm <ict@cmgg.be>
  */
 
+@Slf4j
 @ServiceName('nomad')
+@CompileStatic
 class NomadExecutor extends Executor implements ExtensionPoint {
 
     private Path remoteBinDir

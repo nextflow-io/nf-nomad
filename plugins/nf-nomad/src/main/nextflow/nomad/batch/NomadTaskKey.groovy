@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package nextflow.nomad.executor
+package nextflow.nomad.batch
 
 import groovy.transform.Canonical
 import groovy.transform.CompileStatic
