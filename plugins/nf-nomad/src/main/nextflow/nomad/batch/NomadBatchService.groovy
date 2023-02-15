@@ -45,15 +45,15 @@ class NomadBatchService implements Closeable {
     }
 
     NomadTaskKey submitTask(TaskRun task) {
-        final poolId = getOrCreatePool(task)
-        final jobId = getOrCreateJob(poolId, task)
-        runTask(poolId, jobId, task)
+        //final poolId = getOrCreatePool(task)
+        //final jobId = getOrCreateJob(poolId, task)
+        //runTask(poolId, jobId, task)
     }
 
     NomadTaskKey runTask(String poolId, String jobId, TaskRun task) {
-        final taskToAdd = createTask(poolId, jobId, task)
+        //final taskToAdd = createTask(poolId, jobId, task)
         //apply(() -> client.taskOperations().createTask(jobId, taskToAdd))
-        return new NomadTaskKey(jobId, taskToAdd.id())
+        //return new NomadTaskKey(jobId, taskToAdd.id())
     }
 
     void terminate(NomadTaskKey key) {
