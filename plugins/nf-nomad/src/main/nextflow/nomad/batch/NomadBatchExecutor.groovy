@@ -44,7 +44,7 @@ import org.pf4j.ExtensionPoint
 @Slf4j
 @ServiceName('nomad')
 @CompileStatic
-class NomadExecutor extends Executor implements ExtensionPoint {
+class NomadBatchExecutor extends Executor implements ExtensionPoint {
 
     private Path remoteBinDir
 
@@ -97,10 +97,11 @@ class NomadExecutor extends Executor implements ExtensionPoint {
         }
     }
 
-    protected void initClient() {
+    protected void initBatchService() {
         config = NomadConfig.getConfig(session)
+        batchService = new NomadBatchService(this)
 
-        nomadExecutor = new ApiClient(this)
+        nomadBatchExecutor = new ApiClient(this)
 
         Global.onCleanup((it) -> batchService.close())
     }
@@ -111,14 +112,13 @@ class NomadExecutor extends Executor implements ExtensionPoint {
     @Override
     protected void register() {
         super.register()
-        initClient()
-        validatePathDir()
+        initBatchService()
         validateWorkDir()
+        validatePathDir()
         uploadBinDir()
     }
 
-    @PackageScope
-    NomadConfig getConfig() {
+    @PackageScope NomadConfig getConfig() {
         return config
     }
 
@@ -129,11 +129,15 @@ class NomadExecutor extends Executor implements ExtensionPoint {
 
     @Override
     TaskHandler createTaskHandler(TaskRun task) {
-        return new NomadTaskHandler(task, this)
+        return new NomadBatchTaskHandler(task, this)
     }
 
-    NomadExecutor getNomadExecutor() {
-        return nomadExecutor
+    NomadBatchService getBatchService() {
+        return batchService
+    }
+
+    NomadBatchExecutor getNomadBatchExecutor() {
+        return nomaBatchdExecutor
     }
 
     Path getRemoteBinDir() { return remoteBinDir }

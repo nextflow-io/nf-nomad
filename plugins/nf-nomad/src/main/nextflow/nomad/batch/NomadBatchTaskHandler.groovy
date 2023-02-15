@@ -38,9 +38,9 @@ import java.nio.file.Path
 
 @Slf4j
 @CompileStatic
-class NomadTaskHandler extends TaskHandler {
+class NomadBatchTaskHandler extends TaskHandler {
 
-    NomadExecutor executor
+    NomadBatchExecutor executor
 
     private TaskBean taskBean
 
@@ -50,11 +50,13 @@ class NomadTaskHandler extends TaskHandler {
 
     private Path errorFile
 
+    private volatile NomadTaskKey taskKey
+
     private volatile long timestamp
 
     private volatile TaskState taskState
 
-    NomadTaskHandler(TaskRun task, NomadExecutor executor) {
+    NomadBatchTaskHandler(TaskRun task, NomadBatchExecutor executor) {
         super(task)
         this.executor = executor
         this.taskBean = new TaskBean(task)
@@ -65,10 +67,10 @@ class NomadTaskHandler extends TaskHandler {
     }
 
     /** only for testing purpose - DO NOT USE */
-    protected NomadTaskHandler() {}
+    protected NomadBatchTaskHandler() {}
 
-    NomadExecutor getBatchService() {
-        return executor.nomadExecutor
+    NomadBatchService getBatchService() {
+        return executor.batchService
     }
 
     void validateConfiguration() {
@@ -76,6 +78,8 @@ class NomadTaskHandler extends TaskHandler {
             throw new ProcessUnrecoverableException("No container image specified for process $task.name -- Either specify the container to use in the process definition or with 'process.container' value in your config")
         }
     }
+
+    protected BashWrapperBuilder createBashWrapper() {}
 
     @Override
     void submit() {
@@ -89,11 +93,31 @@ class NomadTaskHandler extends TaskHandler {
     boolean checkIfCompleted() {
     }
 
+    private Boolean shouldDelete() {
+        executor.config.batch().deleteJobsOnCompletion
+    }
+
+    protected void deleteTask(NomadTaskKey taskKey, TaskRun task) {
+        if( !taskKey || shouldDelete()==Boolean.FALSE )
+            return
+
+        if( !task.isSuccess() && shouldDelete()==null ) {
+            // do not delete successfully executed pods for debugging purpose
+            return
+        }
+
+        try {
+            batchService.deleteTask(taskKey)
+        }
+        catch( Exception e ) {
+            log.warn "Unable to cleanup batch task: $taskKey -- see the log file for details", e
+        }
+    }
+
     /**
      * @return Retrieve the task status caching the result for at lest one second
      */
-    protected TaskState taskState0(key) {
-    }
+    protected TaskState taskState0( NomadTaskKey key) {}
 
     protected int readExitFile() {
         try {
@@ -107,10 +131,19 @@ class NomadTaskHandler extends TaskHandler {
 
     @Override
     void kill() {
+        if( !taskKey )
+            return
+        batchService.terminate(taskKey)
     }
 
     @Override
     TraceRecord getTraceRecord() {
+        def result = super.getTraceRecord()
+        if( taskKey ) {
+            result.put('native_id', taskKey.keyPair())
+            result.machineInfo = getMachineInfo()
+        }
+        return result
     }
 
 
