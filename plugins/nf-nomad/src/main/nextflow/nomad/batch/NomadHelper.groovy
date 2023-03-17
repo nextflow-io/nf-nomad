@@ -14,29 +14,13 @@
  * limitations under the License.
  */
 
-package nextflow.nomad.executor
-
-import groovy.transform.CompileStatic
-import io.nomadproject.client.Configuration
-import nextflow.nomad.config.NomadClientOpts
+package nextflow.nomad.batch
 
 /**
- * Nomad API client
+ * Nomad API Helper methods
  *
  * @author Abhinav Sharma <abhi18av@outlook.com>
  */
 
-@CompileStatic
-class NomadClient {
-    NomadClient() {
-        Configuration.getDefaultApiClient()
-                .setBasePath(NomadClientOpts.DEFAULT_BASE_PATH)
-                .getAuthentication(NomadClientOpts.DEFAULT_AUTH_NAME)
-    }
-
-    NomadClient(NomadClientOpts clientOpts) {
-        Configuration.getDefaultApiClient()
-                .setBasePath(clientOpts.basePath)
-                .getAuthentication(clientOpts.authName)
-    }
+class NomadHelper {
 }
