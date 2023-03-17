@@ -1,6 +1,16 @@
 # nf-nomad plugin
 
-This plugin implements a Nextflow executor for [Hashicorp Nomad](https://www.nomadproject.io)
+This plugin implements a Nextflow executor for [Hashicorp Nomad](https://www.nomadproject.io).
+
+
+# Maintainers
+
+Please note that this is a **community contributed** plugin and is a collaboration between 
+
+1. Abhinav Sharma (@abhi18av) as part of his PhD work at the Stellenbosch University
+2. Matthias de Smet (@matthdsm) and Tomas (@tomiles) from Center For Medical Genetics Ghent 
+
+Feel free to reach out to us on the `#platform-nomad` channel on Slack for discussions and feedbacks.
 
 ## Plugin Assets
 
