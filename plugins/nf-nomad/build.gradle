@@ -34,6 +34,7 @@ repositories {
     maven { url = 'https://jitpack.io' }
     maven { url = 'https://s3-eu-west-1.amazonaws.com/maven.seqera.io/releases' }
     maven { url = 'https://s3-eu-west-1.amazonaws.com/maven.seqera.io/snapshots' }
+    maven { url "https://repo.clojars.org" }
 }
 
 configurations {
@@ -57,14 +58,8 @@ dependencies {
     compileOnly 'org.pf4j:pf4j:3.4.1'
 
     // add here plugins depepencies
-
-    // source the locally built nomad-openapi based client
-    implementation "io.nomadproject:nomad-openapi-java-client:1.1.4"
-
-    //TODO: Build a shadowjar and source it locally
-    //    implementation fileTree(dir: '_resources/nomad-openapi/clients/java/v1/targets/libs', include: '*.jar')
-    //    implementation files('_resources/nomad-openapi/clients/java/v1/target/nomad-openapi-java-client-1.1.4.jar', '_resources/nomad-openapi/clients/java/v1/target/nomad-openapi-java-client-1.1.4-sources.jar')
-    //    dependencies { implementation name: 'io.nomadproject:nomad-openapi-java-client:1.1.4' }
+    // source the custom published version
+    implementation "org.clojars.abhi18av:nomad-client-java:1.1.4"
 
 
     // test configuration
