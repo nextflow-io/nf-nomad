@@ -15,29 +15,26 @@
  * limitations under the License.
  */
 
-package nextflow.nomad
+package nextflow.nomad.config
 
-import groovy.transform.CompileStatic
-import io.nomadproject.client.Configuration
-import nextflow.nomad.config.NomadClientOpts
 
+import spock.lang.Specification
 /**
- * Nomad API client
  *
  * @author Abhinav Sharma <abhi18av@outlook.com>
  */
+class NomadConfigTest extends Specification {
 
-@CompileStatic
-class NomadClient {
-    NomadClient() {
-        Configuration.getDefaultApiClient()
-                .setBasePath(NomadClientOpts.DEFAULT_BASE_PATH)
-                .getAuthentication(NomadClientOpts.DEFAULT_AUTH_NAME)
+    def 'should create config object'() {
+
+        given:
+        def cfg = new NomadConfig()
+        then:
+        cfg.getConfig()
+
+//        when:
+//        def cfg = new NomadConfig()
+//        then:
     }
 
-    NomadClient(NomadClientOpts clientOpts) {
-        Configuration.getDefaultApiClient()
-                .setBasePath(clientOpts.basePath)
-                .getAuthentication(clientOpts.authName)
-    }
 }

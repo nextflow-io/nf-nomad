@@ -15,34 +15,25 @@
  * limitations under the License.
  */
 
-package nextflow.nomad.config
+package nextflow.nomad.executor
 
+import groovy.transform.Canonical
 import groovy.transform.CompileStatic
 
 /**
- * Model Nomad job settings defined in the nextflow.config file
+ * Model a fully qualified taskId ie. JobId + TaskId
  *
  * @author Abhinav Sharma <abhi18av@outlook.com>
  */
+
+@Canonical
 @CompileStatic
-class NomadClientOpts {
+class NomadTaskKey {
+    String jobId
+    String taskId
 
-    static public final String DEFAULT_BASE_PATH = "http://127.0.0.1:4646/v1"
-    //TODO Fail the config check if an ACL token isn't provided
-    static public final String DEFAULT_API_KEY = "NONE"
-
-    String basePath
-    String apiKey
-
-    NomadClientOpts() {
-        this.basePath = DEFAULT_BASE_PATH
-        this.apiKey = DEFAULT_API_KEY
-    }
-
-    NomadClientOpts(Map config) {
-        assert config != null
-        this.basePath = config.basePath ?: DEFAULT_BASE_PATH
-        this.apiKey = config.apiKey ?: DEFAULT_API_KEY
+    String keyPair() {
+        "$jobId/$taskId"
     }
 
 }

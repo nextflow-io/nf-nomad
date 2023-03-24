@@ -31,7 +31,6 @@ import spock.lang.Specification
  */
 class NomadClientTest extends Specification {
 
-    def DEV_NOMAD_TOKEN_ACCESSOR = System.getenv("DEV_NOMAD_TOKEN_ACCESSOR")
     def DEV_NOMAD_TOKEN_SECRET = System.getenv("DEV_NOMAD_TOKEN_SECRET")
     def DEV_NOMAD_BASE_PATH = System.getenv("DEV_NOMAD_BASE_PATH")
 
@@ -43,23 +42,23 @@ class NomadClientTest extends Specification {
                 .setBasePath(DEV_NOMAD_BASE_PATH)
 
 
-        def region = "";
-        def namespace = "";
-        def index = 56;
-        def wait = "";
-        def stale = "";
-        def prefix = "";
-        def tokenAccessor = DEV_NOMAD_TOKEN_ACCESSOR
+        def region = ""
+        def namespace = ""
+        def index = 56
+        def wait = ""
+        def stale = ""
+        def prefix = ""
+        def tokenAccessor = ""
         def xNomadToken = DEV_NOMAD_TOKEN_SECRET
-        def perPage = 56;
-        def nextToken = "";
+        def perPage = 56
+        def nextToken = ""
         def idempotencyToken = ""
         def result
 
         and:
         def taskDef = new Task()
-                .driver("exec")
-                .config(["command": "/bin/echo", "args": ["hello-nomad"]])
+                .driver("raw_exec")
+                .config(["command": "/usr/local/opt/coreutils/libexec/gnubin/echo", "args": ["hello-nomad"]])
                 .name("task-name")
 
         def taskGroup = new TaskGroup()
@@ -85,10 +84,10 @@ class NomadClientTest extends Specification {
                 .secretID(xNomadToken)
 
 
-        def apiInstance = new JobsApi(defaultClient);
+        def apiInstance = new JobsApi(defaultClient)
         result = apiInstance.postJob("hello-nomad", jobRegisterRequest, region, namespace, xNomadToken, idempotencyToken)
 
-        println(result);
+        println(result)
 
     }
 
