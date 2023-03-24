@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package nextflow.nomad.batch
+package nextflow.nomad
 
 import groovy.transform.CompileStatic
 import groovy.transform.PackageScope
@@ -83,7 +83,7 @@ class NomadExecutor extends Executor implements ExtensionPoint {
     protected void validatePathDir() {
         def path = session.config.navigate('env.PATH')
         if (path) {
-            log.warn "Environment PATH defined in config file is ignored by Azure Batch executor"
+            log.warn "Environment PATH defined in config file is ignored by Nomad executor"
         }
     }
 

@@ -15,29 +15,25 @@
  * limitations under the License.
  */
 
-package nextflow.nomad.batch
+package nextflow.nomad
 
+import groovy.transform.Canonical
 import groovy.transform.CompileStatic
-import io.nomadproject.client.Configuration
-import nextflow.nomad.config.NomadClientOpts
 
 /**
- * Nomad API client
+ * Model a fully qualified taskId ie. JobId + TaskId
  *
  * @author Abhinav Sharma <abhi18av@outlook.com>
  */
 
+@Canonical
 @CompileStatic
-class NomadClient {
-    NomadClient() {
-        Configuration.getDefaultApiClient()
-                .setBasePath(NomadClientOpts.DEFAULT_BASE_PATH)
-                .getAuthentication(NomadClientOpts.DEFAULT_AUTH_NAME)
+class NomadTaskKey {
+    String jobId
+    String taskId
+
+    String keyPair() {
+        "$jobId/$taskId"
     }
 
-    NomadClient(NomadClientOpts clientOpts) {
-        Configuration.getDefaultApiClient()
-                .setBasePath(clientOpts.basePath)
-                .getAuthentication(clientOpts.authName)
-    }
 }

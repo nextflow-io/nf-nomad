@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package nextflow.nomad.batch
+package nextflow.nomad
 
 /**
  * Nomad API Helper methods
