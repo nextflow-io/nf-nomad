@@ -1,4 +1,5 @@
 /*
+ * Copyright 2023, University of Stellenbosch, South Africa
  * Copyright 2022, Center for Medical Genetics, Ghent
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -24,7 +25,6 @@ import nextflow.executor.BashWrapperBuilder
 import nextflow.processor.TaskBean
 import nextflow.processor.TaskHandler
 import nextflow.processor.TaskRun
-import nextflow.processor.TaskStatus
 import nextflow.trace.TraceRecord
 
 import java.nio.file.Path
@@ -38,9 +38,9 @@ import java.nio.file.Path
 
 @Slf4j
 @CompileStatic
-class NomadBatchTaskHandler extends TaskHandler {
+class NomadTaskHandler extends TaskHandler {
 
-    NomadBatchExecutor executor
+    NomadExecutor executor
 
     private TaskBean taskBean
 
@@ -56,7 +56,7 @@ class NomadBatchTaskHandler extends TaskHandler {
 
     private volatile TaskState taskState
 
-    NomadBatchTaskHandler(TaskRun task, NomadBatchExecutor executor) {
+    NomadTaskHandler(TaskRun task, NomadExecutor executor) {
         super(task)
         this.executor = executor
         this.taskBean = new TaskBean(task)
@@ -67,9 +67,9 @@ class NomadBatchTaskHandler extends TaskHandler {
     }
 
     /** only for testing purpose - DO NOT USE */
-    protected NomadBatchTaskHandler() {}
+    protected NomadTaskHandler() {}
 
-    NomadBatchService getBatchService() {
+    NomadService getBatchService() {
         return executor.batchService
     }
 

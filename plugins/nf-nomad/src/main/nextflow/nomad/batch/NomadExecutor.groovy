@@ -1,4 +1,5 @@
 /*
+ * Copyright 2023, University of Stellenbosch, South Africa
  * Copyright 2022, Center for Medical Genetics, Ghent
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -44,7 +45,7 @@ import org.pf4j.ExtensionPoint
 @Slf4j
 @ServiceName('nomad')
 @CompileStatic
-class NomadBatchExecutor extends Executor implements ExtensionPoint {
+class NomadExecutor extends Executor implements ExtensionPoint {
 
     private Path remoteBinDir
 
@@ -99,7 +100,7 @@ class NomadBatchExecutor extends Executor implements ExtensionPoint {
 
     protected void initBatchService() {
         config = NomadConfig.getConfig(session)
-        batchService = new NomadBatchService(this)
+        batchService = new NomadService(this)
 
         nomadBatchExecutor = new ApiClient(this)
 
@@ -129,14 +130,14 @@ class NomadBatchExecutor extends Executor implements ExtensionPoint {
 
     @Override
     TaskHandler createTaskHandler(TaskRun task) {
-        return new NomadBatchTaskHandler(task, this)
+        return new NomadTaskHandler(task, this)
     }
 
-    NomadBatchService getBatchService() {
+    NomadService getBatchService() {
         return batchService
     }
 
-    NomadBatchExecutor getNomadBatchExecutor() {
+    NomadExecutor getNomadBatchExecutor() {
         return nomadBatchExecutor
     }
 

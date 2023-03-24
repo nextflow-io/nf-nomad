@@ -1,5 +1,6 @@
 /*
- * Copyright 2023 FIXME
+ * Copyright 2023, University of Stellenbosch, South Africa
+ * Copyright 2022, Center for Medical Genetics, Ghent
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,14 +19,8 @@ package nextflow.nomad.batch
 
 import groovy.transform.CompileStatic
 import groovy.util.logging.Slf4j
-import nextflow.Global
 import nextflow.nomad.config.NomadConfig
-import nextflow.processor.TaskProcessor
 import nextflow.processor.TaskRun
-import nextflow.util.CacheHelper
-import nextflow.util.MemoryUnit
-import nextflow.util.MustacheTemplateEngine
-import nextflow.util.Rnd
 
 /**
  * Implements Nomad Batch operations for Nextflow executor
@@ -35,11 +30,11 @@ import nextflow.util.Rnd
 
 @Slf4j
 @CompileStatic
-class NomadBatchService implements Closeable {
+class NomadService implements Closeable {
 
     NomadConfig config
 
-    NomadBatchService(NomadBatchExecutor executor) {
+    NomadService(NomadExecutor executor) {
         assert executor
         this.config = executor.config
     }
