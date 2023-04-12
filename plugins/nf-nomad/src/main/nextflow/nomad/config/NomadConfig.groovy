@@ -30,17 +30,25 @@ import nextflow.Session
 @CompileStatic
 class NomadConfig {
 
-    private NomadJobOpts jobOpts
+    // private NomadJobOpts jobOpts
     private NomadClientOpts clientOpts
 
+    // NomadJobOpts job() { jobOpts }
+
+    NomadClientOpts client() { clientOpts }
+
+
     NomadConfig(Map nomad) {
-        this.jobOpts = new NomadJobOpts((Map) nomad.job ?: Collections.emptyMap())
+        // this.jobOpts = new NomadJobOpts((Map) nomad.job ?: Collections.emptyMap())
         this.clientOpts = new NomadClientOpts((Map) nomad.client ?: Collections.emptyMap())
     }
 
-    NomadJobOpts job() { jobOpts }
 
-    NomadClientOpts client() { clientOpts }
+    NomadConfig() {
+//        this.jobOpts = new NomadJobOpts()
+        this.clientOpts = new NomadClientOpts()
+    }
+
 
     static NomadConfig getConfig(Session session) {
         if (!session)

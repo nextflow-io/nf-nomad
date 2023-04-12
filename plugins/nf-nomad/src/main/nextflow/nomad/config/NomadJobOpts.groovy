@@ -25,7 +25,18 @@ package nextflow.nomad.config
 
 class NomadJobOpts {
 
-    NomadJobOpts(Map config) {
+  //NOTE: Do not expose this to users, as this is the only job type supported
+    static public final String DEFAULT_JOB_TYPE = "batch"
+
+  //TODO: We should support CSI-volumes 
+
+
+//Only nice to have
+// group 
+
+    NomadJobOpts() {
+      volumes
+
     }
 
 }

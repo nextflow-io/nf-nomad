@@ -17,7 +17,7 @@
 
 package nextflow.nomad.config
 
-
+import nextflow.Session
 import spock.lang.Specification
 /**
  *
@@ -29,7 +29,8 @@ class NomadConfigTest extends Specification {
 
         given:
         def cfg = new NomadConfig()
-        then:
+        and:
+        def session = Mock(Session)
         cfg.getConfig()
 
 //        when:

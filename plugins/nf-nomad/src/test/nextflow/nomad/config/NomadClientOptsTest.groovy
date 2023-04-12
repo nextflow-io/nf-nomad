@@ -15,27 +15,26 @@
  * limitations under the License.
  */
 
-package nextflow.nomad.executor
+package nextflow.nomad.config
 
-import groovy.transform.CompileStatic
-import io.nomadproject.client.Configuration
-import nextflow.nomad.config.NomadClientOpts
+import spock.lang.Specification
 
 /**
- * Nomad API client
  *
  * @author Abhinav Sharma <abhi18av@outlook.com>
  */
+class NomadClientOptsTest extends Specification {
 
-@CompileStatic
-class NomadClient {
-    NomadClient() {
-        Configuration.getDefaultApiClient()
-                .setBasePath(NomadClientOpts.DEFAULT_SERVER_BASE_PATH)
+    def 'should get server path'() {
+
+        expect:
+        new NomadClientOpts(serverBasePath: PATH, apiToken: TOKEN).serverBasePath == EXPECTED
+
+        where:
+        PATH               | TOKEN | EXPECTED
+        null               | null  | NomadClientOpts.DEFAULT_SERVER_BASE_PATH
+        "http://nomad.api" | null  | "http://nomad.api"
+
     }
 
-    NomadClient(NomadClientOpts clientOpts) {
-        Configuration.getDefaultApiClient()
-                .setBasePath(clientOpts.serverBasePath)
-    }
 }
