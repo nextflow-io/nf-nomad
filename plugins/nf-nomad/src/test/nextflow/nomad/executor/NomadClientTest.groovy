@@ -31,15 +31,17 @@ import spock.lang.Specification
  */
 class NomadClientTest extends Specification {
 
-    def DEV_NOMAD_TOKEN_SECRET = System.getenv("DEV_NOMAD_TOKEN_SECRET")
-    def DEV_NOMAD_BASE_PATH = System.getenv("DEV_NOMAD_BASE_PATH")
+    def NOMAD_TOKEN = System.getenv("NOMAD_TOKEN")
+    def NOMAD_ADDR = System.getenv("NOMAD_ADDR")
 
     def 'should create a client and submit a job'() {
+
+//FIXME Read the relevant fields from the client config
 
         given:
         def defaultClient = Configuration
                 .getDefaultApiClient()
-                .setBasePath(DEV_NOMAD_BASE_PATH)
+                .setBasePath(NOMAD_ADDR)
 
 
         def region = ""
@@ -49,7 +51,7 @@ class NomadClientTest extends Specification {
         def stale = ""
         def prefix = ""
         def tokenAccessor = ""
-        def xNomadToken = DEV_NOMAD_TOKEN_SECRET
+        def xNomadToken = NOMAD_TOKEN
         def perPage = 56
         def nextToken = ""
         def idempotencyToken = ""
@@ -58,7 +60,7 @@ class NomadClientTest extends Specification {
         and:
         def taskDef = new Task()
                 .driver("raw_exec")
-                .config(["command": "/usr/local/opt/coreutils/libexec/gnubin/echo", "args": ["hello-nomad"]])
+                .config(["command": "/bin/echo", "args": ["hello-nomad"]])
                 .name("task-name")
 
         def taskGroup = new TaskGroup()

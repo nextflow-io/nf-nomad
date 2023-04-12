@@ -25,17 +25,21 @@ import spock.lang.Specification
  */
 class NomadConfigTest extends Specification {
 
-    def 'should create config object'() {
+    def 'should get nomad client object'() {
 
         given:
-        def cfg = new NomadConfig()
+        def SERVER_URL = "http://nomad.api"
         and:
-        def session = Mock(Session)
-        cfg.getConfig()
+        def session = Mock(Session) {
+            getConfig() >> [nomad:
+                                    [client:
+                                             [serverBasePath : SERVER_URL]]]
+        }
 
-//        when:
-//        def cfg = new NomadConfig()
-//        then:
+        when:
+        def cfg = NomadConfig.getConfig(session)
+        then:
+        cfg.client().serverBasePath == SERVER_URL
     }
 
 }

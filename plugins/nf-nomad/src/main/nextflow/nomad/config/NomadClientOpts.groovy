@@ -28,28 +28,39 @@ import groovy.transform.CompileStatic
 class NomadClientOpts {
 
     static public final String DEFAULT_SERVER_BASE_PATH = "http://127.0.0.1:4646/v1"
-    //TODO Fail the config check if an ACL token isn't provided
-    static public final String DEFAULT_API_TOKEN = "NONE"
-
-// namespace
-// datacenter
-// region
-
     String serverBasePath
+
+    static public final String DEFAULT_NAMESPACE = "default"
+    String namespace
+
+    static public final String DEFAULT_DATACENTER = "dc1"
+    String datacenter
+  
+    static public final String DEFAULT_REGION = "global"
+    String region
+
+    //FIXME Fail the config check if an ACL token isn't provided
+    static public final String DEFAULT_API_TOKEN = "NONE"
     String apiToken
 
+
     // TODO (fix milestone): Implement the TLS certificate
-    // TODO: Get the github actions setup with single-dev-node setup
 
     NomadClientOpts() {
-        this.serverBasePath = DEFAULT_SERVER_BASE_PATH
-        this.apiToken = DEFAULT_API_TOKEN
+        this.serverBasePath = DEFAULT_SERVER_BASE_PATH 
+        this.namespace = DEFAULT_NAMESPACE 
+        this.datacenter = DEFAULT_DATACENTER 
+        this.region = DEFAULT_REGION 
+        this.apiToken = DEFAULT_API_TOKEN 
     }
 
     NomadClientOpts(Map config) {
         assert config != null
-        this.serverBasePath = config.serverBasePath ?: DEFAULT_SERVER_BASE_PATH
-        this.apiToken = config.apiToken ?: DEFAULT_API_TOKEN
+        this.serverBasePath = config.serverBasePath ?: DEFAULT_SERVER_BASE_PATH 
+        this.namespace = config.namespace ?: DEFAULT_NAMESPACE 
+        this.datacenter = config.datacenter ?: DEFAULT_DATACENTER 
+        this.region = config.region ?: DEFAULT_REGION 
+        this.apiToken = config.apiToken ?: DEFAULT_API_TOKEN 
     }
 
 }
