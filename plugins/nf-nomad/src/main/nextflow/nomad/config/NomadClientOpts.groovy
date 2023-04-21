@@ -34,7 +34,7 @@ class NomadClientOpts {
     String namespace
 
     static public final String DEFAULT_DATACENTER = "dc1"
-    String datacenter
+    String dataCenter
   
     static public final String DEFAULT_REGION = "global"
     String region
@@ -43,24 +43,39 @@ class NomadClientOpts {
     static public final String DEFAULT_API_TOKEN = "NONE"
     String apiToken
 
+    //-------------------------------------------------------------------
+    //NOTE: Hard-coded driver, refactor later to adapt different drivers
+    //-------------------------------------------------------------------
+    static public final String DEFAULT_DRIVER = "docker"
+    String driver
+
+    static public final String DEFAULT_JOB_TYPE = "batch"
+    String jobType
+
+    //-------------------------------------------------------------------
+
 
     // TODO (fix milestone): Implement the TLS certificate
 
     NomadClientOpts() {
         this.serverBasePath = DEFAULT_SERVER_BASE_PATH 
         this.namespace = DEFAULT_NAMESPACE 
-        this.datacenter = DEFAULT_DATACENTER 
+        this.dataCenter = DEFAULT_DATACENTER 
         this.region = DEFAULT_REGION 
         this.apiToken = DEFAULT_API_TOKEN 
+        this.driver = DEFAULT_DRIVER
+        this.jobType = DEFAULT_JOB_TYPE
     }
 
     NomadClientOpts(Map config) {
         assert config != null
         this.serverBasePath = config.serverBasePath ?: DEFAULT_SERVER_BASE_PATH 
         this.namespace = config.namespace ?: DEFAULT_NAMESPACE 
-        this.datacenter = config.datacenter ?: DEFAULT_DATACENTER 
+        this.dataCenter = config.dataCenter ?: DEFAULT_DATACENTER
         this.region = config.region ?: DEFAULT_REGION 
         this.apiToken = config.apiToken ?: DEFAULT_API_TOKEN 
+        this.driver = DEFAULT_DRIVER
+        this.jobType = DEFAULT_JOB_TYPE
     }
 
 }
