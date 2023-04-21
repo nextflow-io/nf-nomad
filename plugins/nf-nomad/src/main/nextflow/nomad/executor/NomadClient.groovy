@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package nextflow.nomad
+package nextflow.nomad.executor
 
 import groovy.transform.CompileStatic
 import io.nomadproject.client.Configuration
@@ -31,13 +31,11 @@ import nextflow.nomad.config.NomadClientOpts
 class NomadClient {
     NomadClient() {
         Configuration.getDefaultApiClient()
-                .setBasePath(NomadClientOpts.DEFAULT_BASE_PATH)
-                .getAuthentication(NomadClientOpts.DEFAULT_AUTH_NAME)
+                .setBasePath(NomadClientOpts.DEFAULT_SERVER_BASE_PATH)
     }
 
     NomadClient(NomadClientOpts clientOpts) {
         Configuration.getDefaultApiClient()
-                .setBasePath(clientOpts.basePath)
-                .getAuthentication(clientOpts.authName)
+                .setBasePath(clientOpts.serverBasePath)
     }
 }

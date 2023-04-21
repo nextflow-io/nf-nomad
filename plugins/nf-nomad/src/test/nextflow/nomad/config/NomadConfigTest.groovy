@@ -15,25 +15,31 @@
  * limitations under the License.
  */
 
-package nextflow.nomad
+package nextflow.nomad.config
 
-import groovy.transform.Canonical
-import groovy.transform.CompileStatic
-
+import nextflow.Session
+import spock.lang.Specification
 /**
- * Model a fully qualified taskId ie. JobId + TaskId
  *
  * @author Abhinav Sharma <abhi18av@outlook.com>
  */
+class NomadConfigTest extends Specification {
 
-@Canonical
-@CompileStatic
-class NomadTaskKey {
-    String jobId
-    String taskId
+    def 'should get nomad client object'() {
 
-    String keyPair() {
-        "$jobId/$taskId"
+        given:
+        def SERVER_URL = "http://nomad.api"
+        and:
+        def session = Mock(Session) {
+            getConfig() >> [nomad:
+                                    [client:
+                                             [serverBasePath : SERVER_URL]]]
+        }
+
+        when:
+        def cfg = NomadConfig.getConfig(session)
+        then:
+        cfg.client().serverBasePath == SERVER_URL
     }
 
 }

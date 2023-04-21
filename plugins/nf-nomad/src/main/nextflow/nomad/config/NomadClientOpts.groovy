@@ -27,33 +27,55 @@ import groovy.transform.CompileStatic
 @CompileStatic
 class NomadClientOpts {
 
-    static public final String DEFAULT_BASE_PATH = "http://127.0.0.1:4646/v1"
-    static public final String DEFAULT_API_KEY = "NONE"
-    static public final String DEFAULT_NAMESPACE = "NONE"
-    static public final String DEFAULT_REGION = "NONE"
-    static public final String DEFAULT_AUTH_NAME = "X-Nomad-Token"
+    static public final String DEFAULT_SERVER_BASE_PATH = "http://127.0.0.1:4646/v1"
+    String serverBasePath
 
-    String basePath
-    String apiKey
+    static public final String DEFAULT_NAMESPACE = "default"
     String namespace
+
+    static public final String DEFAULT_DATACENTER = "dc1"
+    String dataCenter
+  
+    static public final String DEFAULT_REGION = "global"
     String region
-    String authName
+
+    //FIXME Fail the config check if an ACL token isn't provided
+    static public final String DEFAULT_API_TOKEN = "NONE"
+    String apiToken
+
+    //-------------------------------------------------------------------
+    //NOTE: Hard-coded driver, refactor later to adapt different drivers
+    //-------------------------------------------------------------------
+    static public final String DEFAULT_DRIVER = "docker"
+    String driver
+
+    static public final String DEFAULT_JOB_TYPE = "batch"
+    String jobType
+
+    //-------------------------------------------------------------------
+
+
+    // TODO (fix milestone): Implement the TLS certificate
 
     NomadClientOpts() {
-        this.basePath = DEFAULT_BASE_PATH
-        this.apiKey = DEFAULT_API_KEY
-        this.namespace = DEFAULT_NAMESPACE
-        this.region = DEFAULT_REGION
-        this.authName = DEFAULT_AUTH_NAME
+        this.serverBasePath = DEFAULT_SERVER_BASE_PATH 
+        this.namespace = DEFAULT_NAMESPACE 
+        this.dataCenter = DEFAULT_DATACENTER 
+        this.region = DEFAULT_REGION 
+        this.apiToken = DEFAULT_API_TOKEN 
+        this.driver = DEFAULT_DRIVER
+        this.jobType = DEFAULT_JOB_TYPE
     }
 
     NomadClientOpts(Map config) {
         assert config != null
-        this.basePath = config.basePath ?: DEFAULT_BASE_PATH
-        this.apiKey = config.apiKey ?: DEFAULT_API_KEY
-        this.namespace = config.namespace ?: DEFAULT_NAMESPACE
-        this.region = config.region ?: DEFAULT_REGION
-        this.authName = config.authName ?: DEFAULT_AUTH_NAME
+        this.serverBasePath = config.serverBasePath ?: DEFAULT_SERVER_BASE_PATH 
+        this.namespace = config.namespace ?: DEFAULT_NAMESPACE 
+        this.dataCenter = config.dataCenter ?: DEFAULT_DATACENTER
+        this.region = config.region ?: DEFAULT_REGION 
+        this.apiToken = config.apiToken ?: DEFAULT_API_TOKEN 
+        this.driver = DEFAULT_DRIVER
+        this.jobType = DEFAULT_JOB_TYPE
     }
 
 }

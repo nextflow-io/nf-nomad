@@ -17,25 +17,23 @@
 
 package nextflow.nomad.config
 
+import spock.lang.Specification
+
 /**
- * Model Nomad job settings defined in the nextflow.config file
  *
  * @author Abhinav Sharma <abhi18av@outlook.com>
  */
+class NomadClientOptsTest extends Specification {
 
-class NomadJobOpts {
+    def 'should get server path'() {
 
-  //NOTE: Do not expose this to users, as this is the only job type supported
-    static public final String DEFAULT_JOB_TYPE = "batch"
+        expect:
+        new NomadClientOpts(serverBasePath: PATH, apiToken: TOKEN).serverBasePath == EXPECTED
 
-  //TODO: We should support CSI-volumes 
-
-
-//Only nice to have
-// group 
-
-    NomadJobOpts() {
-      volumes
+        where:
+        PATH               | TOKEN | EXPECTED
+        null               | null  | NomadClientOpts.DEFAULT_SERVER_BASE_PATH
+        "http://nomad.api" | null  | "http://nomad.api"
 
     }
 

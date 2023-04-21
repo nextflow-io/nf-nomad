@@ -15,44 +15,25 @@
  * limitations under the License.
  */
 
-package nextflow.nomad.config
+package nextflow.nomad.executor
 
+import groovy.transform.Canonical
 import groovy.transform.CompileStatic
-import nextflow.Global
-import nextflow.Session
 
 /**
- * Model Nomad job settings defined in the nextflow.config file
+ * Model a fully qualified taskId ie. JobId + TaskId
  *
  * @author Abhinav Sharma <abhi18av@outlook.com>
  */
 
+@Canonical
 @CompileStatic
-class NomadConfig {
+class NomadTaskKey {
+    String jobId
+    String taskId
 
-    private NomadClientOpts clientOpts
-
-    NomadClientOpts client() { clientOpts }
-
-
-    NomadConfig(Map nomad) {
-        this.clientOpts = new NomadClientOpts((Map) nomad.client ?: Collections.emptyMap())
+    String keyPair() {
+        "$jobId/$taskId"
     }
 
-
-    NomadConfig() {
-        this.clientOpts = new NomadClientOpts()
-    }
-
-
-    static NomadConfig getConfig(Session session) {
-        if (!session)
-            throw new IllegalStateException("Missing Nextflow session")
-
-        new NomadConfig((Map) session.config.nomad ?: Collections.emptyMap())
-    }
-
-    static NomadConfig getConfig() {
-        getConfig(Global.session as Session)
-    }
 }
