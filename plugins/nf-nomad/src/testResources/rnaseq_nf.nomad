@@ -32,12 +32,24 @@ job "nomad-rnaseq-nf" {
 
   group "workflow-rnaseq-nf" {
 
+    volume "scratch" {
+      type            = "csi"
+      source          = "nextflow_scratch"
+      attachment_mode = "file-system"
+      access_mode     = "single-node-writer"
+    }
+
     task "process-fastqc" {
       driver = "docker"
 
       # labels {
       #   tag = "$transcriptome.simpleName"
       # }
+
+      volume_mount {
+        volume      = "scratch"
+        destination = "/scratch"
+      }
 
       meta {
         sample_id = "TEST"
