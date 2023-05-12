@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package nextflow.nomad.executor
+package nextflow.nomad
 
 import io.nomadproject.client.Configuration
 import io.nomadproject.client.api.JobsApi
@@ -24,7 +24,6 @@ import io.nomadproject.client.models.JobRegisterRequest
 import io.nomadproject.client.models.Task
 import io.nomadproject.client.models.TaskGroup
 import nextflow.Session
-import nextflow.nomad.config.NomadClientOpts
 import nextflow.nomad.config.NomadConfig
 import spock.lang.Specification
 
@@ -32,41 +31,32 @@ import spock.lang.Specification
  *
  * @author Abhinav Sharma <abhi18av@outlook.com>
  */
-class NomadClientTest extends Specification {
-
-    def NOMAD_TOKEN = System.getenv("NOMAD_TOKEN")
-    def NOMAD_ADDR = System.getenv("NOMAD_ADDR")
-    def NOMAD_DATACENTER = System.getenv("NOMAD_DATACENTER")
+class scratch extends Specification {
 
     def 'should create a client and submit a job'() {
 
         given:
         def RANDOM_ID = Math.abs(new Random().nextInt() % 999) + 1
-        def TASK_NAME = "task-name-$RANDOM_ID"
-        def TASK_GROUP_NAME = "task-group-$RANDOM_ID"
-        def JOB_NAME = "job-$RANDOM_ID"
+        def NF_TASKJOB_NAME =  "nf-$RANDOM_ID"
 
         def session = Mock(Session) {
-            getConfig() >> [nomad:
-                                    [client:
-                                             [dataCenter : NOMAD_DATACENTER]]]
+            getConfig() >> [:]
         }
 
         when:
         def clientConfig = NomadConfig.getConfig(session).client()
 
+
         def defaultClient = Configuration
                 .getDefaultApiClient()
-                .setBasePath(NOMAD_ADDR)
-
-
+                .setBasePath(clientConfig.address)
 
         def region = clientConfig.region
         def namespace = clientConfig.namespace
         def dataCenter = clientConfig.dataCenter
         def driver = clientConfig.driver
         def jobType = clientConfig.jobType
-        def xNomadToken = NOMAD_TOKEN
+        def xNomadToken = clientConfig.token
         def index = 56
         def wait = ""
         def stale = ""
@@ -84,18 +74,18 @@ class NomadClientTest extends Specification {
                 .config([ "image": "quay.io/nextflow/rnaseq-nf:v1.1",
                           "command": "echo", 
                           "args": ["hello-nomad"]])
-                .name(TASK_NAME)
+                .name(NF_TASKJOB_NAME)
 
         def taskGroup = new TaskGroup()
                 .addTasksItem(taskDef)
-                .name(TASK_GROUP_NAME)
+                .name(NF_TASKJOB_NAME)
 
         def jobDef = new Job()
                 .taskGroups([taskGroup])
                 .type(jobType)
                 .datacenters([dataCenter])
-                .name(JOB_NAME)
-                .ID(JOB_NAME)
+                .name(NF_TASKJOB_NAME)
+                .ID(NF_TASKJOB_NAME)
 
         def jobRegisterRequest = new JobRegisterRequest()
                 .job(jobDef)
@@ -109,7 +99,7 @@ class NomadClientTest extends Specification {
                 .preserveCounts(false)
 
         def apiInstance = new JobsApi(defaultClient)
-        result = apiInstance.postJob(JOB_NAME, jobRegisterRequest, region, namespace, xNomadToken, idempotencyToken)
+        result = apiInstance.postJob(NF_TASKJOB_NAME, jobRegisterRequest, region, namespace, xNomadToken, idempotencyToken)
 
         then:
         println(result)

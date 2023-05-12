@@ -27,21 +27,13 @@ import groovy.transform.CompileStatic
 @CompileStatic
 class NomadClientOpts {
 
-    static public final String DEFAULT_SERVER_BASE_PATH = "http://127.0.0.1:4646/v1"
-    String serverBasePath
+    private Map<String,String> sysEnv
 
-    static public final String DEFAULT_NAMESPACE = "default"
+    String address
     String namespace
-
-    static public final String DEFAULT_DATACENTER = "dc1"
     String dataCenter
-  
-    static public final String DEFAULT_REGION = "global"
     String region
-
-    //FIXME Fail the config check if an ACL token isn't provided
-    static public final String DEFAULT_API_TOKEN = "NONE"
-    String apiToken
+    String token
 
     //-------------------------------------------------------------------
     //NOTE: Hard-coded driver, refactor later to adapt different drivers
@@ -57,23 +49,18 @@ class NomadClientOpts {
 
     // TODO (fix milestone): Implement the TLS certificate
 
-    NomadClientOpts() {
-        this.serverBasePath = DEFAULT_SERVER_BASE_PATH 
-        this.namespace = DEFAULT_NAMESPACE 
-        this.dataCenter = DEFAULT_DATACENTER 
-        this.region = DEFAULT_REGION 
-        this.apiToken = DEFAULT_API_TOKEN 
-        this.driver = DEFAULT_DRIVER
-        this.jobType = DEFAULT_JOB_TYPE
-    }
-
-    NomadClientOpts(Map config) {
+    NomadClientOpts(Map config, Map<String,String> env = null) {
         assert config != null
-        this.serverBasePath = config.serverBasePath ?: DEFAULT_SERVER_BASE_PATH 
-        this.namespace = config.namespace ?: DEFAULT_NAMESPACE 
-        this.dataCenter = config.dataCenter ?: DEFAULT_DATACENTER
-        this.region = config.region ?: DEFAULT_REGION 
-        this.apiToken = config.apiToken ?: DEFAULT_API_TOKEN 
+        sysEnv = env==null ? new HashMap<String,String>(System.getenv()) : env
+
+        def addr = config.address ?: sysEnv.get("NOMAD_ADDR")
+        this.address = "${addr}/v1"
+
+        this.token = config.token ?: sysEnv.get("NOMAD_TOKEN")
+        this.dataCenter = config.dataCenter ?: sysEnv.get("NOMAD_DC")
+        this.namespace = config.namespace ?: sysEnv.get("NOMAD_NAMESPACE")
+        this.region = config.region ?: sysEnv.get("NOMAD_REGION")
+
         this.driver = DEFAULT_DRIVER
         this.jobType = DEFAULT_JOB_TYPE
     }

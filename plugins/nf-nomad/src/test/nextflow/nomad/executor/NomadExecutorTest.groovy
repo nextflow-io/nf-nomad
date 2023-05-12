@@ -17,25 +17,28 @@
 
 package nextflow.nomad.executor
 
-import groovy.transform.CompileStatic
-import io.nomadproject.client.Configuration
-import nextflow.nomad.config.NomadClientOpts
+import com.google.common.hash.HashCode
+import nextflow.Session
+import nextflow.nomad.config.NomadConfig
+import nextflow.nomad.executor.NomadService
+import nextflow.processor.TaskConfig
+import nextflow.processor.TaskProcessor
+import nextflow.processor.TaskRun
+import spock.lang.Specification
 
 /**
- * Nomad API client
  *
  * @author Abhinav Sharma <abhi18av@outlook.com>
  */
+class NomadExecutorTest extends Specification {
 
-@CompileStatic
-class NomadClient {
-    NomadClient() {
-        Configuration.getDefaultApiClient()
-                .setBasePath(NomadClientOpts.DEFAULT_SERVER_BASE_PATH)
-    }
+    def 'should config and init executor'() {
+        given:
+        def session = Mock(Session) {
+            getConfig() >> [:]
+        }
 
-    NomadClient(NomadClientOpts clientOpts) {
-        Configuration.getDefaultApiClient()
-                .setBasePath(clientOpts.serverBasePath)
+        new NomadConfig()
+
     }
 }

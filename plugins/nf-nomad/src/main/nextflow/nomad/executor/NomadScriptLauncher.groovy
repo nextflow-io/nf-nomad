@@ -1,3 +1,9 @@
+package nextflow.nomad.executor
+
+import nextflow.executor.BashWrapperBuilder
+import nextflow.executor.SimpleFileCopyStrategy
+import nextflow.processor.TaskBean
+
 /*
  * Copyright 2023, Stellenbosch University, South Africa
  * Copyright 2022, Center for Medical Genetics, Ghent
@@ -15,31 +21,17 @@
  * limitations under the License.
  */
 
-package nextflow.nomad.config
 
-import nextflow.Session
-import spock.lang.Specification
 /**
+ * Custom bash wrapper builder for Nomad tasks
  *
  * @author Abhinav Sharma <abhi18av@outlook.com>
  */
-class NomadConfigTest extends Specification {
+class NomadScriptLauncher extends BashWrapperBuilder {
 
-    def 'should get nomad client object'() {
-
-        given:
-        def SERVER_URL = "http://nomad.api"
-        and:
-        def session = Mock(Session) {
-            getConfig() >> [nomad:
-                                    [client:
-                                             [address : "http://127.0.0.1:4646"]]]
-        }
-
-        when:
-        def cfg = NomadConfig.getConfig(session)
-        then:
-        cfg.client().address == "http://127.0.0.1:4646/v1"
+    NomadScriptLauncher(TaskBean bean, NomadExecutor executor) {
+        //FIXME: The executor isn't being used so far
+        super(bean, new SimpleFileCopyStrategy(bean))
     }
 
 }

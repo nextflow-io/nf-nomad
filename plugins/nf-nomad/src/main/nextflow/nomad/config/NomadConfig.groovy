@@ -35,15 +35,9 @@ class NomadConfig {
     NomadClientOpts client() { clientOpts }
 
 
-    NomadConfig(Map nomad) {
-        this.clientOpts = new NomadClientOpts((Map) nomad.client ?: Collections.emptyMap())
+    NomadConfig(Map nomadConfigMap) {
+        this.clientOpts = new NomadClientOpts((Map) nomadConfigMap.client ?: Collections.emptyMap())
     }
-
-
-    NomadConfig() {
-        this.clientOpts = new NomadClientOpts()
-    }
-
 
     static NomadConfig getConfig(Session session) {
         if (!session)
