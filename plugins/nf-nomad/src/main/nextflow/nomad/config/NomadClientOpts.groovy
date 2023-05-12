@@ -36,7 +36,7 @@ class NomadClientOpts {
     String token
 
     //-------------------------------------------------------------------
-    //NOTE: Hard-coded driver, refactor later to adapt different drivers
+    //NOTE: Hard-coded to job type and docker containers
     //-------------------------------------------------------------------
     static public final String DEFAULT_DRIVER = "docker"
     String driver

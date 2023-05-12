@@ -26,6 +26,8 @@ import nextflow.processor.TaskProcessor
 import nextflow.processor.TaskRun
 import spock.lang.Specification
 
+import java.nio.file.Paths
+
 /**
  *
  * @author Abhinav Sharma <abhi18av@outlook.com>
@@ -35,10 +37,18 @@ class NomadExecutorTest extends Specification {
     def 'should config and init executor'() {
         given:
         def session = Mock(Session) {
-            getConfig() >> [:]
+            getConfig() >> [nomad: [client: [namespace: "random-namespace"]]]
+            getWorkDir() >> Paths.get('/work/some')
         }
 
-        new NomadConfig()
+        and:
+        def exec = Spy(NomadExecutor)
+        exec.session = session
 
+        when:
+        exec.register()
+
+        then:
+        exec.config.client().namespace == "random-namespace"
     }
 }

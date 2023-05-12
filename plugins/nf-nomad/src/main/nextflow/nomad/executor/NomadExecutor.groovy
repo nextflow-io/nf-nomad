@@ -71,7 +71,7 @@ class NomadExecutor extends Executor implements ExtensionPoint {
          */
         if (!(workDir instanceof Path)) {
             session.abort()
-            throw new AbortOperationException("When using `$name` executor a local path must be provided as working directory")
+            throw new AbortOperationException("When using Nomad executor a local path must be provided as working directory")
         }
     }
 
