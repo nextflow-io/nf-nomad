@@ -30,10 +30,20 @@ class NomadClientOpts {
     private Map<String,String> sysEnv
 
     String address
-    String namespace
     String dataCenter
-    String region
     String token
+
+    // TODO (fix milestone): Implement the TLS certificate
+
+    //-------------------------------------------------------------------
+    //NOTE: Use the default for region and namespace
+    //-------------------------------------------------------------------
+
+    static public final String DEFAULT_REGION = "global"
+    String region
+
+    static public final String DEFAULT_NAMESPACE = "default"
+    String namespace
 
     //-------------------------------------------------------------------
     //NOTE: Hard-coded to job type and docker containers
@@ -47,7 +57,6 @@ class NomadClientOpts {
     //-------------------------------------------------------------------
 
 
-    // TODO (fix milestone): Implement the TLS certificate
 
     NomadClientOpts(Map config, Map<String,String> env = null) {
         assert config != null
@@ -58,8 +67,9 @@ class NomadClientOpts {
 
         this.token = config.token ?: sysEnv.get("NOMAD_TOKEN")
         this.dataCenter = config.dataCenter ?: sysEnv.get("NOMAD_DC")
-        this.namespace = config.namespace ?: sysEnv.get("NOMAD_NAMESPACE")
-        this.region = config.region ?: sysEnv.get("NOMAD_REGION")
+
+        this.region = config.region ?: DEFAULT_REGION
+        this.namespace = config.namespace ?: DEFAULT_NAMESPACE
 
         this.driver = DEFAULT_DRIVER
         this.jobType = DEFAULT_JOB_TYPE

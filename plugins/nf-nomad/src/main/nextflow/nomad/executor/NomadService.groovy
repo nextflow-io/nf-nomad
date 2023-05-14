@@ -43,6 +43,12 @@ class NomadService implements Closeable {
 
     NomadConfig config
 
+    NomadService(NomadExecutor executor) {
+        assert executor
+        this.config = executor.config
+    }
+
+
     Map<TaskProcessor, String> allJobIds = new HashMap<>(50)
 
     synchronized String getOrCreateJob(TaskRun task) {
@@ -62,10 +68,6 @@ class NomadService implements Closeable {
     }
 
 
-    NomadService(NomadExecutor executor) {
-        assert executor
-        this.config = executor.config
-    }
 
     @Memoized
     protected ApiClient getClient() {

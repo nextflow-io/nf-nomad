@@ -37,7 +37,7 @@ class scratch extends Specification {
 
         given:
         def RANDOM_ID = Math.abs(new Random().nextInt() % 999) + 1
-        def NF_TASKJOB_NAME =  "nf-$RANDOM_ID"
+        def NF_TASKJOB_NAME =  "nf-scratch-$RANDOM_ID"
 
         def session = Mock(Session) {
             getConfig() >> [:]

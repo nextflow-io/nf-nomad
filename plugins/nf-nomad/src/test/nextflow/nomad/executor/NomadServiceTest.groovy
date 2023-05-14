@@ -25,6 +25,9 @@ import nextflow.processor.TaskConfig
 import nextflow.processor.TaskProcessor
 import nextflow.processor.TaskRun
 import spock.lang.Specification
+
+import java.nio.file.Paths
+
 /**
  *
  * @author Abhinav Sharma <abhi18av@outlook.com>
@@ -60,27 +63,19 @@ class NomadServiceTest extends Specification {
 
         def RANDOM_ID = Math.abs(new Random().nextInt() % 999) + 1
         def NF_TASKJOB_NAME =  "nf-$RANDOM_ID"
-
-        def exec = Mock(NomadExecutor) {
-            getConfig() >> new NomadConfig([nomad:
-                                                    [client:
-                                                             [serverBasePath:NOMAD_ADDR,
-                                                              apiToken:NOMAD_TOKEN ,
-                                                              dataCenter: NOMAD_DATACENTER]]])
-        }
-        def svc = new NomadService(exec)
+        def CONFIG_MAP = [nomad: [client: [namespace: "default"]]]
 
         and:
+        def exec = Mock(NomadExecutor) {getConfig() >> new NomadConfig(CONFIG_MAP) }
+        def svc = Spy(new NomadService(exec))
+
         def TASK = Mock(TaskRun) {
             getHash() >> HashCode.fromInt(1)
-            getContainer() >> '"quay.io/nextflow/rnaseq-nf:v1.1"'
+            getContainer() >> 'ubuntu:latest'
             getConfig() >> Mock(TaskConfig)
         }
 
-//        and:
-//
-//        expect:
-//        svc.createTaskJob(id, TASK)
+        svc.createTaskJob(NF_TASKJOB_NAME, TASK)
 
     }
 
