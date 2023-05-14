@@ -48,27 +48,6 @@ class NomadService implements Closeable {
         this.config = executor.config
     }
 
-
-    Map<TaskProcessor, String> allJobIds = new HashMap<>(50)
-
-    synchronized String getOrCreateJob(TaskRun task) {
-        final mapKey = task.processor
-        if (allJobIds.containsKey(mapKey)) {
-            return allJobIds[mapKey]
-        }
-
-        // create a batch job
-        final jobId = makeJobId(task)
-
-//        apply(() -> client .jobOperations() .createJob(jobId, poolInfo))
-
-        // add to the map
-        allJobIds[mapKey] = jobId
-        return jobId
-    }
-
-
-
     @Memoized
     protected ApiClient getClient() {
         createNomadClient()
@@ -92,41 +71,103 @@ class NomadService implements Closeable {
     }
 
 
-//    NomadTaskKey submitTask(TaskRun task) {
-//        final jobId = getOrCreateJob(task)
-//        runTask(jobId, task)
-//    }
-//
-//    NomadTaskKey runTask(String jobId, TaskRun task) {
-//        final taskToAdd = createTaskJob(jobId, task)
-//        //apply(() -> client.taskOperations().createTask(jobId, taskToAdd))
-//        return new NomadTaskKey(jobId, taskToAdd.id())
-//    }
-//
+    static String makeJobId(TaskRun task) {
+        final PREFIX = "nf"
+        final RANDOM = Rnd.hex()
 
-    protected createTaskJob(String jobId, TaskRun task) {
+        final name = task
+                .processor
+                .name
+                .trim()
+                .replaceAll(/[^a-zA-Z0-9-_]+/, '_')
+
+        final String key = "$PREFIX-${name}-$RANDOM"
+
+        //FIXME Perhaps NOT needed
+        // Nomad job max len is 64 characters, however we keep it a bit shorter
+        // because the jobId + taskId composition must be less then 100
+        final MAX_LEN = 62i
+        return key.size() > MAX_LEN ? key.substring(0, MAX_LEN) : key
+    }
+
+
+    Map<TaskProcessor, String> allJobIds = new HashMap<>(50)
+
+    synchronized String getOrRunJob(TaskRun task) {
+
+        //If job doesn't already exist
+        final mapKey = task.processor
+        if (allJobIds.containsKey(mapKey)) {
+            return allJobIds[mapKey]
+        }
+
+        //If job doesn't already exist
+
+        //- create a job ID
+        final newJobId = makeJobId(task)
+        //- add to the map
+        allJobIds[mapKey] = newJobId
+
+
+        //- create a job def
+        def jobDef = createJobDef(newJobId,task)
+        //- run the job
+        runJob(jobDef, task)
+
+        return new NomadTaskKey(jobDef.name, jobDef.name)
+    }
+
+
+    NomadTaskKey runJob(Job taskJob, TaskRun task) {
+
+        def region = config.client().region
+        def namespace = config.client().namespace
+        def xNomadToken = config.client().token
+        def idempotencyToken = ""
+
+        def jobRegisterRequest = new JobRegisterRequest()
+                .job(taskJob)
+                .region(region)
+                .secretID(xNomadToken)
+                .namespace(namespace)
+                .enforceIndex(false)
+                .evalPriority(10)
+                .jobModifyIndex(1)
+                .policyOverride(true)
+                .preserveCounts(false)
+
+        def apiInstance = new JobsApi(client)
+
+        def response = apiInstance.postJob(taskJob.name,
+                jobRegisterRequest,
+                region,
+                namespace,
+                xNomadToken,
+                idempotencyToken)
+
+
+        return new NomadTaskKey(taskJob.name, taskJob.name)
+    }
+
+
+    protected Job createJobDef(String taskId, TaskRun task) {
 
         final container = task.getContainer()
         if (!container)
             throw new IllegalArgumentException("Missing container image for process: $task.name")
 
-        final taskId = "nf-${task.hash.toString()}"
-
         log.trace "[NOMAD] Submitting task: $taskId, cpus=${task.config.getCpus()}, mem=${task.config.getMemory() ?: '-'}"
 
-        def region = config.client().region
-        def namespace = config.client().namespace
+
         def dataCenter = config.client().dataCenter
         def driver = config.client().driver
         def jobType = config.client().jobType
-        def xNomadToken = config.client().token
-        def idempotencyToken = ""
 
         def taskDef = new Task()
                 .driver(driver)
-                .config([ "image": task.container,
-                          "command": task.script,
-                          "args": ["hello-nomad"]])
+                .config(["image"  : task.container,
+                         "command": task.script,
+                         "args"   : ["hello-nomad"]])
                 .name(taskId)
 
         def taskGroup = new TaskGroup()
@@ -140,23 +181,12 @@ class NomadService implements Closeable {
                 .name(taskId)
                 .ID(taskId)
 
-        def jobRegisterRequest = new JobRegisterRequest()
-                .job(jobDef)
-                .region(region)
-                .secretID(xNomadToken)
-                .namespace(namespace)
-                .enforceIndex(false)
-                .evalPriority(10)
-                .jobModifyIndex(1)
-                .policyOverride(true)
-                .preserveCounts(false)
 
-        def apiInstance = new JobsApi(client)
-        def response = apiInstance.postJob(taskId, jobRegisterRequest, region, namespace, xNomadToken, idempotencyToken)
-
-        return response
+        return jobDef
 
     }
+
+
 
 
     void terminate(NomadTaskKey key) {
@@ -172,20 +202,5 @@ class NomadService implements Closeable {
 
     }
 
-    String makeJobId(TaskRun task) {
-        final name = task
-                .processor
-                .name
-                .trim()
-                .replaceAll(/[^a-zA-Z0-9-_]+/, '_')
-
-        final String key = "job-${Rnd.hex()}-${name}"
-
-        //FIXME Perhaps NOT needed
-        // Nomad job max len is 64 characters, however we keep it a bit shorter
-        // because the jobId + taskId composition must be less then 100
-        final MAX_LEN = 62i
-        return key.size() > MAX_LEN ? key.substring(0, MAX_LEN) : key
-    }
 
 }

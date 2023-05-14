@@ -18,21 +18,20 @@
 package nextflow.nomad.executor
 
 import com.google.common.hash.HashCode
-import nextflow.Session
 import nextflow.nomad.config.NomadConfig
-import nextflow.nomad.executor.NomadService
 import nextflow.processor.TaskConfig
 import nextflow.processor.TaskProcessor
 import nextflow.processor.TaskRun
 import spock.lang.Specification
-
-import java.nio.file.Paths
 
 /**
  *
  * @author Abhinav Sharma <abhi18av@outlook.com>
  */
 class NomadServiceTest extends Specification {
+
+    def RANDOM_ID = Math.abs(new Random().nextInt() % 999) + 1
+    def NF_TASKJOB_NAME =  "nf-service-test-$RANDOM_ID"
 
     def 'should make job id'() {
         given:
@@ -53,16 +52,14 @@ class NomadServiceTest extends Specification {
 
         where:
         NAME        | EXPECTED
-        'foo'       | /job-\w+-foo/
-        'foo  bar'  | /job-\w+-foo_bar/
+        'foo'       | /nf-foo-\w+/
+        'foo  bar'  | /nf-foo_bar-\w+/
     }
 
 
-    def 'should submit a job'() {
+    def 'should create a job definition'() {
         given:
 
-        def RANDOM_ID = Math.abs(new Random().nextInt() % 999) + 1
-        def NF_TASKJOB_NAME =  "nf-$RANDOM_ID"
         def CONFIG_MAP = [nomad: [client: [namespace: "default"]]]
 
         and:
@@ -72,15 +69,45 @@ class NomadServiceTest extends Specification {
         def TASK = Mock(TaskRun) {
             getHash() >> HashCode.fromInt(1)
             getContainer() >> 'ubuntu:latest'
+            getScript() >> 'echo'
             getConfig() >> Mock(TaskConfig)
         }
 
-        svc.createTaskJob(NF_TASKJOB_NAME, TASK)
+        and:
+        def job = svc.createJobDef(NF_TASKJOB_NAME, TASK)
+
+        expect:
+        job.name == NF_TASKJOB_NAME
+        job.taskGroups.tasks[0].config[0]['image'] == "ubuntu:latest"
 
     }
 
 
+    def 'should create and submit a job'() {
+        given:
 
+        def CONFIG_MAP = [nomad: [client: [namespace: "default"]]]
+
+        and:
+        def exec = Mock(NomadExecutor) {getConfig() >> new NomadConfig(CONFIG_MAP) }
+        def svc = Spy(new NomadService(exec))
+
+        def TASK = Mock(TaskRun) {
+            getHash() >> HashCode.fromInt(1)
+            getContainer() >> 'ubuntu:latest'
+            getScript() >> 'echo'
+            getConfig() >> Mock(TaskConfig)
+            getProcessor() >> Mock(TaskProcessor) {
+                getName() >> "svctest"
+            }
+        }
+
+        and:
+        def jobId = svc.getOrRunJob(TASK)
+
+        expect:
+        println(svc.allJobIds)
+    }
 
 
 }
