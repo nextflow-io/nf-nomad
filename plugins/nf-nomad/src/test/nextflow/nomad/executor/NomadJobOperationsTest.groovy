@@ -20,7 +20,6 @@ package nextflow.nomad.executor
 import com.google.common.hash.HashCode
 import nextflow.nomad.config.NomadConfig
 import nextflow.processor.TaskConfig
-import nextflow.processor.TaskProcessor
 import nextflow.processor.TaskRun
 import spock.lang.Specification
 
@@ -28,62 +27,35 @@ import spock.lang.Specification
  *
  * @author Abhinav Sharma <abhi18av@outlook.com>
  */
-class NomadServiceTest extends Specification {
+class NomadJobOperationsTest extends Specification {
 
     def RANDOM_ID = Math.abs(new Random().nextInt() % 999) + 1
     def NF_TASKJOB_NAME =  "nf-service-test-$RANDOM_ID"
 
-    def 'should make job id'() {
+    def TEST_CONTAINER_NAME = "quay.io/nextflow/rnaseq-nf:v1.1"
+
+    def 'should create a job definition'() {
         given:
-        def task = Mock(TaskRun) {
-            getProcessor() >> Mock(TaskProcessor) {
-                getName() >> NAME
-            }
-        }
-        and:
-        def exec = Mock(NomadExecutor) {
-            getConfig() >> new NomadConfig([:])
-        }
-        and:
-        def svc = new NomadService(exec)
-
-        expect:
-        svc.makeJobId(task) =~ EXPECTED
-
-        where:
-        NAME        | EXPECTED
-        'foo'       | /nf-foo-\w+/
-        'foo  bar'  | /nf-foo_bar-\w+/
-    }
-
-    def 'should create and submit a job'() {
-        given:
-
         def CONFIG_MAP = [nomad: [client: [namespace: "default"]]]
+        def config = new NomadConfig(CONFIG_MAP)
 
         and:
-        def exec = Mock(NomadExecutor) {getConfig() >> new NomadConfig(CONFIG_MAP) }
-        def svc = Spy(new NomadService(exec))
-
         def TASK = Mock(TaskRun) {
             getHash() >> HashCode.fromInt(1)
-            getContainer() >> 'quay.io/nextflow/rnaseq-nf:v1.1'
+            getContainer() >> TEST_CONTAINER_NAME
             getScript() >> getClass().getResource("/ServiceTest.command.sh").text
             getConfig() >> Mock(TaskConfig) {
                 getShell() >> ["bash"]
             }
-            getProcessor() >> Mock(TaskProcessor) {
-                getName() >> "svctest"
-            }
         }
 
         and:
-        def jobId = svc.getOrRunJob(TASK)
+        def job = NomadJobOperations.createJobDef(config, TASK, NF_TASKJOB_NAME)
 
         expect:
-        println(svc.allJobIds)
-        println(jobId)
-    }
+        job.name == NF_TASKJOB_NAME
+        job.taskGroups.tasks[0].config[0]['image'] == TEST_CONTAINER_NAME
 
+    }
 
 }

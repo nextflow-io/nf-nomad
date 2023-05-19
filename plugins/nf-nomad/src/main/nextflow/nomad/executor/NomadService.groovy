@@ -1,4 +1,3 @@
-package nextflow.nomad.executor
 /*
  * Copyright 2023, Stellenbosch University, South Africa
  * Copyright 2022, Center for Medical Genetics, Ghent
@@ -16,6 +15,8 @@ package nextflow.nomad.executor
  * limitations under the License.
  */
 
+package nextflow.nomad.executor
+
 import groovy.transform.CompileStatic
 import groovy.transform.Memoized
 import groovy.util.logging.Slf4j
@@ -24,8 +25,6 @@ import io.nomadproject.client.Configuration
 import io.nomadproject.client.api.JobsApi
 import io.nomadproject.client.models.Job
 import io.nomadproject.client.models.JobRegisterRequest
-import io.nomadproject.client.models.Task
-import io.nomadproject.client.models.TaskGroup
 import nextflow.nomad.config.NomadConfig
 import nextflow.processor.TaskProcessor
 import nextflow.processor.TaskRun
@@ -110,10 +109,12 @@ class NomadService implements Closeable {
 
 
         //- create a job def
-        def jobDef = createJobDef(newJobId,task)
+        def jobDef = NomadJobOperations.createJobDef(config, task, newJobId)
+
         //- run the job
         runJob(jobDef, task)
 
+        //FIXME update the overall key computation
         return new NomadTaskKey(jobDef.name, jobDef.name)
     }
 
@@ -148,45 +149,6 @@ class NomadService implements Closeable {
 
         return new NomadTaskKey(taskJob.name, taskJob.name)
     }
-
-
-    protected Job createJobDef(String taskId, TaskRun task) {
-
-        final container = task.getContainer()
-        if (!container)
-            throw new IllegalArgumentException("Missing container image for process: $task.name")
-
-        log.trace "[NOMAD] Submitting task: $taskId, cpus=${task.config.getCpus()}, mem=${task.config.getMemory() ?: '-'}"
-
-
-        def dataCenter = config.client().dataCenter
-        def driver = config.client().driver
-        def jobType = config.client().jobType
-
-        def taskDef = new Task()
-                .driver(driver)
-                .config(["image"  : task.container,
-                         "command": task.script,
-                         "args"   : ["hello-nomad"]])
-                .name(taskId)
-
-        def taskGroup = new TaskGroup()
-                .addTasksItem(taskDef)
-                .name(taskId)
-
-        def jobDef = new Job()
-                .taskGroups([taskGroup])
-                .type(jobType)
-                .datacenters([dataCenter])
-                .name(taskId)
-                .ID(taskId)
-
-
-        return jobDef
-
-    }
-
-
 
 
     void terminate(NomadTaskKey key) {
