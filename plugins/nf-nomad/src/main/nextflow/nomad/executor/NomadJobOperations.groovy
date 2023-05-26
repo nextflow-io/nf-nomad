@@ -20,7 +20,9 @@ package nextflow.nomad.executor
 import groovy.transform.CompileStatic
 import io.nomadproject.client.models.Job
 import io.nomadproject.client.models.Task
+import io.nomadproject.client.models.Resources
 import io.nomadproject.client.models.TaskGroup
+import io.nomadproject.client.models.Template
 import nextflow.nomad.config.NomadConfig
 import nextflow.processor.TaskRun
 import groovy.util.logging.Slf4j
@@ -47,12 +49,29 @@ class NomadJobOperations {
         def driver = config.client().driver
         def jobType = config.client().jobType
 
+        def commandRunTmpl = new Template()
+                .destPath("/local/.command.run")
+                .embeddedTmpl(task.getScript())
+
+        def commandShTmpl = new Template()
+                .destPath("/local/.command.sh")
+
+
+        def taskMemMB = task.config.getMemory().toMega().intValue()
+
+        def taskResources = new Resources()
+                .CPU(task.config.getCpus())
+                .memoryMB(taskMemMB)
+
         def taskDef = new Task()
                 .driver(driver)
                 .name(taskId)
                 .config(["image"  : task.container,
                          "command": task.config.getShell().first(),
-                         "args"   : [".command.run"]])
+                         "args"   : ["/local/.command.run"]])
+                .templates([commandRunTmpl])
+                .resources(taskResources)
+                .killTimeout(task.config.getTime().toSeconds())
 
         def taskGroup = new TaskGroup()
                 .addTasksItem(taskDef)

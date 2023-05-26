@@ -25,6 +25,8 @@ import io.nomadproject.client.Configuration
 import io.nomadproject.client.api.JobsApi
 import io.nomadproject.client.models.Job
 import io.nomadproject.client.models.JobRegisterRequest
+import io.nomadproject.client.models.JobValidateRequest
+import io.nomadproject.client.models.JobValidateResponse
 import nextflow.nomad.config.NomadConfig
 import nextflow.processor.TaskProcessor
 import nextflow.processor.TaskRun
@@ -149,6 +151,36 @@ class NomadService implements Closeable {
 
         return new NomadTaskKey(taskJob.name, taskJob.name)
     }
+
+    //FIXME refactor this and move to a separate namespace
+    JobValidateResponse validateJob(TaskRun task ) {
+
+        def region = config.client().region
+        def namespace = config.client().namespace
+        def xNomadToken = config.client().token
+        def idempotencyToken = ""
+
+        def jobDef = NomadJobOperations.createJobDef(config, task, "validate-")
+
+        def jobValidateRequest = new JobValidateRequest()
+                .job(jobDef)
+                .region(region)
+                .secretID(xNomadToken)
+                .namespace(namespace)
+
+        def apiInstance = new JobsApi(client)
+
+        def response = apiInstance.postJobValidateRequest(
+                jobValidateRequest,
+                region,
+                namespace,
+                xNomadToken,
+                idempotencyToken)
+
+
+        return response
+    }
+
 
 
     void terminate(NomadTaskKey key) {

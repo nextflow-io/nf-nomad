@@ -21,6 +21,7 @@ import com.google.common.hash.HashCode
 import nextflow.nomad.config.NomadConfig
 import nextflow.processor.TaskConfig
 import nextflow.processor.TaskRun
+import nextflow.util.MemoryUnit
 import spock.lang.Specification
 
 /**
@@ -46,6 +47,8 @@ class NomadJobOperationsTest extends Specification {
             getScript() >> getClass().getResource("/ServiceTest.command.sh").text
             getConfig() >> Mock(TaskConfig) {
                 getShell() >> ["bash"]
+                getCpus() >> 4
+                getMemory() >> new MemoryUnit(4000)
             }
         }
 

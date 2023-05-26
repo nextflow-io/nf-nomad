@@ -22,6 +22,8 @@ import nextflow.nomad.config.NomadConfig
 import nextflow.processor.TaskConfig
 import nextflow.processor.TaskProcessor
 import nextflow.processor.TaskRun
+import nextflow.util.Duration
+import nextflow.util.MemoryUnit
 import spock.lang.Specification
 
 /**
@@ -71,6 +73,9 @@ class NomadServiceTest extends Specification {
             getScript() >> getClass().getResource("/ServiceTest.command.sh").text
             getConfig() >> Mock(TaskConfig) {
                 getShell() >> ["bash"]
+                getCpus() >> 4
+                getMemory() >> new MemoryUnit("400.MB")
+                getTime() >> new Duration("55s")
             }
             getProcessor() >> Mock(TaskProcessor) {
                 getName() >> "svctest"
@@ -84,6 +89,4 @@ class NomadServiceTest extends Specification {
         println(svc.allJobIds)
         println(jobId)
     }
-
-
 }

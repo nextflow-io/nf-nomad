@@ -1,1 +1,1 @@
-echo
+echo "Hello, Nomad!"
