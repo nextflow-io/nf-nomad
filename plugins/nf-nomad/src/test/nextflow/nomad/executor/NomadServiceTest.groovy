@@ -26,6 +26,8 @@ import nextflow.util.Duration
 import nextflow.util.MemoryUnit
 import spock.lang.Specification
 
+import java.nio.file.Path
+
 /**
  *
  * @author Abhinav Sharma <abhi18av@outlook.com>
@@ -80,6 +82,7 @@ class NomadServiceTest extends Specification {
             getProcessor() >> Mock(TaskProcessor) {
                 getName() >> "svctest"
             }
+//            getWorkDir() >> Path.of("mount2")
         }
 
         and:

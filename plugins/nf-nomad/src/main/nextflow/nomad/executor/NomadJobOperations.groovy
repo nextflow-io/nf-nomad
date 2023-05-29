@@ -23,6 +23,7 @@ import io.nomadproject.client.models.Task
 import io.nomadproject.client.models.Resources
 import io.nomadproject.client.models.TaskGroup
 import io.nomadproject.client.models.Template
+import io.nomadproject.client.models.VolumeMount
 import nextflow.nomad.config.NomadConfig
 import nextflow.processor.TaskRun
 import groovy.util.logging.Slf4j
@@ -54,8 +55,11 @@ class NomadJobOperations {
                 .embeddedTmpl(task.getScript())
 
         def commandShTmpl = new Template()
-                .destPath("/local/.command.sh")
+                .destPath(".command.sh")
 
+        def volMounts = new VolumeMount()
+                .volume("/home/abhinav/projects/nomad-testdir/_volume")
+                .destination(task.workDir.toString())
 
         def taskMemMB = task.config.getMemory().toMega().intValue()
 
@@ -68,10 +72,12 @@ class NomadJobOperations {
                 .name(taskId)
                 .config(["image"  : task.container,
                          "command": task.config.getShell().first(),
-                         "args"   : ["/local/.command.run"]])
+                         "args"   : [".command.run"],
+                         "work_dir"  : "/local" ])
                 .templates([commandRunTmpl])
                 .resources(taskResources)
                 .killTimeout(task.config.getTime().toSeconds())
+//                .volumeMounts([volMounts])
 
         def taskGroup = new TaskGroup()
                 .addTasksItem(taskDef)

@@ -1,4 +1,3 @@
-package nextflow.nomad.executor
 /*
  * Copyright 2023, Stellenbosch University, South Africa
  * Copyright 2022, Center for Medical Genetics, Ghent
@@ -16,6 +15,8 @@ package nextflow.nomad.executor
  * limitations under the License.
  */
 
+
+package nextflow.nomad.executor
 
 import groovy.transform.CompileStatic
 import groovy.transform.PackageScope

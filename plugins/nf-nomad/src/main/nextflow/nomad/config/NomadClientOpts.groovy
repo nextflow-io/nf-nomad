@@ -64,7 +64,6 @@ class NomadClientOpts {
 
         def addr = config.address ?: sysEnv.get("NOMAD_ADDR")
         this.address = "${addr}/v1"
-
         this.token = config.token ?: sysEnv.get("NOMAD_TOKEN")
         this.dataCenter = config.dataCenter ?: sysEnv.get("NOMAD_DC")
 

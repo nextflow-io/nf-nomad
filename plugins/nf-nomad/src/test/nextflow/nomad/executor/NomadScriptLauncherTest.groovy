@@ -1,9 +1,3 @@
-package nextflow.nomad.executor
-
-import nextflow.executor.BashWrapperBuilder
-import nextflow.executor.SimpleFileCopyStrategy
-import nextflow.processor.TaskBean
-
 /*
  * Copyright 2023, Stellenbosch University, South Africa
  * Copyright 2022, Center for Medical Genetics, Ghent
@@ -22,15 +16,19 @@ import nextflow.processor.TaskBean
  */
 
 
-/**
- * Custom bash wrapper builder for Nomad tasks
- *
- * @author Abhinav Sharma <abhi18av@outlook.com>
- */
-class NomadScriptLauncher extends BashWrapperBuilder {
+package nextflow.nomad.executor
 
-    NomadScriptLauncher(TaskBean bean, NomadExecutor executor) {
-        super(bean, new SimpleFileCopyStrategy(bean))
+import spock.lang.Specification
+
+/**
+ *
+ * @author Abhinav Sharma  <abhi18av@outlook.com>
+ */
+class NomadTaskKeyTest extends Specification {
+
+    def 'should return the key pair' () {
+        expect:
+        new NomadTaskKey('foo','bar').keyPair() == 'foo/bar'
     }
 
 }
