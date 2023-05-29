@@ -68,7 +68,7 @@ class NomadJobOperations {
                 .name(taskId)
                 .config(["image"   : task.container,
                          "work_dir": "/local" ,
-                         "volumes" : [task.workDir.toString() + ":" + task.workDir.toString() + "/mount"],
+                         "volumes" : [task.workDir.toString() + ":" + "/mount"],
                          "command" : task.config.getShell().first(),
                          "args"    : [".command.run"]])
                 .templates([commandRunTmpl])
