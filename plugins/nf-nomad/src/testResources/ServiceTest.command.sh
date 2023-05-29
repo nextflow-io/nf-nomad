@@ -1,1 +1,1 @@
-echo "Hello, Nomad!"
+printf "%s\n"  $(printenv)  | tee  alloc.$NOMAD_ALLOC_ID.env

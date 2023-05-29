@@ -23,7 +23,6 @@ import io.nomadproject.client.models.Task
 import io.nomadproject.client.models.Resources
 import io.nomadproject.client.models.TaskGroup
 import io.nomadproject.client.models.Template
-import io.nomadproject.client.models.VolumeMount
 import nextflow.nomad.config.NomadConfig
 import nextflow.processor.TaskRun
 import groovy.util.logging.Slf4j
@@ -50,16 +49,10 @@ class NomadJobOperations {
         def driver = config.client().driver
         def jobType = config.client().jobType
 
+        def CMD_RUN_LOCATION = "/local/.command.run"
         def commandRunTmpl = new Template()
-                .destPath("/local/.command.run")
+                .destPath(CMD_RUN_LOCATION)
                 .embeddedTmpl(task.getScript())
-
-        def commandShTmpl = new Template()
-                .destPath(".command.sh")
-
-        def volMounts = new VolumeMount()
-                .volume("/home/abhinav/projects/nomad-testdir/_volume")
-                .destination(task.workDir.toString())
 
         def taskMemMB = task.config.getMemory().toMega().intValue()
 
@@ -72,8 +65,9 @@ class NomadJobOperations {
                 .name(taskId)
                 .config(["image"  : task.container,
                          "command": task.config.getShell().first(),
-                         "args"   : [".command.run"],
-                         "work_dir"  : "/local" ])
+                         "args"   : [CMD_RUN_LOCATION],
+                         "work_dir"  : task.workDir.toString(),
+                         "volumes": ["/opt/nomad/_scratch:" + task.workDir.toString()]])
                 .templates([commandRunTmpl])
                 .resources(taskResources)
                 .killTimeout(task.config.getTime().toSeconds())

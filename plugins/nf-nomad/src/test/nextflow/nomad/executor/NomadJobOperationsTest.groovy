@@ -21,8 +21,12 @@ import com.google.common.hash.HashCode
 import nextflow.nomad.config.NomadConfig
 import nextflow.processor.TaskConfig
 import nextflow.processor.TaskRun
+import nextflow.util.Duration
 import nextflow.util.MemoryUnit
 import spock.lang.Specification
+
+import java.nio.file.Path
+import java.nio.file.Paths
 
 /**
  *
@@ -48,14 +52,18 @@ class NomadJobOperationsTest extends Specification {
             getConfig() >> Mock(TaskConfig) {
                 getShell() >> ["bash"]
                 getCpus() >> 4
-                getMemory() >> new MemoryUnit(4000)
+                getMemory() >> new MemoryUnit("400.MB")
+                getTime() >> new Duration("55s")
             }
         }
+
+        TASK.getWorkDir() >> Paths.get('/some/dir')
 
         and:
         def job = NomadJobOperations.createJobDef(config, TASK, NF_TASKJOB_NAME)
 
         expect:
+        println(job)
         job.name == NF_TASKJOB_NAME
         job.taskGroups.tasks[0].config[0]['image'] == TEST_CONTAINER_NAME
 

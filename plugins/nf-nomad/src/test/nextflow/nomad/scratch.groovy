@@ -46,7 +46,6 @@ class scratch extends Specification {
         when:
         def clientConfig = NomadConfig.getConfig(session).client()
 
-
         def defaultClient = Configuration
                 .getDefaultApiClient()
                 .setBasePath(clientConfig.address)
@@ -86,6 +85,8 @@ class scratch extends Specification {
                 .datacenters([dataCenter])
                 .name(NF_TASKJOB_NAME)
                 .ID(NF_TASKJOB_NAME)
+
+        println(jobDef)
 
         def jobRegisterRequest = new JobRegisterRequest()
                 .job(jobDef)

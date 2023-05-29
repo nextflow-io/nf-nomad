@@ -26,7 +26,7 @@ import nextflow.util.Duration
 import nextflow.util.MemoryUnit
 import spock.lang.Specification
 
-import java.nio.file.Path
+import java.nio.file.Paths
 
 /**
  *
@@ -72,6 +72,7 @@ class NomadServiceTest extends Specification {
         def TASK = Mock(TaskRun) {
             getHash() >> HashCode.fromInt(1)
             getContainer() >> 'quay.io/nextflow/rnaseq-nf:v1.1'
+            getWorkDir() >> Paths.get('/workdir')
             getScript() >> getClass().getResource("/ServiceTest.command.sh").text
             getConfig() >> Mock(TaskConfig) {
                 getShell() >> ["bash"]
@@ -82,8 +83,8 @@ class NomadServiceTest extends Specification {
             getProcessor() >> Mock(TaskProcessor) {
                 getName() >> "svctest"
             }
-//            getWorkDir() >> Path.of("mount2")
         }
+
 
         and:
         def jobId = svc.getOrRunJob(TASK)
