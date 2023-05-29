@@ -37,7 +37,7 @@ import groovy.util.logging.Slf4j
 @CompileStatic
 class NomadJobOperations {
 
-    static Job createJobDef(NomadConfig config, TaskRun task, String taskId ) {
+    static Job createJobDef(NomadConfig config, TaskRun task, String taskId) {
 
         final container = task.getContainer()
         if (!container)
@@ -49,10 +49,6 @@ class NomadJobOperations {
         def driver = config.client().driver
         def jobType = config.client().jobType
 
-        def CMD_RUN_LOCATION = "/local/.command.run"
-        def commandRunTmpl = new Template()
-                .destPath(CMD_RUN_LOCATION)
-                .embeddedTmpl(task.getScript())
 
         def taskMemMB = task.config.getMemory().toMega().intValue()
 
@@ -60,14 +56,21 @@ class NomadJobOperations {
                 .CPU(task.config.getCpus())
                 .memoryMB(taskMemMB)
 
+
+        //        def CMD_RUN_LOCATION =  "/workdir/" + task.hashCode() + "/.command.run"
+        def CMD_RUN_LOCATION =  "/local/.command.run"
+        def commandRunTmpl = new Template()
+                .embeddedTmpl(task.getScript())
+                .destPath(CMD_RUN_LOCATION)
+
         def taskDef = new Task()
                 .driver(driver)
                 .name(taskId)
-                .config(["image"  : task.container,
-                         "command": task.config.getShell().first(),
-                         "args"   : [CMD_RUN_LOCATION],
-                         "work_dir"  : task.workDir.toString(),
-                         "volumes": ["/opt/nomad/_scratch:" + task.workDir.toString()]])
+                .config(["image"   : task.container,
+                         "work_dir": "/local" ,
+                         "volumes" : [task.workDir.toString() + ":" + task.workDir.toString() + "/mount"],
+                         "command" : task.config.getShell().first(),
+                         "args"    : [".command.run"]])
                 .templates([commandRunTmpl])
                 .resources(taskResources)
                 .killTimeout(task.config.getTime().toSeconds())

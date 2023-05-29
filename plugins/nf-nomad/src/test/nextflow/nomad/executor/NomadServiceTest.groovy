@@ -72,7 +72,7 @@ class NomadServiceTest extends Specification {
         def TASK = Mock(TaskRun) {
             getHash() >> HashCode.fromInt(1)
             getContainer() >> 'quay.io/nextflow/rnaseq-nf:v1.1'
-            getWorkDir() >> Paths.get('/workdir')
+            getWorkDir() >> Paths.get('/opt/nomad/_scratch/workdir')
             getScript() >> getClass().getResource("/ServiceTest.command.sh").text
             getConfig() >> Mock(TaskConfig) {
                 getShell() >> ["bash"]
@@ -87,6 +87,7 @@ class NomadServiceTest extends Specification {
 
 
         and:
+        println(TASK.hashCode())
         def jobId = svc.getOrRunJob(TASK)
 
         expect:
