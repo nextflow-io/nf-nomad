@@ -33,4 +33,8 @@ class NomadScriptLauncher extends BashWrapperBuilder {
         super(bean, new SimpleFileCopyStrategy(bean))
     }
 
+    @Override
+    protected boolean shouldUnstageOutputs() {
+        return true
+    }
 }

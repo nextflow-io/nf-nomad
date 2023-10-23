@@ -21,6 +21,7 @@ package nextflow.nomad.executor
 import groovy.transform.CompileStatic
 import groovy.transform.PackageScope
 import groovy.util.logging.Slf4j
+import nextflow.fusion.FusionHelper
 
 import java.nio.file.Path
 import nextflow.Global
@@ -60,6 +61,13 @@ class NomadExecutor extends Executor implements ExtensionPoint {
     final boolean isContainerNative() {
         return true
     }
+
+
+    @Override
+    String containerConfigEngine() {
+        return 'docker'
+    }
+
 
     @Override
     Path getWorkDir() {
@@ -129,5 +137,9 @@ class NomadExecutor extends Executor implements ExtensionPoint {
 
     Path getRemoteBinDir() { return remoteBinDir }
 
+    @Override
+    boolean isFusionEnabled() {
+        return FusionHelper.isFusionEnabled(session)
+    }
 
 }

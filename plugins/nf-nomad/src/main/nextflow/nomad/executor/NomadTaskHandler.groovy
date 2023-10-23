@@ -23,6 +23,7 @@ import io.nomadproject.client.models.TaskState
 import nextflow.cloud.types.CloudMachineInfo
 import nextflow.exception.ProcessUnrecoverableException
 import nextflow.executor.BashWrapperBuilder
+import nextflow.fusion.FusionAwareTask
 import nextflow.processor.TaskBean
 import nextflow.processor.TaskHandler
 import nextflow.processor.TaskRun
@@ -40,7 +41,7 @@ import java.nio.file.Path
 
 @Slf4j
 @CompileStatic
-class NomadTaskHandler extends TaskHandler {
+class NomadTaskHandler extends TaskHandler implements FusionAwareTask {
 
     NomadExecutor executor
 
@@ -63,7 +64,6 @@ class NomadTaskHandler extends TaskHandler {
     NomadTaskHandler(TaskRun task, NomadExecutor executor) {
         super(task)
         this.executor = executor
-        this.taskBean = new TaskBean(task)
         this.outputFile = task.workDir.resolve(TaskRun.CMD_OUTFILE)
         this.errorFile = task.workDir.resolve(TaskRun.CMD_ERRFILE)
         this.exitFile = task.workDir.resolve(TaskRun.CMD_EXIT)
@@ -73,7 +73,7 @@ class NomadTaskHandler extends TaskHandler {
     /** only for testing purpose - DO NOT USE */
     protected NomadTaskHandler() {}
 
-    NomadService getBatchService() {
+    NomadService getNomadService() {
         return executor.nomadService
     }
 
@@ -84,7 +84,9 @@ class NomadTaskHandler extends TaskHandler {
     }
 
     protected BashWrapperBuilder createBashWrapper() {
-        new NomadScriptLauncher(taskBean, executor)
+        fusionEnabled()
+                ? fusionLauncher()
+                : new NomadScriptLauncher(task.toTaskBean(), executor)
     }
 
     @Override
@@ -93,7 +95,7 @@ class NomadTaskHandler extends TaskHandler {
         createBashWrapper().build()
 
         // submit the task execution
-//        this.taskKey = batchService.submitTask(task)
+        this.taskKey = nomadService.submitTask(task)
 
         log.debug "[NOMAD] Submitted task $task.name with taskId=$taskKey"
         // update the status
@@ -102,10 +104,40 @@ class NomadTaskHandler extends TaskHandler {
 
     @Override
     boolean checkIfRunning() {
+
+        if( !taskKey || !isSubmitted() )
+            return false
+        final state = taskState0(taskKey)
+        // note, include complete status otherwise it hangs if the task
+        // completes before reaching this check
+        final running = state==!TaskState.SERIALIZED_NAME_FAILED
+        log.debug "[NOMAD] Task status $task.name taskId=$taskKey; running=$running"
+        if( running )
+            this.status = TaskStatus.RUNNING
+        return running
+
     }
 
     @Override
     boolean checkIfCompleted() {
+        assert taskKey
+        if( !isRunning() )
+            return false
+        final done = taskState0(taskKey)==TaskState.SERIALIZED_NAME_FINISHED_AT
+        if( done ) {
+            // finalize the task
+            task.exitStatus = readExitFile()
+            task.stdout = outputFile
+            task.stderr = errorFile
+            status = TaskStatus.COMPLETED
+            TaskExecutionInformation info = nomadService.getTask(taskKey).executionInfo()
+            if (info.result() == TaskExecutionResult.FAILURE)
+                task.error = new ProcessUnrecoverableException(info.failureInfo().message())
+            deleteTask(taskKey, task)
+            return true
+        }
+        return false
+
     }
 
     private Boolean shouldDelete() {
@@ -122,17 +154,30 @@ class NomadTaskHandler extends TaskHandler {
         }
 
         try {
-            batchService.deleteTask(taskKey)
+            nomadService.deleteTask(taskKey)
         }
         catch( Exception e ) {
-            log.warn "Unable to cleanup batch task: $taskKey -- see the log file for details", e
+            log.warn "Unable to cleanup nomad task: $taskKey -- see the log file for details", e
         }
     }
 
     /**
      * @return Retrieve the task status caching the result for at lest one second
      */
-    protected TaskState taskState0( NomadTaskKey key) {}
+    protected TaskState taskState0(NomadTaskKey key) {
+        final now = System.currentTimeMillis()
+        final delta =  now - timestamp;
+        if( !taskState || delta >= 1_000) {
+            def newState = nomadService.getTask(key).state()
+            log.trace "[NOMAD] Task: $key state=$newState"
+            if( newState ) {
+                taskState = newState
+                timestamp = now
+            }
+        }
+        return taskState
+    }
+
 
     protected int readExitFile() {
         try {
@@ -148,7 +193,7 @@ class NomadTaskHandler extends TaskHandler {
     void kill() {
         if( !taskKey )
             return
-        batchService.terminate(taskKey)
+        nomadService.terminate(taskKey)
     }
 
     @Override
@@ -156,10 +201,20 @@ class NomadTaskHandler extends TaskHandler {
         def result = super.getTraceRecord()
         if( taskKey ) {
             result.put('native_id', taskKey.keyPair())
-            //result.machineInfo = getMachineInfo()
+            result.machineInfo = getMachineInfo()
         }
         return result
     }
 
+    protected CloudMachineInfo getMachineInfo() {
+        if( machineInfo )
+            return machineInfo
+        if( taskKey ) {
+            machineInfo = nomadService.machineInfo(taskKey)
+            log.trace "[NOMAD] task=$taskKey => machineInfo=$machineInfo"
+        }
+        return machineInfo
+    }
 
 }
+

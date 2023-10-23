@@ -87,7 +87,6 @@ class NomadServiceTest extends Specification {
 
 
         and:
-        println(TASK.hashCode())
         def jobId = svc.getOrRunJob(TASK)
 
         expect:

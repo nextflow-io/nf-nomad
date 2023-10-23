@@ -62,14 +62,19 @@ class NomadClientOpts {
         assert config != null
         sysEnv = env==null ? new HashMap<String,String>(System.getenv()) : env
 
+
+        //Source these from the environment
         def addr = config.address ?: sysEnv.get("NOMAD_ADDR")
         this.address = "${addr}/v1"
         this.token = config.token ?: sysEnv.get("NOMAD_TOKEN")
         this.dataCenter = config.dataCenter ?: sysEnv.get("NOMAD_DC")
 
+        //Source these from the config file
         this.region = config.region ?: DEFAULT_REGION
         this.namespace = config.namespace ?: DEFAULT_NAMESPACE
 
+
+        //These are hard-coded temporarily
         this.driver = DEFAULT_DRIVER
         this.jobType = DEFAULT_JOB_TYPE
     }

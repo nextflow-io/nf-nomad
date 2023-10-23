@@ -1,6 +1,5 @@
 /*
- * Copyright 2023, Stellenbosch University, South Africa
- * Copyright 2022, Center for Medical Genetics, Ghent
+ * Copyright 2013-2023, Seqera Labs
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,17 +12,20 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
+ *
  */
 
-package nextflow.nomad
+package nextflow.nomad.model
 
 /**
- * Nomad API Helper methods
+ * Model the resource type to be used to run nextflow tasks
  *
- * @author Abhinav Sharma <abhi18av@outlook.com>
+ * @author Paolo Di Tommaso <paolo.ditommaso@gmail.com>
  */
+enum ResourceType {
+    Pod, Job;
 
-class NomadHelper {
-
-    //NOTE: Implement helpers for task-status
+    String lower() {
+        return this.name().toLowerCase()
+    }
 }

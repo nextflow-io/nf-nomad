@@ -1,6 +1,5 @@
 /*
- * Copyright 2023, Stellenbosch University, South Africa
- * Copyright 2022, Center for Medical Genetics, Ghent
+ * Copyright 2013-2023, Seqera Labs
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,15 +14,28 @@
  * limitations under the License.
  */
 
-package nextflow.nomad
+package nextflow.nomad.model
+
+import groovy.transform.CompileStatic
+import groovy.transform.EqualsAndHashCode
+import groovy.transform.ToString
 
 /**
- * Nomad API Helper methods
+ * Model a K8s pod host mount definition
  *
- * @author Abhinav Sharma <abhi18av@outlook.com>
+ * @author Paolo Di Tommaso <paolo.ditommaso@gmail.com>
  */
+@EqualsAndHashCode
+@ToString(includeNames = true)
+@CompileStatic
+class PodHostMount {
 
-class NomadHelper {
+    String hostPath
 
-    //NOTE: Implement helpers for task-status
+    String mountPath
+
+    PodHostMount(String host, String container) {
+        this.hostPath = host
+        this.mountPath = container
+    }
 }

@@ -27,6 +27,8 @@ import io.nomadproject.client.models.Job
 import io.nomadproject.client.models.JobRegisterRequest
 import io.nomadproject.client.models.JobValidateRequest
 import io.nomadproject.client.models.JobValidateResponse
+import nextflow.cloud.types.CloudMachineInfo
+import nextflow.cloud.types.PriceModel
 import nextflow.nomad.config.NomadConfig
 import nextflow.processor.TaskProcessor
 import nextflow.processor.TaskRun
@@ -43,6 +45,8 @@ import nextflow.util.Rnd
 class NomadService implements Closeable {
 
     NomadConfig config
+
+    Map<TaskProcessor, String> allJobIds = new HashMap<>(50)
 
     NomadService(NomadExecutor executor) {
         assert executor
@@ -92,11 +96,10 @@ class NomadService implements Closeable {
     }
 
 
-    Map<TaskProcessor, String> allJobIds = new HashMap<>(50)
 
     synchronized String getOrRunJob(TaskRun task) {
 
-        //If job doesn't already exist
+        //If job already exists
         final mapKey = task.processor
         if (allJobIds.containsKey(mapKey)) {
             return allJobIds[mapKey]
@@ -106,6 +109,7 @@ class NomadService implements Closeable {
 
         //- create a job ID
         final newJobId = makeJobId(task)
+
         //- add to the map
         allJobIds[mapKey] = newJobId
 
@@ -148,7 +152,6 @@ class NomadService implements Closeable {
                 xNomadToken,
                 idempotencyToken)
 
-
         return new NomadTaskKey(taskJob.name, taskJob.name)
     }
 
@@ -181,6 +184,20 @@ class NomadService implements Closeable {
         return response
     }
 
+
+    CloudMachineInfo machineInfo(NomadTaskKey key) {
+//        if( !key || !key.jobId )
+//            throw new IllegalArgumentException("Missing Azure Batch job id")
+//        CloudJob job = apply(() -> client.jobOperations().getJob(key.jobId))
+//        final poolId = job.poolInfo().poolId()
+//        final AzVmPoolSpec spec = allPools.get(poolId)
+//        if( !spec )
+//            throw new IllegalStateException("Missing VM pool spec for pool id: $poolId")
+//        final type = spec.vmType.name
+//        if( !type )
+//            throw new IllegalStateException("Missing VM type for pool id: $poolId")
+//        new CloudMachineInfo(type: type, priceModel: PriceModel.standard, zone: config.batch().location)
+    }
 
 
     void terminate(NomadTaskKey key) {
