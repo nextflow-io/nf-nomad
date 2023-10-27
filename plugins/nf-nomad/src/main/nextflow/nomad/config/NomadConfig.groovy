@@ -1,6 +1,7 @@
+
+
 /*
- * Copyright 2023, Stellenbosch University, South Africa
- * Copyright 2022, Center for Medical Genetics, Ghent
+ * Copyright 2013-2023, Seqera Labs
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,22 +19,29 @@
 package nextflow.nomad.config
 
 import groovy.transform.CompileStatic
+import groovy.transform.Memoized
+import groovy.transform.PackageScope
+import groovy.util.logging.Slf4j
+import nextflow.nomad.model.NomadJobOptions
+import nextflow.util.Duration
 import nextflow.Global
 import nextflow.Session
 
-/**
- * Model Nomad job settings defined in the nextflow.config file
- *
- * @author Abhinav Sharma <abhi18av@outlook.com>
- */
+import javax.annotation.Nullable
 
+/**
+ * Model Nomad specific settings defined in the nextflow
+ * configuration file
+ *
+ * @author Paolo Di Tommaso <paolo.ditommaso@gmail.com>
+ */
+@Slf4j
 @CompileStatic
 class NomadConfig {
 
     private NomadClientOpts clientOpts
 
     NomadClientOpts client() { clientOpts }
-
 
     NomadConfig(Map nomadConfigMap) {
         this.clientOpts = new NomadClientOpts((Map) nomadConfigMap.client ?: Collections.emptyMap())
@@ -49,4 +57,6 @@ class NomadConfig {
     static NomadConfig getConfig() {
         getConfig(Global.session as Session)
     }
+
 }
+

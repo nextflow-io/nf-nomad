@@ -14,39 +14,41 @@
  * limitations under the License.
  */
 
-package nextflow.nomad.model
+package nextflow.nomad.client
 
 import groovy.transform.CompileStatic
-import groovy.transform.EqualsAndHashCode
-import groovy.transform.ToString
 
 /**
- * Models K8s pod security context
- *
- * See
- * https://kubernetes.io/docs/tasks/configure-pod-container/security-context/
+ * Model a Kubernetes API response
  *
  * @author Paolo Di Tommaso <paolo.ditommaso@gmail.com>
  */
 @CompileStatic
-@ToString(includeNames = true)
-@EqualsAndHashCode(includeFields = true)
-class PodSecurityContext {
+class NomadResponseApi {
 
-    private Map spec
+    private int code
 
-    PodSecurityContext(def user) {
-        spec = [runAsUser: user]
+    private InputStream stream
+
+    private String text
+
+    NomadResponseApi(int code, InputStream stream) {
+        this.code = code
+        this.stream = stream
     }
-
-    PodSecurityContext(Map ctx) {
-        assert ctx
-        spec = ctx
-    }
-
-    Map toSpec() { spec }
 
     String toString() {
-        "PodSecurityContext[ ${spec?.toString()} ]"
+        "code=$code; stream=$stream"
+    }
+
+    int getCode() { code }
+
+    InputStream getStream() { stream }
+
+    String getText() {
+        if( text == null ) {
+            text = stream?.text
+        }
+        return text
     }
 }

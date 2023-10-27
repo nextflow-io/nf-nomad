@@ -3,5 +3,5 @@ Plugin-Id: nf-nomad
 Plugin-Version: 0.0.1
 Plugin-Class: nextflow.nomad.NomadPlugin
 Plugin-Provider: nextflow
-Plugin-Requires: >=22.10.0
+Plugin-Requires: >=23.10.0
 

@@ -1,6 +1,5 @@
 /*
- * Copyright 2023, Stellenbosch University, South Africa
- * Copyright 2022, Center for Medical Genetics, Ghent
+ * Copyright 2013-2023, Seqera Labs
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,19 +14,15 @@
  * limitations under the License.
  */
 
-
 package nextflow.nomad.executor
 
 import groovy.transform.CompileStatic
 import groovy.transform.PackageScope
 import groovy.util.logging.Slf4j
-import nextflow.fusion.FusionHelper
-
-import java.nio.file.Path
 import nextflow.Global
-import nextflow.exception.AbortOperationException
 import nextflow.executor.Executor
 import nextflow.extension.FilesEx
+import nextflow.fusion.FusionHelper
 import nextflow.nomad.config.NomadConfig
 import nextflow.processor.TaskHandler
 import nextflow.processor.TaskMonitor
@@ -37,50 +32,46 @@ import nextflow.util.Duration
 import nextflow.util.ServiceName
 import org.pf4j.ExtensionPoint
 
-/**
- * Nextflow executor for Nomad
- *
- * @author Abhinav Sharma <abhi18av@outlook.com>
- * @author matthdsm <ict@cmgg.be>
- */
+import java.nio.file.Path
 
+/**
+ * Implement the Kubernetes executor
+ *
+ * @author Paolo Di Tommaso <paolo.ditommaso@gmail.com>
+ */
 @Slf4j
-@ServiceName('nomad')
 @CompileStatic
+@ServiceName('nomad')
 class NomadExecutor extends Executor implements ExtensionPoint {
 
     private Path remoteBinDir
 
     private NomadConfig config
 
-    private NomadService nomadService
+    private NomadService service
 
     /**
-     * @return {@code true} to signal containers are managed directly by the Nomad executor
+     * @return {@code true} to signal containers are managed directly the AWS Batch service
      */
     final boolean isContainerNative() {
         return true
     }
-
 
     @Override
     String containerConfigEngine() {
         return 'docker'
     }
 
-
     @Override
     Path getWorkDir() {
         session.workDir
     }
 
-    protected void validateWorkDir() {
-        /*
-         * Make sure the work dir is a local path
-         */
-        if (!(workDir instanceof Path)) {
-            session.abort()
-            throw new AbortOperationException("When using Nomad executor a local path must be provided as working directory")
+
+    protected void validatePathDir() {
+        def path = session.config.navigate('env.PATH')
+        if( path ) {
+            log.warn "Environment PATH defined in config file is ignored by Nomadure Batch executor"
         }
     }
 
@@ -88,18 +79,18 @@ class NomadExecutor extends Executor implements ExtensionPoint {
         /*
          * upload local binaries
          */
-        if (session.binDir && !session.binDir.empty() && !session.disableRemoteBinDir) {
+        if( session.binDir && !session.binDir.empty() && !session.disableRemoteBinDir ) {
             final remote = getTempDir()
             log.info "Uploading local `bin` scripts folder to ${remote.toUriString()}/bin"
             remoteBinDir = FilesEx.copyTo(session.binDir, remote)
         }
     }
 
-    protected void initBatchService() {
+    protected void initService() {
         config = NomadConfig.getConfig(session)
-        def nomadService = new NomadService(this)
+        service = new NomadService(this)
 
-        Global.onCleanup((it) -> nomadService.close())
+        Global.onCleanup((it) -> service.close())
     }
 
     /**
@@ -108,8 +99,8 @@ class NomadExecutor extends Executor implements ExtensionPoint {
     @Override
     protected void register() {
         super.register()
-        initBatchService()
-        validateWorkDir()
+        initService()
+        validatePathDir()
         uploadBinDir()
     }
 
@@ -124,18 +115,15 @@ class NomadExecutor extends Executor implements ExtensionPoint {
 
     @Override
     TaskHandler createTaskHandler(TaskRun task) {
-        return new NomadTaskHandler(task, this)
+//        def handler = new NomadTaskHandler(task, this)
+//        return handler
+        return null
     }
 
-    NomadService getNomadService() {
-        return nomadService
+    NomadService getService() {
+        return service
     }
 
-    NomadExecutor getNomadBatchExecutor() {
-        return nomadBatchExecutor
-    }
-
-    Path getRemoteBinDir() { return remoteBinDir }
 
     @Override
     boolean isFusionEnabled() {

@@ -1,6 +1,5 @@
 /*
- * Copyright 2023, Stellenbosch University, South Africa
- * Copyright 2022, Center for Medical Genetics, Ghent
+ * Copyright 2013-2023, Seqera Labs
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,26 +17,31 @@
 package nextflow.nomad.config
 
 import groovy.transform.CompileStatic
+import groovy.transform.EqualsAndHashCode
+import nextflow.util.Duration
+
+import java.nio.file.Paths
 
 /**
- * Model Nomad job settings defined in the nextflow.config file
+ * Models the kubernetes cluster client configuration settings
  *
- * @author Abhinav Sharma <abhi18av@outlook.com>
+ * @author Paolo Di Tommaso <paolo.ditommaso@gmail.com>
  */
+@EqualsAndHashCode
 @CompileStatic
 class NomadClientOpts {
 
     private Map<String,String> sysEnv
 
-    String address
+    String server
     String dataCenter
     String token
+    Duration httpReadTimeout
+    Duration httpConnectTimeout
 
-    // TODO (fix milestone): Implement the TLS certificate
-
-    //-------------------------------------------------------------------
-    //NOTE: Use the default for region and namespace
-    //-------------------------------------------------------------------
+//-------------------------------------------------------------------
+//NOTE: Use the default for region and namespace
+//-------------------------------------------------------------------
 
     static public final String DEFAULT_REGION = "global"
     String region
@@ -45,38 +49,42 @@ class NomadClientOpts {
     static public final String DEFAULT_NAMESPACE = "default"
     String namespace
 
-    //-------------------------------------------------------------------
-    //NOTE: Hard-coded to job type and docker containers
-    //-------------------------------------------------------------------
+//-------------------------------------------------------------------
+//NOTE: Hard-coded to job type and docker containers
+//-------------------------------------------------------------------
     static public final String DEFAULT_DRIVER = "docker"
     String driver
 
     static public final String DEFAULT_JOB_TYPE = "batch"
     String jobType
 
-    //-------------------------------------------------------------------
+//-------------------------------------------------------------------
 
 
+    NomadClientOpts(Map clientConfig, Map<String,String> env = null) {
+        assert clientConfig != null
 
-    NomadClientOpts(Map config, Map<String,String> env = null) {
-        assert config != null
         sysEnv = env==null ? new HashMap<String,String>(System.getenv()) : env
 
+        this.server = clientConfig.server ?: "${sysEnv.get('NOMAD_ADDR')}/v1"
+        this.token = clientConfig.token ?: sysEnv.get("NOMAD_TOKEN")
+        this.dataCenter = clientConfig.dataCenter ?: sysEnv.get("NOMAD_DC")
 
-        //Source these from the environment
-        def addr = config.address ?: sysEnv.get("NOMAD_ADDR")
-        this.address = "${addr}/v1"
-        this.token = config.token ?: sysEnv.get("NOMAD_TOKEN")
-        this.dataCenter = config.dataCenter ?: sysEnv.get("NOMAD_DC")
+        this.region = clientConfig.region ?: DEFAULT_REGION
+        this.namespace = clientConfig.namespace ?: DEFAULT_NAMESPACE
 
-        //Source these from the config file
-        this.region = config.region ?: DEFAULT_REGION
-        this.namespace = config.namespace ?: DEFAULT_NAMESPACE
-
-
-        //These are hard-coded temporarily
         this.driver = DEFAULT_DRIVER
         this.jobType = DEFAULT_JOB_TYPE
     }
 
+    private String cut(String str) {
+        if( !str ) return '-'
+        return str.size()<10 ? str : str[0..5].toString() + '..'
+    }
+
+    String toString() {
+        "${this.class.getSimpleName()}[ server=$server, namespace=$namespace, token=${cut(token)}, httpReadTimeout=$httpReadTimeout, httpConnectTimeout=$httpConnectTimeout ]"
+    }
+
 }
+

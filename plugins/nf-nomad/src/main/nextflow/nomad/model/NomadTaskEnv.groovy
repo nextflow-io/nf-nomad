@@ -21,61 +21,48 @@ import groovy.transform.EqualsAndHashCode
 import groovy.transform.ToString
 
 /**
- * Model a K8s pod environment variable definition
+ * Model a Nomad task environment variable definition
+ * https://developer.hashicorp.com/nomad/docs/job-specification/env
  *
  * @author Paolo Di Tommaso <paolo.ditommaso@gmail.com>
  */
 @CompileStatic
 @ToString(includeNames = true)
 @EqualsAndHashCode(includeFields = true)
-class PodEnv {
+class NomadTaskEnv {
 
     private Map spec
 
-    private PodEnv(Map spec) {
+    private NomadTaskEnv(Map spec) {
         this.spec = spec
     }
 
-    static PodEnv value(String env, String value) {
-        new PodEnv([name:env, value:value])
+    static NomadTaskEnv value(String env, String value) {
+        new NomadTaskEnv([name:env, value:value])
     }
 
-    static PodEnv fieldPath(String env, String fieldPath) {
-        new PodEnv([ name: env, valueFrom: [fieldRef:[fieldPath: fieldPath]]])
+    static NomadTaskEnv fieldPath(String env, String fieldPath) {
+        new NomadTaskEnv([ name: env, valueFrom: [fieldRef:[fieldPath: fieldPath]]])
     }
 
-    static PodEnv config(String env, String config) {
+    static NomadTaskEnv config(String env, String config) {
         final tokens = config.tokenize('/')
         if( tokens.size() > 2 )
-            throw new IllegalArgumentException("K8s invalid pod env file: $config -- Secret must be specified as <config-name>/<config-key>")
+            throw new IllegalArgumentException("Nomad invalid env: $config -- Secret must be specified as <config-name>/<config-key>")
 
         final name = tokens[0]
         final key = tokens[1]
 
-        assert env, 'Missing pod env variable name'
-        assert name, 'Missing pod env config name'
+        assert env, 'Missing task env variable name'
+        assert name, 'Missing task env config name'
 
         final ref = [ name: name, key: (key ?: env) ]
-        new PodEnv([ name: env, valueFrom: [configMapKeyRef: ref]])
+        new NomadTaskEnv([ name: env, valueFrom: [configMapKeyRef: ref]])
     }
-
-    static PodEnv secret(String env, String secret) {
-
-        final tokens = secret.tokenize('/')
-        if( tokens.size() > 2 )
-            throw new IllegalArgumentException("K8s invalid pod env secret: $secret -- Secret must be specified as <secret-name>/<secret-key>")
-
-        final name = tokens[0]
-        final key = tokens[1]
-
-        final ref = [ name: name, key: (key ?: env) ]
-        new PodEnv([ name: env, valueFrom: [secretKeyRef: ref]])
-    }
-
 
     Map toSpec() { spec }
 
     String toString() {
-        "PodEnv[ ${spec?.toString()} ]"
+        "NomadTaskEnv[ ${spec?.toString()} ]"
     }
 }

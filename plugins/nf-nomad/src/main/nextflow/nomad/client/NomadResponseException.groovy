@@ -26,25 +26,25 @@ import groovy.util.logging.Slf4j
 
 @Slf4j
 @CompileStatic
-class K8sResponseException extends Exception {
+class NomadResponseException extends Exception {
 
-    nextflow.k8s.client.K8sResponseJson response
+    NomadResponseJson response
 
-    K8sResponseException(nextflow.k8s.client.K8sResponseJson response) {
+    NomadResponseException(NomadResponseJson response) {
         super(msg0(response))
         this.response = response
     }
 
-    K8sResponseException(String message, nextflow.k8s.client.K8sResponseJson response) {
+    NomadResponseException(String message, NomadResponseJson response) {
         super(msg1(message,response))
         this.response = response
     }
 
-    K8sResponseException(String message, InputStream response) {
-        this(message, new nextflow.k8s.client.K8sResponseJson(fetch(response)))
+    NomadResponseException(String message, InputStream response) {
+        this(message, new NomadResponseJson(fetch(response)))
     }
 
-    static private String msg1(String msg, nextflow.k8s.client.K8sResponseJson resp ) {
+    static private String msg1(String msg, NomadResponseJson resp ) {
         if( !msg && resp==null )
             return null
 
@@ -60,7 +60,7 @@ class K8sResponseException extends Exception {
         }
     }
 
-    static private String msg0(nextflow.k8s.client.K8sResponseJson response ) {
+    static private String msg0(NomadResponseJson response ) {
         if( response == null )
             return null
 

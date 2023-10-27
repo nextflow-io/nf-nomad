@@ -16,6 +16,7 @@
 
 package nextflow.nomad.client
 
+
 import groovy.json.JsonOutput
 import groovy.json.JsonSlurper
 import groovy.transform.CompileStatic
@@ -28,19 +29,23 @@ import groovy.util.logging.Slf4j
  */
 @Slf4j
 @CompileStatic
-class K8sResponseJson implements Map {
+class NomadResponseJson implements Map {
 
     @Delegate
     private Map response
-
     private String rawText
 
-    K8sResponseJson(Map response) {
+    NomadResponseJson(Map response) {
         this.response = response
     }
 
-    K8sResponseJson(String response) {
+    NomadResponseJson(String response) {
         this.response = toJson(response)
+        this.rawText = response
+    }
+
+    NomadResponseJson(InputStream inputStream) {
+        this.response = parseStream(inputStream)
         this.rawText = response
     }
 
@@ -48,15 +53,39 @@ class K8sResponseJson implements Map {
 
     String getRawText() { rawText }
 
+
+    static private String streamToText(InputStream inputStream) {
+        def newLine = System.getProperty("line.separator");
+        def result = new StringBuilder();
+
+        try (BufferedReader reader = new BufferedReader(new InputStreamReader(inputStream))) {
+            String line;
+            while ((line = reader.readLine()) != null) {
+                result
+                        .append(line)
+                        .append(newLine);
+            }
+        }
+        return result
+    }
+
+
+    static private Map parseStream(InputStream inputStream) {
+        def text = streamToText(inputStream)
+        return [json: (new JsonSlurper().parseText(text))]
+    }
+
+
     static private Map toJson(String raw) {
         try {
             return (Map)new JsonSlurper().parseText(raw)
         }
         catch( Exception e ) {
-            log.trace "[K8s] cannot parse response to json -- raw: ${raw? '\n'+raw.indent('  ') :'null'}"
+            log.trace "[Nomad] Cannot parse response to json -- raw: ${raw? '\n'+raw.indent('  ') :'null'}"
             return Collections.emptyMap()
         }
     }
+
 
     static private String prettyPrint(String json) {
         try {
@@ -66,6 +95,13 @@ class K8sResponseJson implements Map {
             return json
         }
     }
+
+
+
+    static private Boolean isValidJson(String json) {
+//FIXME
+    }
+
 
     String toString() {
         response ? prettyPrint(JsonOutput.toJson(response)) : rawText

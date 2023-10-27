@@ -14,28 +14,24 @@
  * limitations under the License.
  */
 
-package nextflow.nomad.model
+package nextflow.nomad.client
 
 import groovy.transform.CompileStatic
-import groovy.transform.EqualsAndHashCode
-import groovy.transform.ToString
+import nextflow.exception.ProcessException
+import nextflow.exception.ShowOnlyExceptionMessage
 
 /**
- * Model a K8s pod host mount definition
+ * Exception raised when a pod cannot be scheduled because
+ * e.g. the container image cannot be pulled, required resources
+ * cannot be fulfilled, etc.
  *
  * @author Paolo Di Tommaso <paolo.ditommaso@gmail.com>
  */
-@EqualsAndHashCode
-@ToString(includeNames = true)
 @CompileStatic
-class PodHostMount {
+class NomadTaskUnschedulableException extends ProcessException implements ShowOnlyExceptionMessage {
 
-    String hostPath
-
-    String mountPath
-
-    PodHostMount(String host, String container) {
-        this.hostPath = host
-        this.mountPath = container
+    NomadTaskUnschedulableException(String message, Throwable cause) {
+        super(message,cause)
     }
+
 }

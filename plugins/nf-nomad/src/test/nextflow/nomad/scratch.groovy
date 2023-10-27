@@ -17,6 +17,7 @@
 
 package nextflow.nomad
 
+import groovy.json.JsonSlurper
 import io.nomadproject.client.Configuration
 import io.nomadproject.client.api.JobsApi
 import io.nomadproject.client.models.Job
@@ -27,11 +28,16 @@ import nextflow.Session
 import nextflow.nomad.config.NomadConfig
 import spock.lang.Specification
 
+import static groovy.json.JsonSlurper.*
+
 /**
  *
  * @author Abhinav Sharma <abhi18av@outlook.com>
  */
 class scratch extends Specification {
+
+
+
 
     def 'should create a client and submit a job'() {
 
@@ -71,7 +77,7 @@ class scratch extends Specification {
         def taskDef = new Task()
                 .driver(driver)
                 .config([ "image": "quay.io/nextflow/rnaseq-nf:v1.1",
-                          "command": "echo", 
+                          "command": "echo",
                           "args": ["hello-nomad"]])
                 .name(NF_TASKJOB_NAME)
 
