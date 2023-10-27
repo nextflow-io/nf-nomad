@@ -24,6 +24,8 @@ import groovy.util.logging.Slf4j
 import nextflow.nomad.client.NomadClient
 import nextflow.nomad.client.NomadResponseJson
 import nextflow.nomad.config.NomadConfig
+import nextflow.nomad.model.NomadJob
+import nextflow.nomad.model.NomadJobBuilder
 
 /**
  * Nomad Service
@@ -77,6 +79,17 @@ class NomadService implements Closeable {
         return new NomadResponseJson(resp.stream)
     }
 
+    NomadResponseJson jobCreate(String jobBaseName, String namespace = "default") {
+        final endpoint = "/jobs?$namespace"
+
+        def jobJson = new NomadJobBuilder()
+                .withJobName(jobBaseName)
+                .buildAsJson()
+
+
+        final resp = client.post(endpoint, jobJson)
+        return new NomadResponseJson(resp.stream)
+    }
 
 
 

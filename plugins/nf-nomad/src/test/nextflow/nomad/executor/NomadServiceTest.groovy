@@ -50,7 +50,27 @@ class NomadServiceTest extends Specification {
 //    }
 
 
-        def 'should list jobs' () {
+
+    def 'should create a job' () {
+        given:
+
+        def exec = Mock(NomadExecutor) {
+            getConfig() >> new NomadConfig([:])
+        }
+        def svc = new NomadService(exec)
+
+        when:
+        def JOB_NAME = "mysleep"
+        def result = svc.jobCreate(JOB_NAME)
+
+        then:
+        println(result.json)
+
+    }
+
+
+
+    def 'should list jobs' () {
         given:
 
         def exec = Mock(NomadExecutor) {
@@ -83,6 +103,7 @@ class NomadServiceTest extends Specification {
         println(result.json.Summary."$JOB_NAME-group")
 
     }
+
 
 
 
