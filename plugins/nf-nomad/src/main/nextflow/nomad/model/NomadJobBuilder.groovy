@@ -51,6 +51,12 @@ class NomadJobBuilder {
 
     String jobBaseName
 
+    String jobName
+
+    String taskGroupName
+
+    String taskName
+
     String restart
 
     String imageName
@@ -89,6 +95,9 @@ class NomadJobBuilder {
 
     NomadJobBuilder withJobName(String name) {
         this.jobBaseName = name
+        this.jobName = "$jobBaseName-job"
+        this.taskGroupName = "$jobBaseName-taskgroup"
+        this.taskName = "$jobBaseName-task"
         return this
     }
 
@@ -187,36 +196,21 @@ class NomadJobBuilder {
             // not the 'spec' securityContext (see below)
             secContext.privileged =true
         }
-        if( capabilities ) {
-            secContext.capabilities = capabilities
-        }
-        if( secContext ) {
-            container.securityContext = secContext
-        }
-
-        final spec = [
-                restartPolicy: restart,
-                containers: [ container ],
-        ]
-
-        if( this.serviceAccount )
-            spec.serviceAccountName = this.serviceAccount
-
 
         final job = [
                 Job: [
-                ID: "$jobBaseName-id",
-                Name: "$jobBaseName-job",
-                Type: 'service',
+                ID: jobName,
+                Name: jobName,
+                Type: 'batch',
                 Datacenters: ["sun-nomadlab"],
                 TaskGroups: [
-                        [Name: "$jobBaseName-taskgroup",
-                         Tasks: [[Name: "$jobBaseName-tasks",
+                        [Name: taskGroupName,
+                         Tasks: [[Name: taskName,
                                  Driver: "docker",
                                  Config: [
                                          args: ["-c", "while true; do echo sleeping; sleep 10; done"],
                                          command: "bash",
-                                         image: "quay.io/nextflow/rnaseq-nf:v1.1"
+                                         image: container.image
                                  ]]]]
                 ]]
         ]

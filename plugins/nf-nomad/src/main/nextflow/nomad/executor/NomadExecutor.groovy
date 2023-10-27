@@ -115,9 +115,8 @@ class NomadExecutor extends Executor implements ExtensionPoint {
 
     @Override
     TaskHandler createTaskHandler(TaskRun task) {
-//        def handler = new NomadTaskHandler(task, this)
-//        return handler
-        return null
+        def handler = new NomadJobHandler(task, this)
+        return handler
     }
 
     NomadService getService() {

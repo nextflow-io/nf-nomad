@@ -31,13 +31,14 @@ import java.nio.file.Paths
 @CompileStatic
 class NomadClientOpts {
 
-    private Map<String,String> sysEnv
+    private Map<String, String> sysEnv
 
     String server
     String dataCenter
     String token
     Duration httpReadTimeout
     Duration httpConnectTimeout
+    Boolean deleteJobsOnCompletion = false
 
 //-------------------------------------------------------------------
 //NOTE: Use the default for region and namespace
@@ -61,10 +62,10 @@ class NomadClientOpts {
 //-------------------------------------------------------------------
 
 
-    NomadClientOpts(Map clientConfig, Map<String,String> env = null) {
+    NomadClientOpts(Map clientConfig, Map<String, String> env = null) {
         assert clientConfig != null
 
-        sysEnv = env==null ? new HashMap<String,String>(System.getenv()) : env
+        sysEnv = env == null ? new HashMap<String, String>(System.getenv()) : env
 
         this.server = clientConfig.server ?: "${sysEnv.get('NOMAD_ADDR')}/v1"
         this.token = clientConfig.token ?: sysEnv.get("NOMAD_TOKEN")
@@ -78,8 +79,8 @@ class NomadClientOpts {
     }
 
     private String cut(String str) {
-        if( !str ) return '-'
-        return str.size()<10 ? str : str[0..5].toString() + '..'
+        if (!str) return '-'
+        return str.size() < 10 ? str : str[0..5].toString() + '..'
     }
 
     String toString() {

@@ -23,10 +23,10 @@ import groovy.transform.ToString
 import nextflow.nomad.model.*
 
 /**
- * Model K8s pod options such as environment variables,
+ * Model Nomad pod options such as environment variables,
  * secret and config-maps
  *
- * @author Paolo Di Tommaso <paolo.ditommaso@gmail.com>
+ * @author Abhinav Sharma <abhi18av@outlook.com>
  */
 @CompileStatic
 @ToString(includeNames = true)
