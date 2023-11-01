@@ -99,6 +99,7 @@ class NomadJobHandler extends TaskHandler implements FusionAwareTask {
     boolean checkIfRunning() {
 
         return false
+
 //        if( !taskKey || !isSubmitted() )
 //            return false
 //        final state = taskState0(taskKey)
@@ -132,10 +133,10 @@ class NomadJobHandler extends TaskHandler implements FusionAwareTask {
         return false
     }
 
-//    private Boolean shouldDelete() {
-//        executor.config.client().deleteJobsOnCompletion
-//    }
-//
+    private Boolean shouldDelete() {
+        executor.config.client().deleteJobsOnCompletion
+    }
+
 //    protected void deleteTask(AzTaskKey taskKey, TaskRun task) {
 //        if( !taskKey || shouldDelete()==Boolean.FALSE )
 //            return
@@ -152,7 +153,7 @@ class NomadJobHandler extends TaskHandler implements FusionAwareTask {
 //            log.warn "Unable to cleanup batch task: $taskKey -- see the log file for details", e
 //        }
 //    }
-//
+
 //    /**
 //     * @return Retrieve the task status caching the result for at lest one second
 //     */
@@ -160,7 +161,7 @@ class NomadJobHandler extends TaskHandler implements FusionAwareTask {
 //        final now = System.currentTimeMillis()
 //        final delta =  now - timestamp;
 //        if( !taskStatus || delta >= 1_000) {
-//            def newState = nomadService.jobSummary(key).state()
+//            def newState = nomadService.jobStatus(key).state()
 //            log.trace "[AZURE BATCH] Task: $key state=$newState"
 //            if( newState ) {
 //                taskStatus = newState as TaskStatus

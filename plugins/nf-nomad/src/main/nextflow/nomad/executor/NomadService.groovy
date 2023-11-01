@@ -1,4 +1,3 @@
-
 /*
  * Copyright 2023, Stellenbosch University, South Africa
  * Copyright 2022, Center for Medical Genetics, Ghent
@@ -21,11 +20,11 @@ package nextflow.nomad.executor
 import groovy.transform.CompileStatic
 import groovy.transform.Memoized
 import groovy.util.logging.Slf4j
-import javafx.concurrent.Task
+import nextflow.Global
+import nextflow.nomad.NomadHelper
 import nextflow.nomad.client.NomadClient
 import nextflow.nomad.client.NomadResponseJson
 import nextflow.nomad.config.NomadConfig
-import nextflow.nomad.model.NomadJob
 import nextflow.nomad.model.NomadJobBuilder
 import nextflow.processor.TaskRun
 
@@ -62,12 +61,12 @@ class NomadService implements Closeable {
         new NomadClient(config)
     }
 
+    @Override
+    void close() {
+        Global.onCleanup((it) -> client.closeConnection())
 
-    NomadResponseJson serverStatus() {
-        final endpoint = "/status/leader"
-        final resp = client.get(endpoint)
-        return new NomadResponseJson(resp.stream)
     }
+
 
     NomadResponseJson jobList(String namespace = "default") {
         final endpoint = "/jobs?$namespace"
@@ -81,32 +80,41 @@ class NomadService implements Closeable {
         return new NomadResponseJson(resp.stream)
     }
 
+    NomadResponseJson jobStatus(String jobName, String namespace = "default") {
+        final endpoint = "/job/${jobName}/summary?$namespace"
+        final resp = client.get(endpoint)
+        return new NomadResponseJson(resp.stream)
+    }
+
     NomadResponseJson jobPurge(String jobName, String namespace = "default") {
         final endpoint = "/job/$jobName?purge=true"
         final resp = client.delete(endpoint)
         return new NomadResponseJson(resp.stream)
     }
 
-    NomadResponseJson jobSubmit(TaskRun task, String namespace = "default") {
+    NomadResponseJson jobSubmit(TaskRun task, String jobName, String namespace = "default") {
         final endpoint = "/jobs?$namespace"
-        final jobJson = createJob(task)
-        final resp = client.post(endpoint, jobJson)
+        final resp = client.post(endpoint, createJob(task, jobName))
         return new NomadResponseJson(resp.stream)
     }
 
-    protected String createJob (TaskRun task) {
-
-        final taskId = "nf-${task.name}-${task.hash.toString()}"
+    protected static String createJob (TaskRun task, String jobName) {
 
         def jobJson = new NomadJobBuilder()
-                .withJobName(taskId)
-                .withImageName(task.container)
-                .buildAsJson()
+            .withJobName(jobName)
+            .withImageName(task.container)
+            .buildAsJson()
 
         return  jobJson
     }
 
-    @Override
-    void close()  {}
+
+//    NomadResponseJson serverStatus() {
+//        final endpoint = "/status/leader"
+//        final resp = client.get(endpoint)
+//        return new NomadResponseJson(resp.stream)
+//    }
+
+
 }
 

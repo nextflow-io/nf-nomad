@@ -28,6 +28,8 @@ class NomadClient {
 
     protected NomadClientOpts clientOpts
 
+    private HttpURLConnection conn
+
     NomadClient(NomadConfig config) {
         log.debug "[Nomad] Creating Nomad client using the configuration options ${config.client()}."
         this.clientOpts = config.client()
@@ -35,6 +37,10 @@ class NomadClient {
 
     protected HttpURLConnection createConnection0(String url) {
         new URL(url).openConnection() as HttpURLConnection
+    }
+
+    HttpURLConnection closeConnection() {
+        this.conn.disconnect()
     }
 
     /**
@@ -69,11 +75,16 @@ class NomadClient {
         }
     }
 
+    static private void debug(String method, String path, String text=null) {
+        log.debug "[Nomad] API request $method $path ${text ? '\n'+prettyPrint(text).indent() : ''}"
+    }
 
     private NomadResponseApi makeRequestCall(String method, String path, String body=null) throws NomadResponseException {
         final endpoint = clientOpts.server + path
 
-        final conn = createConnection0(endpoint)
+        debug(method, endpoint, body)
+        conn = createConnection0(endpoint)
+
         conn.setRequestProperty("Content-Type", "application/json")
         if( clientOpts.token ) {
             conn.setRequestProperty("Authorization", "Bearer ${clientOpts.token}")
@@ -81,7 +92,6 @@ class NomadClient {
 
         if( !method ) method = body ? 'POST' : 'GET'
         conn.setRequestMethod(method)
-        log.debug "[Nomad] API request $method $endpoint ${body ? '\n'+prettyPrint(body).indent() : ''}"
 
         if( body ) {
             conn.setDoOutput(true);
@@ -98,9 +108,6 @@ class NomadClient {
         return new NomadResponseApi(code, stream)
     }
 
-    static private void debug(String method, String path, String text=null) {
-        log.debug "[Nomad] API request $method $path \n${prettyPrint(text).indent()}"
-    }
 
     NomadResponseApi get(String path) {
         def method="GET"

@@ -20,21 +20,22 @@ import groovy.json.JsonBuilder
 import groovy.transform.CompileStatic
 import groovy.transform.PackageScope
 import groovy.util.logging.Slf4j
+import nextflow.processor.TaskRun
 import nextflow.util.MemoryUnit
 
 import java.nio.file.Path
 import java.util.concurrent.atomic.AtomicInteger
 
 /**
- * Object build for a K8s pod specification
+ * Object build for a Nomad job specification
  *
- * @author Paolo Di Tommaso <paolo.ditommaso@gmail.com>
+ * @author Abhinav Sharma <abhi18av@outlook.com>
  */
 @CompileStatic
 @Slf4j
 class NomadJobBuilder {
 
-    static enum MetaType { LABEL, ANNOTATION }
+    static enum MetaType { LABEL, META }
 
     static enum SegmentType {
         PREFIX (253),
@@ -48,8 +49,6 @@ class NomadJobBuilder {
     }
 
     static @PackageScope AtomicInteger VOLUMES = new AtomicInteger()
-
-    String jobBaseName
 
     String jobName
 
@@ -77,9 +76,6 @@ class NomadJobBuilder {
 
     String serviceAccount
 
-    boolean automountServiceAccountToken = true
-
-
     boolean privileged
 
     Map<String,List<String>> capabilities
@@ -93,11 +89,11 @@ class NomadJobBuilder {
         "vol-${VOLUMES.incrementAndGet()}".toString()
     }
 
+
     NomadJobBuilder withJobName(String name) {
-        this.jobBaseName = name
-        this.jobName = "$jobBaseName-job"
-        this.taskGroupName = "$jobBaseName-taskgroup"
-        this.taskName = "$jobBaseName-task"
+        this.jobName = name
+        this.taskGroupName = "${jobName}_taskgroup"
+        this.taskName = "${jobName}_task"
         return this
     }
 
@@ -171,17 +167,17 @@ class NomadJobBuilder {
     }
 
     Map build() {
-        assert this.jobBaseName, 'Missing K8s jobName parameter'
+//        assert this.jobName, 'Missing Nomad jobName parameter'
 //        assert this.imageName, 'Missing K8s imageName parameter'
 //        assert this.command || this.args, 'Missing K8s command parameter'
 
         final restart = this.restart ?: 'Never'
 
         final metadata = new LinkedHashMap<String,Object>()
-        metadata.name = jobBaseName
+        metadata.name = jobName
         metadata.namespace = namespace ?: 'default'
 
-        final container = [name: this.jobBaseName, image: this.imageName ]
+        final container = [name: this.jobName, image: this.imageName ]
         if( this.command )
             container.command = this.command
         if( this.args )
@@ -208,7 +204,7 @@ class NomadJobBuilder {
                          Tasks: [[Name: taskName,
                                  Driver: "docker",
                                  Config: [
-                                         args: ["-c", "while true; do echo sleeping; sleep 10; done"],
+                                         args: ["-c", "echo nf-nomad"],
                                          command: "bash",
                                          image: container.image
                                  ]]]]
@@ -236,24 +232,6 @@ class NomadJobBuilder {
         final job = build()
 
         return new JsonBuilder(job)
-    }
-
-
-    Map buildAsJob() {
-        final job = build()
-
-        return [
-            apiVersion: 'batch/v1',
-            kind: 'Job',
-            metadata: job.metadata,
-            spec: [
-                backoffLimit: 0,
-                template: [
-                    metadata: job.metadata,
-                    spec: job.spec
-                ]
-            ]
-        ]
     }
 
     @PackageScope

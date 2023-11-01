@@ -1,18 +1,3 @@
-/*
- * Copyright 2013-2023, Seqera Labs
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
 
 package nextflow.nomad.executor
 
@@ -20,6 +5,7 @@ import groovy.transform.CompileStatic
 import groovy.transform.PackageScope
 import groovy.util.logging.Slf4j
 import nextflow.Global
+import nextflow.exception.AbortOperationException
 import nextflow.executor.Executor
 import nextflow.extension.FilesEx
 import nextflow.fusion.FusionHelper
@@ -31,18 +17,17 @@ import nextflow.processor.TaskRun
 import nextflow.util.Duration
 import nextflow.util.ServiceName
 import org.pf4j.ExtensionPoint
-
 import java.nio.file.Path
 
 /**
- * Implement the Kubernetes executor
+ * Implement the Nomad executor
  *
- * @author Paolo Di Tommaso <paolo.ditommaso@gmail.com>
+ * @author Abhinav Sharma <abhi18av@outlook.com>
  */
 @Slf4j
 @CompileStatic
 @ServiceName('nomad')
-class NomadExecutor extends Executor implements ExtensionPoint {
+class NomadExecutor extends Executor implements  ExtensionPoint {
 
     private Path remoteBinDir
 
@@ -51,7 +36,7 @@ class NomadExecutor extends Executor implements ExtensionPoint {
     private NomadService service
 
     /**
-     * @return {@code true} to signal containers are managed directly the AWS Batch service
+     * @return {@code true} to signal containers are managed directly by the Nomad cluster
      */
     final boolean isContainerNative() {
         return true
@@ -67,11 +52,19 @@ class NomadExecutor extends Executor implements ExtensionPoint {
         session.workDir
     }
 
-
+    protected void validateWorkDir() {
+        /*
+         * make sure the work dir is an Azure bucket
+         */
+        if( !(workDir instanceof Path) ) {
+            session.abort()
+            throw new AbortOperationException("When using `$name` executor a working directory must be provided using the `-work-dir` command line option")
+        }
+    }
     protected void validatePathDir() {
         def path = session.config.navigate('env.PATH')
         if( path ) {
-            log.warn "Environment PATH defined in config file is ignored by Nomadure Batch executor"
+            log.warn "Environment PATH defined in config file is ignored by Nomad executor"
         }
     }
 
@@ -86,11 +79,11 @@ class NomadExecutor extends Executor implements ExtensionPoint {
         }
     }
 
-    protected void initService() {
-        config = NomadConfig.getConfig(session)
-        service = new NomadService(this)
+    protected void initNomadService() {
+        this.config = NomadConfig.getConfig(session)
+        this.service = new NomadService(this)
 
-        Global.onCleanup((it) -> service.close())
+        Global.onCleanup((it) -> service.client.closeConnection())
     }
 
     /**
@@ -99,9 +92,10 @@ class NomadExecutor extends Executor implements ExtensionPoint {
     @Override
     protected void register() {
         super.register()
-        initService()
-        validatePathDir()
-        uploadBinDir()
+        initNomadService()
+//        validateWorkDir()
+//        validatePathDir()
+//        uploadBinDir()
     }
 
     @PackageScope NomadConfig getConfig() {
@@ -110,19 +104,19 @@ class NomadExecutor extends Executor implements ExtensionPoint {
 
     @Override
     protected TaskMonitor createTaskMonitor() {
-        TaskPollingMonitor.create(session, name, 1000, Duration.of('10 sec'))
+        TaskPollingMonitor.create(session, name, 100, Duration.of('5 sec'))
     }
 
     @Override
     TaskHandler createTaskHandler(TaskRun task) {
-        def handler = new NomadJobHandler(task, this)
-        return handler
+        return new NomadTaskHandler(task, this)
     }
 
     NomadService getService() {
         return service
     }
 
+    Path getRemoteBinDir() { return remoteBinDir }
 
     @Override
     boolean isFusionEnabled() {

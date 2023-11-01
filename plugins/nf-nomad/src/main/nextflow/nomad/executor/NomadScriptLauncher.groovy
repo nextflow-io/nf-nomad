@@ -12,8 +12,8 @@ import nextflow.processor.TaskBean
  */
 class NomadScriptLauncher extends BashWrapperBuilder {
 
-    NomadScriptLauncher(TaskBean taskBean, NomadExecutor executor) {
-        super(taskBean, new SimpleFileCopyStrategy(taskBean, executor))
+    NomadScriptLauncher(TaskBean taskBean) {
+        super(taskBean, new SimpleFileCopyStrategy(taskBean))
     }
 
 }

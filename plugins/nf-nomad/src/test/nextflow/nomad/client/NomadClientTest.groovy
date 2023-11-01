@@ -17,12 +17,7 @@
 package nextflow.nomad.client
 
 import nextflow.Session
-import nextflow.exception.K8sOutOfCpuException
-import nextflow.exception.K8sOutOfMemoryException
-import nextflow.exception.NodeTerminationException
-import nextflow.k8s.client.K8sClient
 import nextflow.nomad.config.NomadConfig
-import nextflow.nomad.executor.NomadService
 import spock.lang.Specification
 
 /**

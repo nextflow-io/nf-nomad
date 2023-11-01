@@ -17,23 +17,45 @@
 
 package nextflow.nomad.model
 
+import com.google.common.hash.HashCode
+import nextflow.nomad.NomadHelper
+import nextflow.nomad.config.NomadConfig
+import nextflow.nomad.executor.NomadExecutor
+import nextflow.nomad.executor.NomadService
+import nextflow.processor.TaskConfig
+import nextflow.processor.TaskRun
 import spock.lang.Specification
+
+import java.util.concurrent.ThreadLocalRandom
 
 /**
  *
  * @author Abhinav Sharma <abhi18av@outlook.com>
  */
 class NomadJobBuilderTest extends Specification {
+    def 'should create a Nomad job definition from Nextflow task' () {
+        given:
+        def randomNuber = ThreadLocalRandom.current().nextInt(100, 999 + 1)
 
-
-    def 'should create job definition' () {
+        def exec = Mock(NomadExecutor) {
+            getConfig() >> new NomadConfig([:])
+        }
+        def svc = new NomadService(exec)
+        def container = "quay.io/nextflow/rnaseq-nf:v1.1"
+        def TASK = Mock(TaskRun) {
+            getHash() >> HashCode.fromInt(randomNuber)
+            getName() >> "test-${randomNuber}"
+            getContainer() >> container
+            getConfig() >> Mock(TaskConfig)
+        }
 
         when:
-        def job = new NomadJobBuilder()
-                .withJobName('foo')
-                .buildAsJson()
+        def result = NomadHelper.createJob(TASK)
 
         then:
-        println(job)
+        TASK.container == container
+        println(result)
+
     }
+
 }

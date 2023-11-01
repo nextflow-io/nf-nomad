@@ -17,6 +17,7 @@
 package nextflow.nomad.executor
 
 import com.google.common.hash.HashCode
+import nextflow.nomad.NomadHelper
 import nextflow.nomad.config.NomadConfig
 import nextflow.processor.TaskConfig
 import nextflow.processor.TaskRun
@@ -47,33 +48,10 @@ class NomadServiceTest extends Specification {
 //    }
 
 
-    def 'should create a Nomad job definition from Nextflow task' () {
-        given:
-        def randomNuber = ThreadLocalRandom.current().nextInt(100, 999 + 1)
-
-        def exec = Mock(NomadExecutor) {
-            getConfig() >> new NomadConfig([:])
-        }
-        def svc = new NomadService(exec)
-        def container = "quay.io/nextflow/rnaseq-nf:v1.1"
-        def TASK = Mock(TaskRun) {
-            getHash() >> HashCode.fromInt(randomNuber)
-            getName() >> "test-${randomNuber}"
-            getContainer() >> container
-            getConfig() >> Mock(TaskConfig)
-        }
-
-        when:
-        def result = svc.createJob(TASK)
-
-        then:
-        TASK.container == container
-        println(result)
-
-    }
 
 
-    def 'should submit a job' () {
+
+    def 'should create and submit a job' () {
         given:
         def randomNuber = ThreadLocalRandom.current().nextInt(100, 999 + 1)
 
@@ -111,9 +89,29 @@ class NomadServiceTest extends Specification {
         def result = svc.jobList()
 
         then:
+        println(result.json)
         result.json[0].Namespace == exec.config.client().namespace
 
     }
+
+    def 'should fetch job status' () {
+        given:
+
+        def exec = Mock(NomadExecutor) {
+            getConfig() >> new NomadConfig([:])
+        }
+        def svc = new NomadService(exec)
+
+        when:
+        def JOB_BASE_NAME = "nf-test-372-74010000"
+        def result = svc.jobSummary(JOB_BASE_NAME + "-job")
+
+        then:
+        println(result.json.Summary["$JOB_BASE_NAME-taskgroup"])
+        result.json.Summary["$JOB_BASE_NAME-taskgroup"].find{it.value == 1}.key
+
+    }
+
 
 
     def 'should fetch job summary' () {
@@ -125,11 +123,12 @@ class NomadServiceTest extends Specification {
         def svc = new NomadService(exec)
 
         when:
-        def JOB_NAME = "sleep"
+        def JOB_NAME = "nf-test-372-74010000-job"
         def result = svc.jobSummary(JOB_NAME)
 
         then:
-        println(result.json.Summary."$JOB_NAME-group")
+        println(result.json)
+        result.json.JobID == JOB_NAME
 
     }
 
@@ -143,7 +142,7 @@ class NomadServiceTest extends Specification {
         def svc = new NomadService(exec)
 
         when:
-        def result = svc.jobPurge("nf-test-401-91010000-id")
+        def result = svc.jobPurge("nf-test-886-76030000-job")
 
 
         then:
