@@ -92,22 +92,12 @@ class NomadService implements Closeable {
         return new NomadResponseJson(resp.stream)
     }
 
-    NomadResponseJson jobSubmit(TaskRun task, String jobName, String namespace = "default") {
+    NomadResponseJson jobSubmit(String jobDef, String namespace = "default") {
+        log.debug "[Nomad] API request ${NomadClient.prettyPrint(jobDef).indent()} "
         final endpoint = "/jobs?$namespace"
-        final resp = client.post(endpoint, createJob(task, jobName))
+        final resp = client.post(endpoint, jobDef)
         return new NomadResponseJson(resp.stream)
     }
-
-    protected static String createJob (TaskRun task, String jobName) {
-
-        def jobJson = new NomadJobBuilder()
-            .withJobName(jobName)
-            .withImageName(task.container)
-            .buildAsJson()
-
-        return  jobJson
-    }
-
 
 //    NomadResponseJson serverStatus() {
 //        final endpoint = "/status/leader"

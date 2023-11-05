@@ -20,6 +20,7 @@ import groovy.json.JsonBuilder
 import groovy.transform.CompileStatic
 import groovy.transform.PackageScope
 import groovy.util.logging.Slf4j
+import nextflow.k8s.model.PodEnv
 import nextflow.processor.TaskRun
 import nextflow.util.MemoryUnit
 
@@ -35,20 +36,21 @@ import java.util.concurrent.atomic.AtomicInteger
 @Slf4j
 class NomadJobBuilder {
 
-    static enum MetaType { LABEL, META }
+    static enum MetaType {
+        LABEL, META
+    }
 
     static enum SegmentType {
-        PREFIX (253),
-        NAME (63),
-        VALUE (63)
+        PREFIX(253),
+        NAME(63),
+        VALUE(63)
 
         private final int maxSize;
+
         SegmentType(int maxSize) {
             this.maxSize = maxSize;
         }
     }
-
-    static @PackageScope AtomicInteger VOLUMES = new AtomicInteger()
 
     String jobName
 
@@ -57,6 +59,10 @@ class NomadJobBuilder {
     String taskName
 
     String restart
+
+    Map<String,String> envVars = [:]
+
+    Map<String,String> labels = [:]
 
     String imageName
 
@@ -78,17 +84,27 @@ class NomadJobBuilder {
 
     boolean privileged
 
-    Map<String,List<String>> capabilities
+    Map<String, ?> resourcesLimits
 
-    Map<String,?> resourcesLimits
-
-    /**
-     * @return A sequential volume unique identifier
-     */
-    static protected String nextVolName() {
-        "vol-${VOLUMES.incrementAndGet()}".toString()
+    NomadJobBuilder withEnv(String name, String value ) {
+        this.envVars.put(name, value)
+        return this
     }
 
+    NomadJobBuilder withEnv( Map envs ) {
+        this.envVars.putAll(envs)
+        return this
+    }
+
+    NomadJobBuilder withLabel( String name, String value ) {
+        this.labels.put(name, value)
+        return this
+    }
+
+    NomadJobBuilder withLabels(Map labels) {
+        this.labels.putAll(labels)
+        return this
+    }
 
     NomadJobBuilder withJobName(String name) {
         this.jobName = name
@@ -102,12 +118,12 @@ class NomadJobBuilder {
         return this
     }
 
-    NomadJobBuilder withWorkDir( String path ) {
+    NomadJobBuilder withWorkDir(String path) {
         this.workDir = path
         return this
     }
 
-    NomadJobBuilder withWorkDir(Path path ) {
+    NomadJobBuilder withWorkDir(Path path) {
         this.workDir = path.toString()
         return this
     }
@@ -122,21 +138,21 @@ class NomadJobBuilder {
         return this
     }
 
-    NomadJobBuilder withCommand( cmd ) {
-        if( cmd==null ) return this
-        assert cmd instanceof List || cmd instanceof CharSequence, "Missing or invalid K8s command parameter: $cmd"
-        this.command = cmd instanceof List ? cmd : ['/bin/bash','-c', cmd.toString()]
+    NomadJobBuilder withCommand(cmd) {
+        if (cmd == null) return this
+        assert cmd instanceof List || cmd instanceof CharSequence, "Missing or invalid Nomad command parameter: $cmd"
+        this.command = cmd instanceof List ? cmd : ['/bin/bash', '-c', cmd.toString()]
         return this
     }
 
-    NomadJobBuilder withArgs( args ) {
-        if( args==null ) return this
-        assert args instanceof List || args instanceof CharSequence, "Missing or invalid K8s args parameter: $args"
-        this.args = args instanceof List ? args : ['/bin/bash','-c', args.toString()]
+    NomadJobBuilder withArgs(args) {
+        if (args == null) return this
+        assert args instanceof List || args instanceof CharSequence, "Missing or invalid Nomad args parameter: $args"
+        this.args = args instanceof List ? args : ['/bin/bash', '-c', args.toString()]
         return this
     }
 
-    NomadJobBuilder withCpus( Integer cpus ) {
+    NomadJobBuilder withCpus(Integer cpus) {
         this.cpus = cpus
         return this
     }
@@ -146,7 +162,7 @@ class NomadJobBuilder {
         return this
     }
 
-    NomadJobBuilder withMemory(MemoryUnit mem)  {
+    NomadJobBuilder withMemory(MemoryUnit mem) {
         this.memory = "${mem.mega}Mi".toString()
         return this
     }
@@ -156,71 +172,85 @@ class NomadJobBuilder {
         return this
     }
 
-    NomadJobBuilder withDisk(MemoryUnit disk)  {
+    NomadJobBuilder withDisk(MemoryUnit disk) {
         this.disk = "${disk.mega}Mi".toString()
         return this
     }
 
-    NomadJobBuilder withResourcesLimits(Map<String,?> limits) {
+    NomadJobBuilder withPrivileged(boolean value) {
+        this.privileged = value
+        return this
+    }
+
+    NomadJobBuilder withResourcesLimits(Map<String, ?> limits) {
         this.resourcesLimits = limits
         return this
     }
 
     Map build() {
-//        assert this.jobName, 'Missing Nomad jobName parameter'
-//        assert this.imageName, 'Missing K8s imageName parameter'
-//        assert this.command || this.args, 'Missing K8s command parameter'
+        assert this.jobName, 'Missing Nomad jobName parameter'
+        assert this.imageName, 'Missing Nomad imageName parameter'
+        assert this.command || this.args, 'Missing Nomad command parameter'
 
         final restart = this.restart ?: 'Never'
 
-        final metadata = new LinkedHashMap<String,Object>()
+        final metadata = new LinkedHashMap<String, Object>()
         metadata.name = jobName
         metadata.namespace = namespace ?: 'default'
 
-        final container = [name: this.jobName, image: this.imageName ]
-        if( this.command )
+        final container = [name: this.jobName, image: this.imageName]
+        if (this.command)
             container.command = this.command
-        if( this.args )
+        if (this.args)
             container.args = args
 
-        if( this.workDir )
+        if (this.workDir)
             container.put('workingDir', workDir)
 
         final secContext = new LinkedHashMap(10)
-        if( privileged ) {
+        if (privileged) {
             // note: privileged flag needs to be defined in the *container* securityContext
             // not the 'spec' securityContext (see below)
-            secContext.privileged =true
+            secContext.privileged = true
         }
 
         final job = [
-                Job: [
-                ID: jobName,
-                Name: jobName,
-                Type: 'batch',
+            Job: [
+                ID         : jobName,
+                Name       : jobName,
+                Type       : 'batch',
+                Constraints: [[
+                                  LTarget: "\${node.unique.name}",
+                                  RTarget: "nomad02",
+                                  Operand: "="
+                              ]],
                 Datacenters: ["sun-nomadlab"],
-                TaskGroups: [
-                        [Name: taskGroupName,
-                         Tasks: [[Name: taskName,
-                                 Driver: "docker",
-                                 Config: [
-                                         args: ["-c", "echo nf-nomad"],
-                                         command: "bash",
-                                         image: container.image
-                                 ]]]]
+                TaskGroups : [
+                    [Name : taskGroupName,
+                     Tasks: [[Name     : taskName,
+                              Driver   : "docker",
+                              Resources: [Cores   : cpus,
+                                          MemoryMB: memory],
+                              Env: envVars,
+                              Config   : [
+                                  privileged: privileged,
+                                  args      : args,
+//                                  command   : "bash",
+                                  image     : container.image
+                              ]]]]
                 ]]
         ]
 
         // add resources
-        if( this.cpus ) {
+        if (this.cpus) {
             container.resources = addCpuResources(this.cpus, container.resources as Map)
         }
 
-        if( this.memory ) {
+        if (this.memory) {
             container.resources = addMemoryResources(this.memory, container.resources as Map)
         }
 
-        if( this.resourcesLimits ) {
+        if (this.resourcesLimits) {
             container.resources = addResourcesLimits(this.resourcesLimits, container.resources as Map)
         }
 
@@ -236,11 +266,11 @@ class NomadJobBuilder {
 
     @PackageScope
     Map addResourcesLimits(Map limits, Map result) {
-        if( result == null )
+        if (result == null)
             result = new LinkedHashMap(10)
 
         final limits0 = result.limits as Map ?: new LinkedHashMap(10)
-        limits0.putAll( limits )
+        limits0.putAll(limits)
         result.limits = limits0
 
         return result
@@ -248,7 +278,7 @@ class NomadJobBuilder {
 
     @PackageScope
     Map addCpuResources(Integer cpus, Map res) {
-        if( res == null )
+        if (res == null)
             res = [:]
 
         final req = res.requests as Map ?: new LinkedHashMap<>(10)
@@ -260,7 +290,7 @@ class NomadJobBuilder {
 
     @PackageScope
     Map addMemoryResources(String memory, Map res) {
-        if( res == null )
+        if (res == null)
             res = new LinkedHashMap(10)
 
         final req = res.requests as Map ?: new LinkedHashMap(10)
@@ -276,7 +306,7 @@ class NomadJobBuilder {
 
     protected Map sanitize(Map map, MetaType kind) {
         final result = new HashMap(map.size())
-        for( Map.Entry entry : map ) {
+        for (Map.Entry entry : map) {
             final key = sanitizeKey(entry.key as String, kind)
             final value = (kind == MetaType.LABEL)
                 ? sanitizeValue(entry.value, kind, SegmentType.VALUE)
@@ -293,10 +323,9 @@ class NomadJobBuilder {
         if (parts.size() == 2) {
             return "${sanitizeValue(parts[0], kind, SegmentType.PREFIX)}/${sanitizeValue(parts[1], kind, SegmentType.NAME)}"
         }
-        if( parts.size() == 1 ) {
+        if (parts.size() == 1) {
             return sanitizeValue(parts[0], kind, SegmentType.NAME)
-        }
-        else {
+        } else {
             throw new IllegalArgumentException("Invalid key in pod ${kind.toString().toLowerCase()} -- Key can only contain exactly one '/' character")
         }
     }
@@ -308,9 +337,9 @@ class NomadJobBuilder {
      */
     protected String sanitizeValue(value, MetaType kind, SegmentType segment) {
         def str = String.valueOf(value)
-        if( str.length() > segment.maxSize ) {
+        if (str.length() > segment.maxSize) {
             log.debug "K8s $kind $segment exceeds allowed size: $segment.maxSize -- offending str=$str"
-            str = str.substring(0,segment.maxSize)
+            str = str.substring(0, segment.maxSize)
         }
         str = str.replaceAll(/[^a-zA-Z0-9\.\_\-]+/, '_')
         str = str.replaceAll(/^[^a-zA-Z0-9]+/, '')

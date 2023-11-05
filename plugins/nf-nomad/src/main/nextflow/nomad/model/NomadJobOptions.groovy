@@ -23,8 +23,7 @@ import groovy.transform.ToString
 import nextflow.nomad.model.*
 
 /**
- * Model Nomad pod options such as environment variables,
- * secret and config-maps
+ * Model Nomad job options such as environment variables and meta fields.
  *
  * @author Abhinav Sharma <abhi18av@outlook.com>
  */
@@ -34,6 +33,11 @@ import nextflow.nomad.model.*
 class NomadJobOptions {
 
     private Collection<NomadTaskEnv> envVars
+
+    private Map<String,String> meta = [:]
+
+
+    Map<String,String> getMeta() { meta }
 
     NomadJobOptions( List<Map> options=null ) {
         int size = options ? options.size() : 0
@@ -51,12 +55,6 @@ class NomadJobOptions {
     @PackageScope void create(Map<String,String> entry) {
         if( entry.env && entry.value ) {
             envVars << NomadTaskEnv.value(entry.env, entry.value)
-        }
-        else if( entry.env && entry.fieldPath ) {
-            envVars << NomadTaskEnv.fieldPath(entry.env, entry.fieldPath)
-        }
-        else if( entry.env && entry.config ) {
-            envVars << NomadTaskEnv.config(entry.env, entry.config)
         }
         else
             throw new IllegalArgumentException("Unknown Nomad job options: $entry")

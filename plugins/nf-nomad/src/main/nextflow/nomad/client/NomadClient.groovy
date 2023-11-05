@@ -76,7 +76,7 @@ class NomadClient {
     }
 
     static private void debug(String method, String path, String text=null) {
-        log.debug "[Nomad] API request $method $path ${text ? '\n'+prettyPrint(text).indent() : ''}"
+        log.trace "[Nomad] API request $method $path ${text ? '\n'+prettyPrint(text).indent() : ''}"
     }
 
     private NomadResponseApi makeRequestCall(String method, String path, String body=null) throws NomadResponseException {
@@ -129,7 +129,7 @@ class NomadClient {
         makeRequest(method,path, body)
     }
 
-    static protected String prettyPrint(String json) {
+    static String prettyPrint(String json) {
         try {
             JsonOutput.prettyPrint(json)
         }

@@ -4,10 +4,15 @@ package nextflow.nomad.executor
 
 import groovy.transform.CompileStatic
 import groovy.util.logging.Slf4j
+import nextflow.SysEnv
 import nextflow.exception.ProcessUnrecoverableException
 import nextflow.executor.BashWrapperBuilder
 import nextflow.fusion.FusionAwareTask
+import nextflow.k8s.model.PodEnv
 import nextflow.nomad.NomadHelper
+import nextflow.nomad.config.NomadConfig
+import nextflow.nomad.model.NomadJobBuilder
+import nextflow.nomad.model.NomadTaskEnv
 import nextflow.processor.TaskHandler
 import nextflow.processor.TaskRun
 import nextflow.processor.TaskStatus
@@ -27,6 +32,8 @@ class NomadTaskHandler extends TaskHandler implements FusionAwareTask {
 
     private NomadExecutor executor
 
+    private NomadConfig config
+
     private Path exitFile
 
     private Path outputFile
@@ -35,13 +42,18 @@ class NomadTaskHandler extends TaskHandler implements FusionAwareTask {
 
     private long timestamp
 
+    //Status in Nextflow Task terminology
     private TaskStatus status
+
+    //State in Nomad Job terminology
+    private String state
 
     private String jobName
 
     NomadTaskHandler(TaskRun task, NomadExecutor executor) {
         super(task)
         this.executor = executor
+        this.config = executor.getConfig()
         this.outputFile = task.workDir.resolve(TaskRun.CMD_OUTFILE)
         this.errorFile = task.workDir.resolve(TaskRun.CMD_ERRFILE)
         this.exitFile = task.workDir.resolve(TaskRun.CMD_EXIT)
@@ -97,61 +109,114 @@ class NomadTaskHandler extends TaskHandler implements FusionAwareTask {
     }
 
     String submitTask(TaskRun task, String jobName) {
-        executor.service.jobSubmit(task, jobName)
+        executor.service.jobSubmit(createTask(task, jobName))
     }
+
+//
+//    protected boolean entrypointOverride() {
+//        return executor.getConfig().job().entrypointOverride()
+//    }
+
+    protected String createTask(TaskRun task, String jobName) {
+
+        final launcher = getSubmitCommand(task)
+
+        def builder = new NomadJobBuilder()
+            .withJobName(jobName)
+            .withImageName(task.container)
+            .withWorkDir( task.workDir)
+            .withArgs(launcher)
+
+        if ( fusionEnabled() ) {
+            if( fusionConfig().privileged() )
+                builder.withPrivileged(true)
+            else {
+                builder.withResourcesLimits(["nextflow.io/fuse": 1])
+            }
+
+            final env = fusionLauncher().fusionEnv()
+            for( Map.Entry<String,String> it : env )
+                builder.withEnv(it.key, it.value)
+        }
+
+
+        if( SysEnv.containsKey('NXF_DEBUG') )
+            builder.withEnv('NXF_DEBUG', SysEnv.get('NXF_DEBUG'))
+
+        return  builder.buildAsJson()
+    }
+
+
 
     @Override
     boolean checkIfRunning() {
         if (!this.jobName || !isSubmitted())
             return false
-        final state = taskState0(this.jobName)
+
+        state = taskState0(this.jobName)
         // note, include complete status otherwise it hangs if the task
         // completes before reaching this check
-        final running = state == TaskStatus.RUNNING || state == TaskStatus.SUBMITTED
-        log.debug "[NOMAD] Task status $task.name taskId=${this.jobName}; running=$running"
-        if (running)
+        final isAllocated = state == "Running"
+        log.debug "[NOMAD] Task status $task.name taskId=${this.jobName}; state=$state running=$isAllocated"
+        if (isAllocated)
             this.status = TaskStatus.RUNNING
-        return running
+        return isAllocated
     }
+
+
+    private Boolean shouldDelete() {
+        executor.config.job().deleteJobsOnCompletion
+    }
+
 
     @Override
     boolean checkIfCompleted() {
         assert this.jobName
-        if (!isRunning())
+        log.trace "[NOMAD] Checking Task completion status  $task.name taskId=${this.jobName}"
+
+        if (isRunning())
             return false
-        final completed = executor.service.jobStatus(this.jobName) == TaskStatus.COMPLETED
-        log.debug "[NOMAD] Task status $task.name taskId=${this.jobName}; completed=$completed"
-        if (completed) {
+
+        state = taskState0(this.jobName)
+
+        final isDone = state == "Complete" || state == "Failed" || state == "Lost" || state == "Unknown"
+        log.debug "[NOMAD] Task status $task.name taskId=${this.jobName}; state=$state completed=$isDone"
+
+        if (isDone) {
             // finalize the task
             task.exitStatus = readExitFile()
             task.stdout = outputFile
             task.stderr = errorFile
-            status = TaskStatus.COMPLETED
-            def info = executor.service.jobStatus(this.jobName)
-            if (info == TaskStatus.COMPLETED)
+            this.status = TaskStatus.COMPLETED
+            if (state == "Failed" || state == "Lost" || state == "Unknown")
                 task.error = new ProcessUnrecoverableException()
-            executor.service.jobPurge(this.jobName)
+
+            if (shouldDelete()) {
+                executor.service.jobPurge(this.jobName)
+            }
+
             return true
         }
+
+        return false
     }
 
 
     /**
-     * @return Retrieve the task status caching the result for at lest one second
+     * @return Retrieve the task status caching the result for at least one second
      */
-    protected TaskStatus taskState0(String taskName) {
+    protected String taskState0(String taskName) {
         final now = System.currentTimeMillis()
         final delta = now - timestamp;
         if (!status || delta >= 1_000) {
-            def resp = executor.service.jobStatus(taskName)
-            def newState =  NomadHelper.mapJobToTaskStatus(resp, taskName)
-            log.debug "[NOMAD] Task: $taskName state=$newState"
+            def newState = NomadHelper.filterStatus(executor.service.jobStatus(this.jobName), this.jobName)
+            log.trace "[NOMAD] Task: $taskName state=$state newState=$newState"
             if (newState) {
-                status = newState
+                state = newState
                 timestamp = now
             }
         }
-        return status
+        return state
     }
 
     protected int readExitFile() {
@@ -163,6 +228,33 @@ class NomadTaskHandler extends TaskHandler implements FusionAwareTask {
             return Integer.MAX_VALUE
         }
     }
+
+    /**
+     * @return The workflow execution unique run name
+     */
+    protected String getRunName() {
+        executor.session.runName
+    }
+
+//    protected Map<String,String> getMeta(TaskRun task) {
+//        final result = new LinkedHashMap<String,String>(10)
+//        final labels = executor.config.job().getMeta()
+//        if( labels ) {
+//            result.putAll(labels)
+//        }
+//        final resLabels = task.config.getResourceLabels()
+//        if( resLabels )
+//            result.putAll(resLabels)
+//        result.'nextflow.io/app' = 'nextflow'
+//        result.'nextflow.io/runName' = getRunName()
+//        result.'nextflow.io/taskName' = task.getName()
+//        result.'nextflow.io/processName' = task.getProcessor().getName()
+//        result.'nextflow.io/sessionId' = "uuid-${executor.getSession().uniqueId}" as String
+//        if( task.config.queue )
+//            result.'nextflow.io/queue' = task.config.queue
+//        return result
+//    }
+
 
     @Override
     void kill() {

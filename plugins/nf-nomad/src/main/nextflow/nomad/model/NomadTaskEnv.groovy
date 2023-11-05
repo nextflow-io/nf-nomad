@@ -24,7 +24,7 @@ import groovy.transform.ToString
  * Model a Nomad task environment variable definition
  * https://developer.hashicorp.com/nomad/docs/job-specification/env
  *
- * @author Paolo Di Tommaso <paolo.ditommaso@gmail.com>
+ * @author Abhinav Sharma <abhi18av@outlook.com>
  */
 @CompileStatic
 @ToString(includeNames = true)
@@ -39,25 +39,6 @@ class NomadTaskEnv {
 
     static NomadTaskEnv value(String env, String value) {
         new NomadTaskEnv([name:env, value:value])
-    }
-
-    static NomadTaskEnv fieldPath(String env, String fieldPath) {
-        new NomadTaskEnv([ name: env, valueFrom: [fieldRef:[fieldPath: fieldPath]]])
-    }
-
-    static NomadTaskEnv config(String env, String config) {
-        final tokens = config.tokenize('/')
-        if( tokens.size() > 2 )
-            throw new IllegalArgumentException("Nomad invalid env: $config -- Secret must be specified as <config-name>/<config-key>")
-
-        final name = tokens[0]
-        final key = tokens[1]
-
-        assert env, 'Missing task env variable name'
-        assert name, 'Missing task env config name'
-
-        final ref = [ name: name, key: (key ?: env) ]
-        new NomadTaskEnv([ name: env, valueFrom: [configMapKeyRef: ref]])
     }
 
     Map toSpec() { spec }

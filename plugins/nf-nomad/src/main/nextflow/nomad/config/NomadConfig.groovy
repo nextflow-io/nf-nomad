@@ -1,5 +1,3 @@
-
-
 /*
  * Copyright 2013-2023, Seqera Labs
  *
@@ -22,6 +20,7 @@ import groovy.transform.CompileStatic
 import groovy.transform.Memoized
 import groovy.transform.PackageScope
 import groovy.util.logging.Slf4j
+import nextflow.nomad.model.NomadJobBuilder
 import nextflow.nomad.model.NomadJobOptions
 import nextflow.util.Duration
 import nextflow.Global
@@ -33,7 +32,7 @@ import javax.annotation.Nullable
  * Model Nomad specific settings defined in the nextflow
  * configuration file
  *
- * @author Paolo Di Tommaso <paolo.ditommaso@gmail.com>
+ * @author Abhinav Sharma <abhi18av@outlook.com>
  */
 @Slf4j
 @CompileStatic
@@ -43,8 +42,13 @@ class NomadConfig {
 
     NomadClientOpts client() { clientOpts }
 
+    private NomadJobOpts jobOpts
+
+    NomadJobOpts job() { jobOpts }
+
     NomadConfig(Map nomadConfigMap) {
         this.clientOpts = new NomadClientOpts((Map) nomadConfigMap.client ?: Collections.emptyMap())
+        this.jobOpts = new NomadJobOpts((Map) nomadConfigMap.job ?: Collections.emptyMap())
     }
 
     static NomadConfig getConfig(Session session) {
