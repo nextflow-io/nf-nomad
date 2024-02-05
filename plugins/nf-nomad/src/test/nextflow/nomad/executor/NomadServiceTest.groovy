@@ -63,10 +63,13 @@ class NomadServiceTest extends Specification {
     def 'should create and submit a job'() {
         given:
 
-        def CONFIG_MAP = [nomad: [client: [namespace: "default"]]]
+        def CONFIG_MAP = [client: [namespace: "default", token:"1234", address : "http://127.0.0.1:4646",dataCenter: "test"]]
 
         and:
-        def exec = Mock(NomadExecutor) {getConfig() >> new NomadConfig(CONFIG_MAP) }
+        def exec = Mock(NomadExecutor) {getConfig() >>{
+            println CONFIG_MAP
+            new NomadConfig(CONFIG_MAP) }
+        }
         def svc = Spy(new NomadService(exec))
 
         def TASK = Mock(TaskRun) {

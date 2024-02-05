@@ -31,7 +31,7 @@ import spock.lang.Specification
  *
  * @author Abhinav Sharma <abhi18av@outlook.com>
  */
-class scratch extends Specification {
+class Scratch extends Specification {
 
     def 'should create a client and submit a job'() {
 
@@ -40,7 +40,14 @@ class scratch extends Specification {
         def NF_TASKJOB_NAME =  "nf-scratch-$RANDOM_ID"
 
         def session = Mock(Session) {
-            getConfig() >> [:]
+            getConfig() >> [nomad:
+                                    [client:
+                                             [
+                                                     address : "http://127.0.0.1:4646",
+                                                     dataCenter: "test"
+                                             ]
+                                    ]
+            ]
         }
 
         when:
