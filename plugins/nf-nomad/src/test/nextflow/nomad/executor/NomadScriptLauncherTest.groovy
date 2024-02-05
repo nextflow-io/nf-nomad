@@ -24,7 +24,7 @@ import spock.lang.Specification
  *
  * @author Abhinav Sharma  <abhi18av@outlook.com>
  */
-class NomadTaskKeyTest extends Specification {
+class NomadScriptLauncherTest extends Specification {
 
     def 'should return the key pair' () {
         expect:
