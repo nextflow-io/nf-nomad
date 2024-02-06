@@ -24,6 +24,8 @@ import nextflow.processor.TaskProcessor
 import nextflow.processor.TaskRun
 import nextflow.util.Duration
 import nextflow.util.MemoryUnit
+import okhttp3.mockwebserver.MockResponse
+import okhttp3.mockwebserver.MockWebServer
 import spock.lang.Specification
 
 import java.nio.file.Paths
@@ -36,6 +38,17 @@ class NomadServiceTest extends Specification {
 
     def RANDOM_ID = Math.abs(new Random().nextInt() % 999) + 1
     def NF_TASKJOB_NAME =  "nf-service-test-$RANDOM_ID"
+
+    MockWebServer mockWebServer
+
+    def setup(){
+        mockWebServer = new MockWebServer()
+        mockWebServer.start()
+    }
+
+    def cleanup(){
+        mockWebServer.shutdown()
+    }
 
     def 'should make job id'() {
         given:
@@ -62,8 +75,9 @@ class NomadServiceTest extends Specification {
 
     def 'should create and submit a job'() {
         given:
+        mockWebServer.enqueue(new MockResponse().setBody('{"JobModifyIndex": 23, "Warnings": "test"}').addHeader("Content-Type", "application/json"))
 
-        def CONFIG_MAP = [client: [namespace: "default", token:"1234", address : "http://127.0.0.1:4646",dataCenter: "test"]]
+        def CONFIG_MAP = [client: [namespace: "default", token:"1234", address : "http://127.0.0.1:${mockWebServer.port}",dataCenter: "test"]]
 
         and:
         def exec = Mock(NomadExecutor) {getConfig() >>{
@@ -91,9 +105,12 @@ class NomadServiceTest extends Specification {
 
         and:
         def jobId = svc.getOrRunJob(TASK)
+        def request = mockWebServer.takeRequest()
 
         expect:
-        println(svc.allJobIds)
-        println(jobId)
+        request.method == "POST"
+        request.path.startsWith("/v1/job/nf-svctest-")
+        svc.allJobIds
+        jobId
     }
 }
