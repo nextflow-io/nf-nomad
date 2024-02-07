@@ -25,6 +25,8 @@ import io.nomadproject.client.models.Task
 import io.nomadproject.client.models.TaskGroup
 import nextflow.Session
 import nextflow.nomad.config.NomadConfig
+import okhttp3.mockwebserver.MockResponse
+import okhttp3.mockwebserver.MockWebServer
 import spock.lang.Specification
 
 /**
@@ -33,9 +35,22 @@ import spock.lang.Specification
  */
 class Scratch extends Specification {
 
+    MockWebServer mockWebServer
+
+    def setup(){
+        mockWebServer = new MockWebServer()
+        mockWebServer.start()
+    }
+
+    def cleanup(){
+        mockWebServer.shutdown()
+    }
+
     def 'should create a client and submit a job'() {
 
         given:
+        mockWebServer.enqueue(new MockResponse().setBody('{}').addHeader("Content-Type", "application/json"))
+
         def RANDOM_ID = Math.abs(new Random().nextInt() % 999) + 1
         def NF_TASKJOB_NAME =  "nf-scratch-$RANDOM_ID"
 
@@ -43,7 +58,7 @@ class Scratch extends Specification {
             getConfig() >> [nomad:
                                     [client:
                                              [
-                                                     address : "http://127.0.0.1:4646",
+                                                     address : "http://127.0.0.1:${mockWebServer.port}",
                                                      dataCenter: "test"
                                              ]
                                     ]
@@ -108,10 +123,14 @@ class Scratch extends Specification {
 
         def apiInstance = new JobsApi(defaultClient)
         result = apiInstance.postJob(NF_TASKJOB_NAME, jobRegisterRequest, region, namespace, xNomadToken, idempotencyToken)
+        println result
+
+        def request = mockWebServer.takeRequest()
 
         then:
-        println(result)
-
+        result
+        request.method == "POST"
+        request.path.startsWith("/v1/job/nf-scratch-")
     }
 
 }

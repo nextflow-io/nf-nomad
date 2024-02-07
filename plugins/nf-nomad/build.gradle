@@ -82,6 +82,8 @@ dependencies {
     modules {
         module("commons-logging:commons-logging") { replacedBy("org.slf4j:jcl-over-slf4j") }
     }
+
+    testImplementation 'com.squareup.okhttp3:mockwebserver:4.9.3'
 }
 
 // use JUnit 5 platform
