@@ -1,2 +1,2 @@
 nextflow.nomad.NomadPlugin
-
+nextflow.nomad.executor.NomadExecutor
