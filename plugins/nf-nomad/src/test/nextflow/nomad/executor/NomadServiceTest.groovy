@@ -21,6 +21,10 @@ import nextflow.nomad.NomadHelper
 import nextflow.nomad.config.NomadConfig
 import nextflow.processor.TaskConfig
 import nextflow.processor.TaskRun
+import nextflow.util.Duration
+import nextflow.util.MemoryUnit
+import okhttp3.mockwebserver.MockResponse
+import okhttp3.mockwebserver.MockWebServer
 import spock.lang.Specification
 
 import java.util.concurrent.ThreadLocalRandom
@@ -47,11 +51,18 @@ class NomadServiceTest extends Specification {
 //        result.json[0] == exec.config.client().server
 //    }
 
+    MockWebServer mockWebServer
 
+    def setup(){
+        mockWebServer = new MockWebServer()
+        mockWebServer.start()
+    }
 
+    def cleanup(){
+        mockWebServer.shutdown()
+    }
 
-
-    def 'should create and submit a job' () {
+    def 'should make job id'() {
         given:
         def randomNuber = ThreadLocalRandom.current().nextInt(100, 999 + 1)
 
@@ -117,14 +128,14 @@ class NomadServiceTest extends Specification {
     def 'should fetch job summary' () {
         given:
 
-        def exec = Mock(NomadExecutor) {
-            getConfig() >> new NomadConfig([:])
-        }
-        def svc = new NomadService(exec)
+        def CONFIG_MAP = [client: [namespace: "default", token:"1234", address : "http://127.0.0.1:${mockWebServer.port}",dataCenter: "test"]]
 
-        when:
-        def JOB_NAME = "nf-test-372-74010000-job"
-        def result = svc.jobSummary(JOB_NAME)
+        and:
+        def exec = Mock(NomadExecutor) {getConfig() >>{
+            println CONFIG_MAP
+            new NomadConfig(CONFIG_MAP) }
+        }
+        def svc = Spy(new NomadService(exec))
 
         then:
         println(result.json)
@@ -144,10 +155,15 @@ class NomadServiceTest extends Specification {
         when:
         def result = svc.jobPurge("nf-test-886-76030000-job")
 
+        and:
+        def jobId = svc.getOrRunJob(TASK)
+        def request = mockWebServer.takeRequest()
 
-        then:
-        result.json.EvalID != null
-
+        expect:
+        request.method == "POST"
+        request.path.startsWith("/v1/job/nf-svctest-")
+        svc.allJobIds
+        jobId
     }
 
 
