@@ -1,6 +1,5 @@
 /*
- * Copyright 2023, Stellenbosch University, South Africa
- * Copyright 2022, Center for Medical Genetics, Ghent
+ * Copyright 2013-2023, Seqera Labs
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,22 +14,24 @@
  * limitations under the License.
  */
 
-package nextflow.nomad
+package nextflow.nomad.client
 
 import groovy.transform.CompileStatic
-import nextflow.plugin.BasePlugin
-import org.pf4j.PluginWrapper
+import nextflow.exception.ProcessException
+import nextflow.exception.ShowOnlyExceptionMessage
 
 /**
- * Nextflow plugin for Nomad executor
+ * Exception raised when a pod cannot be scheduled because
+ * e.g. the container image cannot be pulled, required resources
+ * cannot be fulfilled, etc.
  *
- * @author Abhinav Sharma <abhi18av@outlook.com>
- * @author : matthdsm <matthias.desmet@ugent.be>
+ * @author Paolo Di Tommaso <paolo.ditommaso@gmail.com>
  */
 @CompileStatic
-class NomadPlugin extends BasePlugin {
+class NomadTaskUnschedulableException extends ProcessException implements ShowOnlyExceptionMessage {
 
-    NomadPlugin(PluginWrapper wrapper) {
-        super(wrapper)
+    NomadTaskUnschedulableException(String message, Throwable cause) {
+        super(message,cause)
     }
+
 }

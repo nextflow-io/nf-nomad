@@ -20,20 +20,25 @@ package nextflow.nomad.executor
 import groovy.transform.CompileStatic
 import groovy.transform.Memoized
 import groovy.util.logging.Slf4j
-import io.nomadproject.client.ApiClient
-import io.nomadproject.client.Configuration
-import io.nomadproject.client.api.JobsApi
-import io.nomadproject.client.models.Job
-import io.nomadproject.client.models.JobRegisterRequest
-import io.nomadproject.client.models.JobValidateRequest
-import io.nomadproject.client.models.JobValidateResponse
+import nextflow.Global
+import nextflow.nomad.NomadHelper
+import nextflow.nomad.client.NomadClient
+import nextflow.nomad.client.NomadResponseJson
 import nextflow.nomad.config.NomadConfig
-import nextflow.processor.TaskProcessor
+import nextflow.nomad.model.NomadJobBuilder
 import nextflow.processor.TaskRun
-import nextflow.util.Rnd
 
 /**
- * Implements Nomad operations for Nextflow executor
+ * Nomad Service
+ *
+ * Tip: Use the following command to find out your kubernetes master node
+ *    nomad node status
+ *
+ * See
+ *   https://developer.hashicorp.com/nomad/api-docs/jobs
+ *
+ * Useful cheatsheet
+ *   https://developer.hashicorp.com/nomad/docs/commands
  *
  * @author Abhinav Sharma <abhi18av@outlook.com>
  */
@@ -44,157 +49,62 @@ class NomadService implements Closeable {
 
     NomadConfig config
 
+
     NomadService(NomadExecutor executor) {
         assert executor
         this.config = executor.config
     }
 
+
     @Memoized
-    protected ApiClient getClient() {
-        createNomadClient()
-    }
-
-    protected ApiClient createNomadClient() {
-        log.debug "[NOMAD] Executor options=${config.client()}"
-
-        // Create Nomad client
-        if (!config.client().token)
-            throw new IllegalArgumentException("Missing Nomad apiToken -- Specify it in the nextflow.config file")
-
-        final client = Configuration
-                .getDefaultApiClient()
-                .setBasePath(config.client().address)
-
-//FIXME
-//        Global.onCleanup((it)->client.protocolLayer().restClient().close())
-
-        return client
-    }
-
-
-    static String makeJobId(TaskRun task) {
-        final PREFIX = "nf"
-        final RANDOM = Rnd.hex()
-
-        final name = task
-                .processor
-                .name
-                .trim()
-                .replaceAll(/[^a-zA-Z0-9-_]+/, '_')
-
-        final String key = "$PREFIX-${name}-$RANDOM"
-
-        //FIXME Perhaps NOT needed
-        // Nomad job max len is 64 characters, however we keep it a bit shorter
-        // because the jobId + taskId composition must be less then 100
-        final MAX_LEN = 62i
-        return key.size() > MAX_LEN ? key.substring(0, MAX_LEN) : key
-    }
-
-
-    Map<TaskProcessor, String> allJobIds = new HashMap<>(50)
-
-    synchronized String getOrRunJob(TaskRun task) {
-
-        //If job doesn't already exist
-        final mapKey = task.processor
-        if (allJobIds.containsKey(mapKey)) {
-            return allJobIds[mapKey]
-        }
-
-        //If job doesn't already exist
-
-        //- create a job ID
-        final newJobId = makeJobId(task)
-        //- add to the map
-        allJobIds[mapKey] = newJobId
-
-
-        //- create a job def
-        def jobDef = NomadJobOperations.createJobDef(config, task, newJobId)
-
-        //- run the job
-        runJob(jobDef, task)
-
-        //FIXME update the overall key computation
-        return new NomadTaskKey(jobDef.name, jobDef.name)
-    }
-
-
-    NomadTaskKey runJob(Job taskJob, TaskRun task) {
-
-        def region = config.client().region
-        def namespace = config.client().namespace
-        def xNomadToken = config.client().token
-        def idempotencyToken = ""
-
-        def jobRegisterRequest = new JobRegisterRequest()
-                .job(taskJob)
-                .region(region)
-                .secretID(xNomadToken)
-                .namespace(namespace)
-                .enforceIndex(false)
-                .evalPriority(10)
-                .jobModifyIndex(1)
-                .policyOverride(true)
-                .preserveCounts(false)
-
-        def apiInstance = new JobsApi(client)
-
-        def response = apiInstance.postJob(taskJob.name,
-                jobRegisterRequest,
-                region,
-                namespace,
-                xNomadToken,
-                idempotencyToken)
-
-
-        return new NomadTaskKey(taskJob.name, taskJob.name)
-    }
-
-    //FIXME refactor this and move to a separate namespace
-    JobValidateResponse validateJob(TaskRun task ) {
-
-        def region = config.client().region
-        def namespace = config.client().namespace
-        def xNomadToken = config.client().token
-        def idempotencyToken = ""
-
-        def jobDef = NomadJobOperations.createJobDef(config, task, "validate-")
-
-        def jobValidateRequest = new JobValidateRequest()
-                .job(jobDef)
-                .region(region)
-                .secretID(xNomadToken)
-                .namespace(namespace)
-
-        def apiInstance = new JobsApi(client)
-
-        def response = apiInstance.postJobValidateRequest(
-                jobValidateRequest,
-                region,
-                namespace,
-                xNomadToken,
-                idempotencyToken)
-
-
-        return response
-    }
-
-
-
-    void terminate(NomadTaskKey key) {
-        //apply(() -> client.taskOperations().terminateTask(key.jobId, key.taskId))
-    }
-
-    void deleteTask(NomadTaskKey key) {
-        //apply(() -> client.taskOperations().deleteTask(key.jobId, key.taskId))
+    protected NomadClient getClient() {
+        new NomadClient(config)
     }
 
     @Override
-    void close() throws IOException {
+    void close() {
+        Global.onCleanup((it) -> client.closeConnection())
 
     }
 
 
+    NomadResponseJson jobList(String namespace = "default") {
+        final endpoint = "/jobs?$namespace"
+        final resp = client.get(endpoint)
+        return new NomadResponseJson(resp.stream)
+    }
+
+    NomadResponseJson jobSummary(String jobName, String namespace = "default") {
+        final endpoint = "/job/${jobName}/summary?$namespace"
+        final resp = client.get(endpoint)
+        return new NomadResponseJson(resp.stream)
+    }
+
+    NomadResponseJson jobStatus(String jobName, String namespace = "default") {
+        final endpoint = "/job/${jobName}/summary?$namespace"
+        final resp = client.get(endpoint)
+        return new NomadResponseJson(resp.stream)
+    }
+
+    NomadResponseJson jobPurge(String jobName, String namespace = "default") {
+        final endpoint = "/job/$jobName?purge=true"
+        final resp = client.delete(endpoint)
+        return new NomadResponseJson(resp.stream)
+    }
+
+    NomadResponseJson jobSubmit(String jobDef, String namespace = "default") {
+        log.debug "[Nomad] API request ${NomadClient.prettyPrint(jobDef).indent()} "
+        final endpoint = "/jobs?$namespace"
+        final resp = client.post(endpoint, jobDef)
+        return new NomadResponseJson(resp.stream)
+    }
+
+//    NomadResponseJson serverStatus() {
+//        final endpoint = "/status/leader"
+//        final resp = client.get(endpoint)
+//        return new NomadResponseJson(resp.stream)
+//    }
+
+
 }
+

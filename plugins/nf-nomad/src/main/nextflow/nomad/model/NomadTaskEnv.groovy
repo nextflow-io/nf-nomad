@@ -1,6 +1,5 @@
 /*
- * Copyright 2023, Stellenbosch University, South Africa
- * Copyright 2022, Center for Medical Genetics, Ghent
+ * Copyright 2013-2023, Seqera Labs
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,25 +14,36 @@
  * limitations under the License.
  */
 
-package nextflow.nomad.executor
+package nextflow.nomad.model
 
-import groovy.transform.Canonical
 import groovy.transform.CompileStatic
+import groovy.transform.EqualsAndHashCode
+import groovy.transform.ToString
 
 /**
- * Model a fully qualified taskId ie. JobId + TaskId
+ * Model a Nomad task environment variable definition
+ * https://developer.hashicorp.com/nomad/docs/job-specification/env
  *
  * @author Abhinav Sharma <abhi18av@outlook.com>
  */
-
-@Canonical
 @CompileStatic
-class NomadTaskKey {
-    String jobId
-    String taskId
+@ToString(includeNames = true)
+@EqualsAndHashCode(includeFields = true)
+class NomadTaskEnv {
 
-    String keyPair() {
-        "$jobId/$taskId"
+    private Map spec
+
+    private NomadTaskEnv(Map spec) {
+        this.spec = spec
     }
 
+    static NomadTaskEnv value(String env, String value) {
+        new NomadTaskEnv([name:env, value:value])
+    }
+
+    Map toSpec() { spec }
+
+    String toString() {
+        "NomadTaskEnv[ ${spec?.toString()} ]"
+    }
 }

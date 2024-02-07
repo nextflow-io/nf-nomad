@@ -15,20 +15,30 @@
  * limitations under the License.
  */
 
-
 package nextflow.nomad.executor
 
-import spock.lang.Specification
+
+import groovy.transform.CompileStatic
+import nextflow.executor.BashWrapperBuilder
+import nextflow.processor.TaskRun
+import nextflow.util.Escape
 
 /**
+ * Implements a BASH wrapper for tasks executed by Nomad cluster
  *
- * @author Abhinav Sharma  <abhi18av@outlook.com>
+ * @author Abhinav Sharma <abhi18av@outlook.com>
  */
-class NomadTaskKeyTest extends Specification {
+@CompileStatic
+class NomadBashWrapperBuilder extends BashWrapperBuilder {
 
-    def 'should return the key pair' () {
-        expect:
-        new NomadTaskKey('foo','bar').keyPair() == 'foo/bar'
+    NomadBashWrapperBuilder(TaskRun task) {
+        super(task)
+        this.headerScript = "NXF_CHDIR=${Escape.path(task.workDir)}"
     }
+
+    /**
+     * only for testing purpose -- do not use
+     */
+    protected NomadBashWrapperBuilder() {}
 
 }

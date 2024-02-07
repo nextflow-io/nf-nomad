@@ -1,50 +1,38 @@
+
 package nextflow.nomad.executor
-/*
- * Copyright 2023, Stellenbosch University, South Africa
- * Copyright 2022, Center for Medical Genetics, Ghent
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
 
 
 import groovy.transform.CompileStatic
 import groovy.util.logging.Slf4j
-import io.nomadproject.client.models.TaskState
-import nextflow.cloud.types.CloudMachineInfo
+import nextflow.SysEnv
 import nextflow.exception.ProcessUnrecoverableException
 import nextflow.executor.BashWrapperBuilder
-import nextflow.processor.TaskBean
+import nextflow.fusion.FusionAwareTask
+import nextflow.k8s.model.PodEnv
+import nextflow.nomad.NomadHelper
+import nextflow.nomad.config.NomadConfig
+import nextflow.nomad.model.NomadJobBuilder
+import nextflow.nomad.model.NomadTaskEnv
 import nextflow.processor.TaskHandler
 import nextflow.processor.TaskRun
 import nextflow.processor.TaskStatus
 import nextflow.trace.TraceRecord
+import nextflow.util.Escape
 
 import java.nio.file.Path
 
-
 /**
- * Implements a task handler for Nomad executor
+ * Implements the {@link TaskHandler} interface for Nomad jobs
  *
  * @author Abhinav Sharma <abhi18av@outlook.com>
  */
-
 @Slf4j
 @CompileStatic
-class NomadTaskHandler extends TaskHandler {
+class NomadTaskHandler extends TaskHandler implements FusionAwareTask {
 
-    NomadExecutor executor
+    private NomadExecutor executor
 
-    private TaskBean taskBean
+    private NomadConfig config
 
     private Path exitFile
 
@@ -52,18 +40,20 @@ class NomadTaskHandler extends TaskHandler {
 
     private Path errorFile
 
-    private volatile NomadTaskKey taskKey
+    private long timestamp
 
-    private volatile long timestamp
+    //Status in Nextflow Task terminology
+    private TaskStatus status
 
-    private volatile TaskState taskState
+    //State in Nomad Job terminology
+    private String state
 
-    private CloudMachineInfo machineInfo
+    private String jobName
 
     NomadTaskHandler(TaskRun task, NomadExecutor executor) {
         super(task)
         this.executor = executor
-        this.taskBean = new TaskBean(task)
+        this.config = executor.getConfig()
         this.outputFile = task.workDir.resolve(TaskRun.CMD_OUTFILE)
         this.errorFile = task.workDir.resolve(TaskRun.CMD_ERRFILE)
         this.exitFile = task.workDir.resolve(TaskRun.CMD_EXIT)
@@ -73,66 +63,161 @@ class NomadTaskHandler extends TaskHandler {
     /** only for testing purpose - DO NOT USE */
     protected NomadTaskHandler() {}
 
-    NomadService getBatchService() {
-        return executor.nomadService
+    NomadService getService() {
+        return executor.service
     }
+
 
     void validateConfiguration() {
         if (!task.container) {
-            throw new ProcessUnrecoverableException("No container image specified for process $task.name -- Either specify the container to use in the process definition or with 'process.container' value in your config")
+            throw new ProcessUnrecoverableException("[NOMAD] No container image specified for process $task.name -- Either specify the container to use in the process definition or with 'process.container' value in your config")
         }
     }
 
     protected BashWrapperBuilder createBashWrapper() {
-        new NomadScriptLauncher(taskBean, executor)
+        fusionEnabled()
+            ? fusionLauncher()
+            : new NomadScriptLauncher(task.toTaskBean())
     }
+
+    protected List<String> classicSubmitCli(TaskRun task) {
+        final result = new ArrayList(BashWrapperBuilder.BASH)
+        result.add("${Escape.path(task.workDir)}/${TaskRun.CMD_RUN}".toString())
+        return result
+    }
+
+    protected List<String> getSubmitCommand(TaskRun task) {
+        return fusionEnabled()
+            ? fusionSubmitCli()
+            : classicSubmitCli(task)
+    }
+
 
     @Override
     void submit() {
-        log.debug "[NOMAD] Submitting task $task.name - work-dir=${task.workDirStr}"
+        log.debug "[NOMAD] Submitting task ${task.name} - work-dir=${task.workDirStr}"
         createBashWrapper().build()
 
-        // submit the task execution
-//        this.taskKey = batchService.submitTask(task)
+        this.jobName = NomadHelper.sanitizeName(task.name + "-" + task.hash)
 
-        log.debug "[NOMAD] Submitted task $task.name with taskId=$taskKey"
+        submitTask(task, jobName)
+
+        // submit the task execution
+        log.debug "[NOMAD] Submitted task ${task.name} with taskId=${this.jobName}"
         // update the status
         this.status = TaskStatus.SUBMITTED
     }
 
+    String submitTask(TaskRun task, String jobName) {
+        executor.service.jobSubmit(createTask(task, jobName))
+    }
+
+//
+//    protected boolean entrypointOverride() {
+//        return executor.getConfig().job().entrypointOverride()
+//    }
+
+    protected String createTask(TaskRun task, String jobName) {
+
+        final launcher = getSubmitCommand(task)
+
+        def builder = new NomadJobBuilder()
+            .withJobName(jobName)
+            .withImageName(task.container)
+            .withWorkDir( task.workDir)
+            .withArgs(launcher)
+
+        if ( fusionEnabled() ) {
+            if( fusionConfig().privileged() )
+                builder.withPrivileged(true)
+            else {
+                builder.withResourcesLimits(["nextflow.io/fuse": 1])
+            }
+
+            final env = fusionLauncher().fusionEnv()
+            for( Map.Entry<String,String> it : env )
+                builder.withEnv(it.key, it.value)
+        }
+
+
+        if( SysEnv.containsKey('NXF_DEBUG') )
+            builder.withEnv('NXF_DEBUG', SysEnv.get('NXF_DEBUG'))
+
+        return  builder.buildAsJson()
+    }
+
+
+
     @Override
     boolean checkIfRunning() {
+        if (!this.jobName || !isSubmitted())
+            return false
+
+        state = taskState0(this.jobName)
+        // note, include complete status otherwise it hangs if the task
+        // completes before reaching this check
+        final isAllocated = state == "Running"
+        log.debug "[NOMAD] Task status $task.name taskId=${this.jobName}; state=$state running=$isAllocated"
+        if (isAllocated)
+            this.status = TaskStatus.RUNNING
+        return isAllocated
     }
+
+
+    private Boolean shouldDelete() {
+        executor.config.job().deleteJobsOnCompletion
+    }
+
 
     @Override
     boolean checkIfCompleted() {
-    }
+        assert this.jobName
+        log.trace "[NOMAD] Checking Task completion status  $task.name taskId=${this.jobName}"
 
-    private Boolean shouldDelete() {
-        //executor.config.batch().deleteJobsOnCompletion
-    }
+        if (isRunning())
+            return false
 
-    protected void deleteTask(NomadTaskKey taskKey, TaskRun task) {
-        if( !taskKey || shouldDelete()==Boolean.FALSE )
-            return
+        state = taskState0(this.jobName)
 
-        if( !task.isSuccess() && shouldDelete()==null ) {
-            // do not delete successfully executed pods for debugging purpose
-            return
+        final isDone = state == "Complete" || state == "Failed" || state == "Lost" || state == "Unknown"
+        log.debug "[NOMAD] Task status $task.name taskId=${this.jobName}; state=$state completed=$isDone"
+
+        if (isDone) {
+            // finalize the task
+            task.exitStatus = readExitFile()
+            task.stdout = outputFile
+            task.stderr = errorFile
+            this.status = TaskStatus.COMPLETED
+            if (state == "Failed" || state == "Lost" || state == "Unknown")
+                task.error = new ProcessUnrecoverableException()
+
+            if (shouldDelete()) {
+                executor.service.jobPurge(this.jobName)
+            }
+
+            return true
         }
 
-        try {
-            batchService.deleteTask(taskKey)
-        }
-        catch( Exception e ) {
-            log.warn "Unable to cleanup batch task: $taskKey -- see the log file for details", e
-        }
+        return false
     }
+
 
     /**
-     * @return Retrieve the task status caching the result for at lest one second
+     * @return Retrieve the task status caching the result for at least one second
      */
-    protected TaskState taskState0( NomadTaskKey key) {}
+    protected String taskState0(String taskName) {
+        final now = System.currentTimeMillis()
+        final delta = now - timestamp;
+        if (!status || delta >= 1_000) {
+            def newState = NomadHelper.filterStatus(executor.service.jobStatus(this.jobName), this.jobName)
+            log.trace "[NOMAD] Task: $taskName state=$state newState=$newState"
+            if (newState) {
+                state = newState
+                timestamp = now
+            }
+        }
+        return state
+    }
 
     protected int readExitFile() {
         try {
@@ -144,22 +229,44 @@ class NomadTaskHandler extends TaskHandler {
         }
     }
 
+    /**
+     * @return The workflow execution unique run name
+     */
+    protected String getRunName() {
+        executor.session.runName
+    }
+
+//    protected Map<String,String> getMeta(TaskRun task) {
+//        final result = new LinkedHashMap<String,String>(10)
+//        final labels = executor.config.job().getMeta()
+//        if( labels ) {
+//            result.putAll(labels)
+//        }
+//        final resLabels = task.config.getResourceLabels()
+//        if( resLabels )
+//            result.putAll(resLabels)
+//        result.'nextflow.io/app' = 'nextflow'
+//        result.'nextflow.io/runName' = getRunName()
+//        result.'nextflow.io/taskName' = task.getName()
+//        result.'nextflow.io/processName' = task.getProcessor().getName()
+//        result.'nextflow.io/sessionId' = "uuid-${executor.getSession().uniqueId}" as String
+//        if( task.config.queue )
+//            result.'nextflow.io/queue' = task.config.queue
+//        return result
+//    }
+
+
     @Override
     void kill() {
-        if( !taskKey )
+        if (!this.jobName)
             return
-        batchService.terminate(taskKey)
+        executor.service.jobPurge(this.jobName)
     }
 
     @Override
     TraceRecord getTraceRecord() {
         def result = super.getTraceRecord()
-        if( taskKey ) {
-            result.put('native_id', taskKey.keyPair())
-            //result.machineInfo = getMachineInfo()
-        }
         return result
     }
-
 
 }

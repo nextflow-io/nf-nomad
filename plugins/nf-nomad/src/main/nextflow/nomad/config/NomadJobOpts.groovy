@@ -1,42 +1,55 @@
-/*
- * Copyright 2023, Stellenbosch University, South Africa
- * Copyright 2022, Center for Medical Genetics, Ghent
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
-
 package nextflow.nomad.config
 
+import groovy.transform.CompileStatic
+import groovy.transform.EqualsAndHashCode
+
 /**
- * Model Nomad job settings defined in the nextflow.config file
+ * Models the Nomad job configuration settings
  *
  * @author Abhinav Sharma <abhi18av@outlook.com>
  */
-
+@EqualsAndHashCode
+@CompileStatic
 class NomadJobOpts {
 
-  //NOTE: Do not expose this to users, as this is the only job type supported
+    private Map<String, String> sysEnv
+
+    Boolean deleteJobsOnCompletion
+
+//-------------------------------------------------------------------
+//NOTE: Use the default for region and namespace
+//-------------------------------------------------------------------
+
+    static public final String DEFAULT_REGION = "global"
+    String region
+
+    static public final String DEFAULT_NAMESPACE = "default"
+    String namespace
+
+//-------------------------------------------------------------------
+//NOTE: Hard-coded to job type and docker containers
+//-------------------------------------------------------------------
+    static public final String DEFAULT_DRIVER = "docker"
+    String driver
+
     static public final String DEFAULT_JOB_TYPE = "batch"
+    String jobType
 
-  //TODO: We should support CSI-volumes 
+//-------------------------------------------------------------------
 
 
-//Only nice to have
-// group 
+    NomadJobOpts(Map jobConfig, Map<String, String> env = null) {
+        assert jobConfig != null
 
-    NomadJobOpts() {
-      volumes
+        sysEnv = env == null ? new HashMap<String, String>(System.getenv()) : env
+
+        this.deleteJobsOnCompletion = jobConfig.deleteTasksOnCompletion
 
     }
 
+    String toString() {
+        "${this.class.getSimpleName()}[ deleteJobsOnCompletion=$deleteJobsOnCompletion]"
+    }
+
 }
+

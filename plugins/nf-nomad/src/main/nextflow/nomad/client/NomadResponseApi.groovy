@@ -1,6 +1,5 @@
 /*
- * Copyright 2023, Stellenbosch University, South Africa
- * Copyright 2022, Center for Medical Genetics, Ghent
+ * Copyright 2013-2023, Seqera Labs
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,22 +14,41 @@
  * limitations under the License.
  */
 
-package nextflow.nomad
+package nextflow.nomad.client
 
 import groovy.transform.CompileStatic
-import nextflow.plugin.BasePlugin
-import org.pf4j.PluginWrapper
 
 /**
- * Nextflow plugin for Nomad executor
+ * Model a Kubernetes API response
  *
- * @author Abhinav Sharma <abhi18av@outlook.com>
- * @author : matthdsm <matthias.desmet@ugent.be>
+ * @author Paolo Di Tommaso <paolo.ditommaso@gmail.com>
  */
 @CompileStatic
-class NomadPlugin extends BasePlugin {
+class NomadResponseApi {
 
-    NomadPlugin(PluginWrapper wrapper) {
-        super(wrapper)
+    private int code
+
+    private InputStream stream
+
+    private String text
+
+    NomadResponseApi(int code, InputStream stream) {
+        this.code = code
+        this.stream = stream
+    }
+
+    String toString() {
+        "code=$code; stream=$stream"
+    }
+
+    int getCode() { code }
+
+    InputStream getStream() { stream }
+
+    String getText() {
+        if( text == null ) {
+            text = stream?.text
+        }
+        return text
     }
 }

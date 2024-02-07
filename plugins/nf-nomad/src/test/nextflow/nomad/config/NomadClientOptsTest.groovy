@@ -28,12 +28,26 @@ class NomadClientOptsTest extends Specification {
     def 'should get server path'() {
 
         expect:
-        new NomadClientOpts(address: PATH, token: TOKEN).address == EXPECTED
+        new NomadClientOpts(server: ADDRESS ).server == EXPECTED
 
         where:
-        PATH               | TOKEN | EXPECTED
-        "http://nomad.api" | null  | "http://nomad.api/v1"
+        ADDRESS               | EXPECTED
+        "http://nomad.api"    | "http://nomad.api"
 
     }
+
+
+
+    def 'should get server path'() {
+
+        expect:
+        new NomadClientOpts(token: TOKEN ).token == EXPECTED
+
+        where:
+        TOKEN                 | EXPECTED
+        "abcdefghijklmnop"    | "abcdefghijklmnop"
+
+    }
+
 
 }
