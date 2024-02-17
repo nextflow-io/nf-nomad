@@ -18,93 +18,136 @@
 package nextflow.nomad.executor
 
 import groovy.transform.CompileStatic
-import groovy.transform.Memoized
 import groovy.util.logging.Slf4j
-import nextflow.Global
-import nextflow.nomad.NomadHelper
-import nextflow.nomad.client.NomadClient
-import nextflow.nomad.client.NomadResponseJson
-import nextflow.nomad.config.NomadConfig
-import nextflow.nomad.model.NomadJobBuilder
-import nextflow.processor.TaskRun
+import io.nomadproject.client.ApiClient
+import io.nomadproject.client.api.JobsApi
+import io.nomadproject.client.models.Job
+import io.nomadproject.client.models.JobRegisterRequest
+import io.nomadproject.client.models.JobRegisterResponse
+import io.nomadproject.client.models.JobSummary
+import io.nomadproject.client.models.Task
+import io.nomadproject.client.models.TaskGroup
+import io.nomadproject.client.models.TaskGroupSummary
 
 /**
  * Nomad Service
- *
- * Tip: Use the following command to find out your kubernetes master node
- *    nomad node status
- *
- * See
- *   https://developer.hashicorp.com/nomad/api-docs/jobs
- *
- * Useful cheatsheet
- *   https://developer.hashicorp.com/nomad/docs/commands
  *
  * @author Abhinav Sharma <abhi18av@outlook.com>
  */
 
 @Slf4j
 @CompileStatic
-class NomadService implements Closeable {
+class NomadService implements Closeable{
 
-    NomadConfig config
+    private final nextflow.nomad.NomadConfig config
 
+    private final JobsApi jobsApi
 
-    NomadService(NomadExecutor executor) {
-        assert executor
-        this.config = executor.config
-    }
-
-
-    @Memoized
-    protected NomadClient getClient() {
-        new NomadClient(config)
+    NomadService(nextflow.nomad.NomadConfig config) {
+        this.config = config
+        ApiClient apiClient = new ApiClient()
+        apiClient.basePath = config.clientOpts.address
+        this.jobsApi = new JobsApi(apiClient);
     }
 
     @Override
-    void close() {
-        Global.onCleanup((it) -> client.closeConnection())
+    void close() throws IOException {
+    }
 
+    String submitTask(String id, String name, String image,
+                      List<String> args,
+                      String workingDir,
+                      Map<String, String>env){
+        Job job = new Job();
+        job.ID = id
+        job.name = name
+        job.type = "batch"
+        job.datacenters = this.config.jobOpts.datacenters
+        job.namespace = this.config.jobOpts.namespace
+
+        job.taskGroups = [createTaskGroup(id, name, image, args, workingDir, env)]
+
+        JobRegisterRequest jobRegisterRequest = new JobRegisterRequest();
+        jobRegisterRequest.setJob(job);
+        JobRegisterResponse jobRegisterResponse = jobsApi.registerJob(jobRegisterRequest, config.jobOpts.region, config.jobOpts.namespace, null, null)
+        jobRegisterResponse.evalID
+    }
+
+    TaskGroup createTaskGroup(String id, String name, String image, List<String> args, String workingDir, Map<String, String>env){
+        def task = createTask(id, image, args, workingDir, env)
+        def taskGroup = new TaskGroup(
+                name: "group",
+                tasks: [ task ]
+        )
+        return taskGroup
+    }
+
+    Task createTask(String id, String image, List<String> args, String workingDir, Map<String, String>env) {
+        def task = new Task(
+                name: "nf-task",
+                driver: "docker",
+                config: [
+                        image: image,
+                        privileged: true,
+                        work_dir: workingDir,
+                        command: args.first(),
+                        args: args.tail(),
+                ] as Map<String,Object>,
+                env: env
+        )
+        if( config.jobOpts.dockerVolume){
+            String destinationDir = workingDir.split(File.separator).dropRight(2).join(File.separator)
+            task.config.mount = [
+                    type : "volume",
+                    target : destinationDir,
+                    source : config.jobOpts.dockerVolume,
+                    readonly : false
+            ]
+        }
+        task
     }
 
 
-    NomadResponseJson jobList(String namespace = "default") {
-        final endpoint = "/jobs?$namespace"
-        final resp = client.get(endpoint)
-        return new NomadResponseJson(resp.stream)
+    String state(String jobId){
+        JobSummary summary = jobsApi.getJobSummary(jobId, config.jobOpts.region, config.jobOpts.namespace, null, null, null, null, null, null, null)
+        TaskGroupSummary taskGroupSummary = summary.summary.values().first()
+        switch (taskGroupSummary){
+            case {taskGroupSummary?.starting }:
+                return TaskGroupSummary.SERIALIZED_NAME_STARTING
+            case {taskGroupSummary?.complete }:
+                return TaskGroupSummary.SERIALIZED_NAME_COMPLETE
+            case {taskGroupSummary?.failed }:
+                return TaskGroupSummary.SERIALIZED_NAME_FAILED
+            case {taskGroupSummary?.lost }:
+                return TaskGroupSummary.SERIALIZED_NAME_LOST
+            case {taskGroupSummary?.queued }:
+                return TaskGroupSummary.SERIALIZED_NAME_QUEUED
+            case {taskGroupSummary?.running }:
+                return TaskGroupSummary.SERIALIZED_NAME_RUNNING
+            default:
+                TaskGroupSummary.SERIALIZED_NAME_UNKNOWN
+        }
     }
 
-    NomadResponseJson jobSummary(String jobName, String namespace = "default") {
-        final endpoint = "/job/${jobName}/summary?$namespace"
-        final resp = client.get(endpoint)
-        return new NomadResponseJson(resp.stream)
+    boolean checkIfRunning(String jobId){
+        Job job = jobsApi.getJob(jobId, config.jobOpts.region, config.jobOpts.namespace, null, null, null, null, null, null, null)
+        job.status == "running"
     }
 
-    NomadResponseJson jobStatus(String jobName, String namespace = "default") {
-        final endpoint = "/job/${jobName}/summary?$namespace"
-        final resp = client.get(endpoint)
-        return new NomadResponseJson(resp.stream)
+    boolean checkIfCompleted(String jobId){
+        Job job = jobsApi.getJob(jobId, config.jobOpts.region, config.jobOpts.namespace, null, null, null, null, null, null, null)
+        job.status == "dead"
     }
 
-    NomadResponseJson jobPurge(String jobName, String namespace = "default") {
-        final endpoint = "/job/$jobName?purge=true"
-        final resp = client.delete(endpoint)
-        return new NomadResponseJson(resp.stream)
+    void kill(String jobId) {
+        purgeJob(jobId, false)
     }
 
-    NomadResponseJson jobSubmit(String jobDef, String namespace = "default") {
-        log.debug "[Nomad] API request ${NomadClient.prettyPrint(jobDef).indent()} "
-        final endpoint = "/jobs?$namespace"
-        final resp = client.post(endpoint, jobDef)
-        return new NomadResponseJson(resp.stream)
+    void jobPurge(String jobId){
+        purgeJob(jobId, true)
     }
 
-//    NomadResponseJson serverStatus() {
-//        final endpoint = "/status/leader"
-//        final resp = client.get(endpoint)
-//        return new NomadResponseJson(resp.stream)
-//    }
-
-
+    protected void purgeJob(String jobId, boolean purge){
+        jobsApi.deleteJob(jobId,config.jobOpts.region, config.jobOpts.namespace,null,null,purge, true)
+    }
 }
-

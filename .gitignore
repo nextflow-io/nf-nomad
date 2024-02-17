@@ -11,3 +11,7 @@ out
 _resources
 oracle-nomad-cluster
 sun-nomadlab
+
+.project
+.classpath
+.settings

@@ -88,6 +88,8 @@ dependencies {
     }
 
     testImplementation 'com.squareup.okhttp3:mockwebserver:4.9.3'
+    testImplementation(testFixtures("io.nextflow:nextflow:$nextflowVersion"))
+    testImplementation(testFixtures("io.nextflow:nf-commons:$nextflowVersion"))
 }
 
 // use JUnit 5 platform
