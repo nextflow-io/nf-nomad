@@ -15,7 +15,6 @@ class NomadScriptLauncher extends BashWrapperBuilder {
 
     NomadScriptLauncher(TaskBean taskBean) {
         super(taskBean, new SimpleFileCopyStrategy(taskBean))
-        this.headerScript = "NXF_CHDIR=${Escape.path(taskBean.workDir)}"
     }
 
 }

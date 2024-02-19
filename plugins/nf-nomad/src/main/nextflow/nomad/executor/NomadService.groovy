@@ -28,6 +28,7 @@ import io.nomadproject.client.models.JobSummary
 import io.nomadproject.client.models.Task
 import io.nomadproject.client.models.TaskGroup
 import io.nomadproject.client.models.TaskGroupSummary
+import nextflow.nomad.NomadConfig
 
 /**
  * Nomad Service
@@ -39,11 +40,11 @@ import io.nomadproject.client.models.TaskGroupSummary
 @CompileStatic
 class NomadService implements Closeable{
 
-    private final nextflow.nomad.NomadConfig config
+    private final NomadConfig config
 
     private final JobsApi jobsApi
 
-    NomadService(nextflow.nomad.NomadConfig config) {
+    NomadService(NomadConfig config) {
         this.config = config
         ApiClient apiClient = new ApiClient()
         apiClient.basePath = config.clientOpts.address
