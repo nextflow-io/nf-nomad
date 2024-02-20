@@ -77,6 +77,8 @@ subprojects {
      * Creates plugin zip and json meta file in plugin `build/libs` directory
      */
     task makeZip(type: Jar) {
+        group 'nextflow'
+
         into('classes') { with jar }
         into('lib') { from configurations.runtimeClasspath }
         manifest.from file('src/resources/META-INF/MANIFEST.MF')
@@ -105,6 +107,8 @@ subprojects {
      * Copy the plugin dependencies in the subproject `build/target/libs` directory
      */
     task copyPluginLibs(type: Sync) {
+        group 'nextflow'
+
         from configurations.runtimeClasspath
         into 'build/target/libs'
     }
@@ -113,6 +117,8 @@ subprojects {
      * Copy the plugin in the project root build/plugins directory
      */
     task copyPluginZip(type: Copy, dependsOn: project.tasks.findByName('makeZip')) {
+        group 'nextflow'
+
         from makeZip
         into "$rootProject.buildDir/plugins"
         outputs.file("$rootProject.buildDir/plugins/${project.name}-${project.version}.zip")
@@ -130,6 +136,8 @@ subprojects {
     project.parent.tasks.getByName("assemble").dependsOn << copyPluginZip
 
     task uploadPlugin(type: io.nextflow.gradle.tasks.GithubUploader, dependsOn: makeZip) {
+        group 'nextflow'
+
         assets = providers.provider {["$buildDir/libs/${project.name}-${project.version}.zip",
                                       "$buildDir/libs/${project.name}-${project.version}-meta.json" ]}
         release = providers.provider { project.version }
@@ -150,6 +158,8 @@ classes.dependsOn subprojects.copyPluginLibs
  * Merge and publish the plugins index file
  */
 task publishIndex( type: io.nextflow.gradle.tasks.GithubRepositoryPublisher ) {
+    group 'nextflow'
+
     indexUrl = 'https://github.com/nextflow-io/plugins/main/plugins.json'
     repos = allPlugins()
     owner = github_organization
