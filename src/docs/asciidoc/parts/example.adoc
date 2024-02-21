@@ -1,0 +1,58 @@
+== Example
+
+.nextflow.config
+[source]
+----
+plugins {
+  id 'nf-nomad@0.0.1'
+  id 'nf-amazon'
+}
+
+fusion {
+    enabled = true
+    exportStorageCredentials=true
+}
+
+wave {
+    enabled = true
+}
+
+nomad{
+    client{
+        address = "http://localhost:4646"
+    }
+    jobs{
+        deleteOnCompletion = false
+    }
+}
+
+process.executor ='nomad'
+----
+
+.main.nf
+[source]
+----
+process sayHello {
+    container   'ubuntu:20.04'
+
+    input:
+    val x
+    output:
+    stdout
+    script:
+    """
+    echo '$x world!'
+    """
+}
+
+workflow {
+    Channel.of('Bonjour', 'Ciao', 'Hello', 'Hola') | sayHello | view
+}
+----
+
+TIP:: You need to use an S3 bucket as working dir
+
+Run the pipeline
+
+`$ nextflow run main.nf`
+

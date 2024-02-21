@@ -1,0 +1,4 @@
+== Setup
+
+Firstly you need a `nomad` cluster. See https://developer.hashicorp.com/nomad/intro
+

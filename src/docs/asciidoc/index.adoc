@@ -1,0 +1,8 @@
+= nf-nomad
+:toc: left
+
+include::parts/intro.adoc[]
+
+include::parts/example.adoc[]
+
+include::parts/setup.adoc[]
