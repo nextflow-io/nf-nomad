@@ -1,0 +1,16 @@
+import nextflow.gradle.plugins.NextflowPlugin
+
+apply plugin: NextflowPlugin
+
+ext{
+    github_organization = 'nextflow-io'
+    github_username = project.findProperty('github_username') ?: 'abhi18av'
+    github_access_token = project.findProperty('github_access_token') ?: System.getenv('GITHUB_TOKEN')
+    github_commit_email = project.findProperty('github_commit_email') ?: 'abhi18av@outlook.com'
+}
+
+nextflowPlugin{
+    githubOrganization = github_organization
+    extensionPoints = [
+    ]
+}
