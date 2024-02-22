@@ -1,3 +1,17 @@
+buildscript {
+    repositories {
+        mavenCentral()
+    }
+}
+
+plugins {
+    id("org.asciidoctor.jvm.convert") version "3.3.2"
+}
+
+repositories {
+    mavenCentral()
+}
+
 import nextflow.gradle.plugins.NextflowPlugin
 
 apply plugin: NextflowPlugin
@@ -13,4 +27,9 @@ nextflowPlugin{
     githubOrganization = github_organization
     extensionPoints = [
     ]
+}
+
+asciidoctor{
+    baseDir 'src/docs/asciidoc'
+    attributes revnumber : { project.version.toString() }
 }
