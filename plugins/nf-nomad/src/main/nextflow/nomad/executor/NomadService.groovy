@@ -111,7 +111,7 @@ class NomadService implements Closeable{
 
     String state(String jobId){
         JobSummary summary = jobsApi.getJobSummary(jobId, config.jobOpts.region, config.jobOpts.namespace, null, null, null, null, null, null, null)
-        TaskGroupSummary taskGroupSummary = summary.summary.values().first()
+        TaskGroupSummary taskGroupSummary = summary?.summary?.values()?.first()
         switch (taskGroupSummary){
             case {taskGroupSummary?.starting }:
                 return TaskGroupSummary.SERIALIZED_NAME_STARTING
