@@ -28,13 +28,14 @@ import groovy.util.logging.Slf4j
 @Slf4j
 @CompileStatic
 class NomadConfig {
+    final static protected API_VERSION = "v1"
 
     final NomadClientOpts clientOpts
     final NomadJobOpts jobOpts
 
     NomadConfig(Map nomadConfigMap) {
-        clientOpts = new NomadClientOpts((nomadConfigMap.client ?: Collections.emptyMap()) as Map)
-        jobOpts = new NomadJobOpts((nomadConfigMap.jobs ?: Collections.emptyMap()) as Map)
+        clientOpts = new NomadClientOpts((nomadConfigMap?.client ?: Collections.emptyMap()) as Map)
+        jobOpts = new NomadJobOpts((nomadConfigMap?.jobs ?: Collections.emptyMap()) as Map)
     }
 
     class NomadClientOpts{
@@ -42,7 +43,10 @@ class NomadConfig {
         final String token
 
         NomadClientOpts(Map nomadClientOpts){
-            address = (nomadClientOpts.address?.toString() ?: "http://127.0.0.1:4646")+"/v1"
+            def tmp = (nomadClientOpts.address?.toString() ?: "http://127.0.0.1:4646")
+            if( !tmp.endsWith("/"))
+                tmp +="/"
+            this.address = tmp + API_VERSION
             token = nomadClientOpts.token ?: null
         }
     }
@@ -57,8 +61,13 @@ class NomadConfig {
         NomadJobOpts(Map nomadJobOpts){
             deleteOnCompletion = nomadJobOpts.containsKey("deleteOnCompletion") ?
                     nomadJobOpts.deleteOnCompletion : false
-            datacenters = (nomadJobOpts.containsKey("datacenters") ?
-                    nomadJobOpts.datacenters.toString().split(",") : List.of("dc1")) as List<String>
+            if( nomadJobOpts.containsKey("datacenters") ) {
+                datacenters = ((nomadJobOpts.datacenters instanceof List<String> ?
+                        nomadJobOpts.datacenters : nomadJobOpts.datacenters.toString().split(","))
+                        as List<String>).findAll{it.size()}.unique()
+            }else{
+                datacenters = []
+            }
             region = nomadJobOpts.region ?: null
             namespace = nomadJobOpts.namespace ?: null
             dockerVolume = nomadJobOpts.dockerVolume ?: null
