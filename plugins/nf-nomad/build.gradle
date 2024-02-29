@@ -98,3 +98,15 @@ test {
     jvmArgs '--add-opens=java.base/java.lang=ALL-UNNAMED'
 }
 
+jar {
+    manifest {
+        attributes(
+                'Manifest-Version':'1.0',
+                'Plugin-Id': project.name,
+                'Plugin-Version': archiveVersion,
+                'Plugin-Class': "nextflow.nomad.NomadPlugin",
+                'Plugin-Provider': 'nextflow',
+                'Plugin-Requires': '>=23.10.0',
+        )
+    }
+}

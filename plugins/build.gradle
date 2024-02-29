@@ -32,6 +32,21 @@ subprojects {
         mavenCentral()
     }
 
+    java {
+        toolchain {
+            languageVersion = JavaLanguageVersion.of(19)
+        }
+    }
+
+    compileJava {
+        options.release.set(11)
+    }
+
+    tasks.withType(GroovyCompile) {
+        sourceCompatibility = '11'
+        targetCompatibility = '11'
+    }
+
     tasks.withType(Jar) {
         duplicatesStrategy = DuplicatesStrategy.INCLUDE
     }
