@@ -1,7 +1,7 @@
 == Example
 
 .nextflow.config
-[source]
+[source,groovy]
 ----
 plugins {
   id 'nf-nomad@0.0.1'
@@ -30,7 +30,7 @@ process.executor ='nomad'
 ----
 
 .main.nf
-[source]
+[source,groovy]
 ----
 process sayHello {
     container   'ubuntu:20.04'
