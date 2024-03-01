@@ -83,8 +83,13 @@ class NomadConfig {
             if( dockerVolume ){
                 log.info "dockerVolume config will be deprecated, use volume type:'docker' name:'name' instead"
             }
-            if( nomadJobOpts.volume && nomadJobOpts.volume instanceof Map){
-                volumeSpec = new VolumeSpec(nomadJobOpts.volume as Map<String, String>)
+            if( nomadJobOpts.volume && nomadJobOpts.volume instanceof Closure){
+                this.volumeSpec = new VolumeSpec()
+                def closure = (nomadJobOpts.volume as Closure)
+                def clone = closure.rehydrate(this.volumeSpec, closure.owner, closure.thisObject)
+                clone.resolveStrategy = Closure.DELEGATE_FIRST
+                clone()
+                this.volumeSpec.validate()
             }else{
                 volumeSpec = null
             }
@@ -93,16 +98,34 @@ class NomadConfig {
 
     class VolumeSpec{
 
-        final String type
-        final String name
+        private String type
+        private String name
 
-        VolumeSpec(Map<String, String> volumeConfig){
-            if( !VOLUME_TYPES.contains(volumeConfig.type) )
+        String getType() {
+            return type
+        }
+
+        String getName() {
+            return name
+        }
+
+        VolumeSpec type(String type){
+            this.type = type
+            this
+        }
+
+        VolumeSpec name(String name){
+            this.name = name
+            this
+        }
+
+        protected validate(){
+            if( !VOLUME_TYPES.contains(type) ) {
                 throw new IllegalArgumentException("Volume type $type is not supported")
-            if( !volumeConfig.name )
+            }
+            if( !this.name ){
                 throw new IllegalArgumentException("Volume name is required")
-            this.type = volumeConfig.type
-            this.name = volumeConfig.name
+            }
         }
     }
 }

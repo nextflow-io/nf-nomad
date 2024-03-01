@@ -195,7 +195,7 @@ class NomadServiceSpec extends Specification{
                         address : "http://${mockWebServer.hostName}:${mockWebServer.port}"
                 ],
                 jobs:[
-                        volume: [ name:'test', type:'csi']
+                        volume: { type "csi" name "test" }
                 ]
         )
         def service = new NomadService(config)

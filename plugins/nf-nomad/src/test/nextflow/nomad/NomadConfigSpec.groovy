@@ -123,7 +123,7 @@ class NomadConfigSpec extends Specification {
     void "should instantiate a volume spec if specified"() {
         when:
         def config = new NomadConfig([
-                jobs: [volume:[type:"docker", name:"test"]]
+                jobs: [volume : { type "docker" name "test" }]
         ])
 
         then:
@@ -133,7 +133,7 @@ class NomadConfigSpec extends Specification {
 
         when:
         def config2 = new NomadConfig([
-                jobs: [volume:[type:"csi", name:"test"]]
+                jobs: [volume : { type "csi" name "test" }]
         ])
 
         then:
@@ -143,7 +143,7 @@ class NomadConfigSpec extends Specification {
 
         when:
         def config3 = new NomadConfig([
-                jobs: [volume:[type:"host", name:"test"]]
+                jobs: [volume  : { type "host" name "test" }]
         ])
 
         then:
@@ -153,7 +153,7 @@ class NomadConfigSpec extends Specification {
 
         when:
         new NomadConfig([
-                jobs: [volume:[type:"not-supported", name:"test"]]
+                jobs: [volume : { type "not-supported" name "test" }]
         ])
 
         then:
