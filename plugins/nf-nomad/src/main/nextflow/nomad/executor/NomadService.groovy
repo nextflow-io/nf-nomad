@@ -21,6 +21,7 @@ import groovy.transform.CompileStatic
 import groovy.util.logging.Slf4j
 import io.nomadproject.client.ApiClient
 import io.nomadproject.client.api.JobsApi
+import io.nomadproject.client.auth.ApiKeyAuth
 import io.nomadproject.client.models.Job
 import io.nomadproject.client.models.JobRegisterRequest
 import io.nomadproject.client.models.JobRegisterResponse
@@ -48,6 +49,9 @@ class NomadService implements Closeable{
         this.config = config
         ApiClient apiClient = new ApiClient()
         apiClient.basePath = config.clientOpts.address
+        if( config.clientOpts.token ){
+            apiClient.apiKey = config.clientOpts.token
+        }
         this.jobsApi = new JobsApi(apiClient);
     }
 
