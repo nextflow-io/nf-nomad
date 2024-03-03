@@ -21,6 +21,7 @@ import groovy.transform.CompileStatic
 import groovy.util.logging.Slf4j
 import io.nomadproject.client.ApiClient
 import io.nomadproject.client.api.JobsApi
+import io.nomadproject.client.models.AllocationListStub
 import io.nomadproject.client.models.Job
 import io.nomadproject.client.models.JobRegisterRequest
 import io.nomadproject.client.models.JobRegisterResponse
@@ -28,9 +29,6 @@ import io.nomadproject.client.models.JobSummary
 import io.nomadproject.client.models.Resources
 import io.nomadproject.client.models.Task
 import io.nomadproject.client.models.TaskGroup
-import io.nomadproject.client.models.TaskGroupSummary
-import io.nomadproject.client.models.VolumeMount
-import io.nomadproject.client.models.VolumeRequest
 import nextflow.nomad.NomadConfig
 import nextflow.processor.TaskRun
 import nextflow.util.MemoryUnit
@@ -163,24 +161,13 @@ class NomadService implements Closeable{
 
 
     String state(String jobId){
-        JobSummary summary = jobsApi.getJobSummary(jobId, config.jobOpts.region, config.jobOpts.namespace, null, null, null, null, null, null, null)
-        TaskGroupSummary taskGroupSummary = summary?.summary?.values()?.first()
-        switch (taskGroupSummary){
-            case {taskGroupSummary?.starting }:
-                return TaskGroupSummary.SERIALIZED_NAME_STARTING
-            case {taskGroupSummary?.complete }:
-                return TaskGroupSummary.SERIALIZED_NAME_COMPLETE
-            case {taskGroupSummary?.failed }:
-                return TaskGroupSummary.SERIALIZED_NAME_FAILED
-            case {taskGroupSummary?.lost }:
-                return TaskGroupSummary.SERIALIZED_NAME_LOST
-            case {taskGroupSummary?.queued }:
-                return TaskGroupSummary.SERIALIZED_NAME_QUEUED
-            case {taskGroupSummary?.running }:
-                return TaskGroupSummary.SERIALIZED_NAME_RUNNING
-            default:
-                TaskGroupSummary.SERIALIZED_NAME_UNKNOWN
-        }
+        List<AllocationListStub> allocations = jobsApi.getJobAllocations(jobId, config.jobOpts.region, config.jobOpts.namespace, null, null, null, null, null, null, null, null)
+        AllocationListStub last = allocations?.sort{
+            it.modifyIndex
+        }?.last()
+        String currentState = last?.taskStates?.values()?.last()?.state
+        log.info "Task $jobId , state=$currentState"
+        currentState ?: "Unknown"
     }
 
 

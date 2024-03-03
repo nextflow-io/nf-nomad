@@ -83,9 +83,10 @@ class NomadTaskHandler extends TaskHandler implements FusionAwareTask {
         state = taskState0(this.jobName)
 
         final isDone = [
-                TaskGroupSummary.SERIALIZED_NAME_COMPLETE,
-                TaskGroupSummary.SERIALIZED_NAME_FAILED,
-                TaskGroupSummary.SERIALIZED_NAME_LOST].contains(state)
+                "complete",
+                "failed",
+                "dead",
+                "lost"].contains(state)
 
         log.debug "[NOMAD] Task status $task.name taskId=${this.jobName}; state=$state completed=$isDone"
 

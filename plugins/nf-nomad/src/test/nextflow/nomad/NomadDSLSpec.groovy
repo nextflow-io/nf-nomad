@@ -98,7 +98,7 @@ class NomadDSLSpec  extends Dsl2Spec{
             MockResponse dispatch(@NotNull RecordedRequest recordedRequest) throws InterruptedException {
                 switch (recordedRequest.method.toLowerCase()){
                     case "get":
-                        if( recordedRequest.path.endsWith("/summary")) {
+                        if( recordedRequest.path.endsWith("/allocations")) {
                             summary = true
                             return new MockResponse().setResponseCode(200)
                                     .setBody('{"Summary": {"test":{"Complete":1}}}').addHeader("Content-Type", "application/json")
