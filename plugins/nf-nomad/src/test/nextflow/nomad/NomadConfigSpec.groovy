@@ -119,4 +119,44 @@ class NomadConfigSpec extends Specification {
         expect:
         config.jobOpts.namespace == "namespace"
     }
+
+    void "should instantiate a volume spec if specified"() {
+        when:
+        def config = new NomadConfig([
+                jobs: [volume : { type "docker" name "test" }]
+        ])
+
+        then:
+        config.jobOpts.volumeSpec
+        config.jobOpts.volumeSpec.type == NomadConfig.VOLUME_DOCKER_TYPE
+        config.jobOpts.volumeSpec.name == "test"
+
+        when:
+        def config2 = new NomadConfig([
+                jobs: [volume : { type "csi" name "test" }]
+        ])
+
+        then:
+        config2.jobOpts.volumeSpec
+        config2.jobOpts.volumeSpec.type == NomadConfig.VOLUME_CSI_TYPE
+        config2.jobOpts.volumeSpec.name == "test"
+
+        when:
+        def config3 = new NomadConfig([
+                jobs: [volume  : { type "host" name "test" }]
+        ])
+
+        then:
+        config3.jobOpts.volumeSpec
+        config3.jobOpts.volumeSpec.type == NomadConfig.VOLUME_HOST_TYPE
+        config3.jobOpts.volumeSpec.name == "test"
+
+        when:
+        new NomadConfig([
+                jobs: [volume : { type "not-supported" name "test" }]
+        ])
+
+        then:
+        thrown(IllegalArgumentException)
+    }
 }

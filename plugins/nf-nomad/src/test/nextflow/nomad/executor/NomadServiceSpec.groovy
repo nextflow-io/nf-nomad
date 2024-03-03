@@ -188,7 +188,65 @@ class NomadServiceSpec extends Specification{
 
     }
 
-    void "should send the token"(){
+    void "submit a task with a volume"(){
+        given:
+        def config = new NomadConfig(
+                client:[
+                        address : "http://${mockWebServer.hostName}:${mockWebServer.port}"
+                ],
+                jobs:[
+                        volume: { type "csi" name "test" }
+                ]
+        )
+        def service = new NomadService(config)
+
+        String id = "theId"
+        String name = "theName"
+        String image = "theImage"
+        List<String> args = ["theCommand", "theArgs"]
+        String workingDir = "a/b/c"
+        Map<String, String>env = [test:"test"]
+
+        mockWebServer.enqueue(new MockResponse()
+                .setBody(JsonOutput.toJson(["EvalID":"test"]).toString())
+                .addHeader("Content-Type", "application/json"));
+        when:
+
+        def idJob = service.submitTask(id, name, image, args, workingDir,env)
+        def recordedRequest = mockWebServer.takeRequest();
+        def body = new JsonSlurper().parseText(recordedRequest.body.readUtf8())
+
+        then:
+        idJob
+
+        and:
+        recordedRequest.method == "POST"
+        recordedRequest.path == "/v1/jobs"
+
+        and:
+        body.Job
+        body.Job.ID == id
+        body.Job.Name == name
+        body.Job.Datacenters == []
+        body.Job.Type == "batch"
+        body.Job.TaskGroups.size() == 1
+        body.Job.TaskGroups[0].Name == "group"
+        body.Job.TaskGroups[0].Tasks.size() == 1
+        body.Job.TaskGroups[0].Tasks[0].Name == "nf-task"
+        body.Job.TaskGroups[0].Tasks[0].Driver == "docker"
+        body.Job.TaskGroups[0].Tasks[0].Config.image == image
+        body.Job.TaskGroups[0].Tasks[0].Config.work_dir == workingDir
+        body.Job.TaskGroups[0].Tasks[0].Config.command == args[0]
+        body.Job.TaskGroups[0].Tasks[0].Config.args == args.drop(1)
+
+        body.Job.TaskGroups[0].Volumes.size() == 1
+        body.Job.TaskGroups[0].Volumes['test'] == [AccessMode:"multi-node-multi-writer", AttachmentMode:"file-system", Source:"test", Type:"csi"]
+        body.Job.TaskGroups[0].Tasks[0].VolumeMounts.size() == 1
+        body.Job.TaskGroups[0].Tasks[0].VolumeMounts[0] == [Destination:"a", Volume:"test"]
+
+    }
+
+        void "should send the token"(){
         given:
         def config = new NomadConfig(
                 client:[
@@ -225,5 +283,4 @@ class NomadServiceSpec extends Specification{
         recordedRequest.path == "/v1/jobs"
         recordedRequest.headers.values('X-Nomad-Token').first()=='1234'
     }
-
 }
