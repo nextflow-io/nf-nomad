@@ -1,7 +1,6 @@
 /*
+ * Copyright 2023-, Stellenbosch University, South Africa
  * Copyright 2024, Evaluacion y Desarrollo de Negocios, Spain
- * Copyright 2023, Stellenbosch University, South Africa
- * Copyright 2022, Center for Medical Genetics, Ghent
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -52,6 +51,7 @@ class NomadService implements Closeable{
         ApiClient apiClient = new ApiClient()
         apiClient.basePath = config.clientOpts.address
         if( config.clientOpts.token ){
+            log.debug "[NOMAD BATCH] Creating Nomad connection using token: ${config.clientOpts.token?.substring(0,5)}.."
             apiClient.apiKey = config.clientOpts.token
         }
         this.jobsApi = new JobsApi(apiClient);
