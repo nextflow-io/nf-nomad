@@ -1,4 +1,5 @@
 /*
+ * Copyright 2024, Evaluacion y Desarrollo de Negocios, Spain
  * Copyright 2023, Stellenbosch University, South Africa
  * Copyright 2022, Center for Medical Genetics, Ghent
  *
@@ -28,6 +29,8 @@ import io.nomadproject.client.models.JobSummary
 import io.nomadproject.client.models.Task
 import io.nomadproject.client.models.TaskGroup
 import io.nomadproject.client.models.TaskGroupSummary
+import io.nomadproject.client.models.VolumeMount
+import io.nomadproject.client.models.VolumeRequest
 import nextflow.nomad.NomadConfig
 
 /**
@@ -80,6 +83,15 @@ class NomadService implements Closeable{
                 name: "group",
                 tasks: [ task ]
         )
+        if( config.jobOpts.volumeSpec){
+            taskGroup.volumes = [:]
+            taskGroup.volumes[config.jobOpts.volumeSpec.name]= new VolumeRequest(
+                    type: config.jobOpts.volumeSpec.type,
+                    source: config.jobOpts.volumeSpec.name,
+                    attachmentMode: "file-system",
+                    accessMode: "multi-node-multi-writer"
+            )
+        }
         return taskGroup
     }
 
@@ -104,6 +116,13 @@ class NomadService implements Closeable{
                     source : config.jobOpts.dockerVolume,
                     readonly : false
             ]
+        }
+        if( config.jobOpts.volumeSpec){
+            String destinationDir = workingDir.split(File.separator).dropRight(2).join(File.separator)
+            task.volumeMounts = [ new VolumeMount(
+                    destination: destinationDir,
+                    volume: config.jobOpts.volumeSpec.name
+            )]
         }
         task
     }

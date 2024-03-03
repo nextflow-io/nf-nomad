@@ -30,6 +30,14 @@ import groovy.util.logging.Slf4j
 class NomadConfig {
     final static protected API_VERSION = "v1"
 
+    final static public String VOLUME_DOCKER_TYPE = "docker"
+    final static public String VOLUME_CSI_TYPE = "csi"
+    final static public String VOLUME_HOST_TYPE = "host"
+
+    final static protected String[] VOLUME_TYPES = [
+            VOLUME_CSI_TYPE, VOLUME_DOCKER_TYPE, VOLUME_HOST_TYPE
+    ]
+
     final NomadClientOpts clientOpts
     final NomadJobOpts jobOpts
 
@@ -57,6 +65,7 @@ class NomadConfig {
         final String region
         final String namespace
         final String dockerVolume
+        final VolumeSpec volumeSpec
 
         NomadJobOpts(Map nomadJobOpts){
             deleteOnCompletion = nomadJobOpts.containsKey("deleteOnCompletion") ?
@@ -71,6 +80,52 @@ class NomadConfig {
             region = nomadJobOpts.region ?: null
             namespace = nomadJobOpts.namespace ?: null
             dockerVolume = nomadJobOpts.dockerVolume ?: null
+            if( dockerVolume ){
+                log.info "dockerVolume config will be deprecated, use volume type:'docker' name:'name' instead"
+            }
+            if( nomadJobOpts.volume && nomadJobOpts.volume instanceof Closure){
+                this.volumeSpec = new VolumeSpec()
+                def closure = (nomadJobOpts.volume as Closure)
+                def clone = closure.rehydrate(this.volumeSpec, closure.owner, closure.thisObject)
+                clone.resolveStrategy = Closure.DELEGATE_FIRST
+                clone()
+                this.volumeSpec.validate()
+            }else{
+                volumeSpec = null
+            }
+        }
+    }
+
+    class VolumeSpec{
+
+        private String type
+        private String name
+
+        String getType() {
+            return type
+        }
+
+        String getName() {
+            return name
+        }
+
+        VolumeSpec type(String type){
+            this.type = type
+            this
+        }
+
+        VolumeSpec name(String name){
+            this.name = name
+            this
+        }
+
+        protected validate(){
+            if( !VOLUME_TYPES.contains(type) ) {
+                throw new IllegalArgumentException("Volume type $type is not supported")
+            }
+            if( !this.name ){
+                throw new IllegalArgumentException("Volume name is required")
+            }
         }
     }
 }
