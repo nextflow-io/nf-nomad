@@ -253,7 +253,7 @@ class NomadServiceSpec extends Specification{
         def config = new NomadConfig(
                 client:[
                         address : "http://${mockWebServer.hostName}:${mockWebServer.port}",
-                        token: "1234"
+                        token: "123456789012345678901234567"
                 ],
                 jobs:[
                         dockerVolume:'test'
@@ -283,6 +283,6 @@ class NomadServiceSpec extends Specification{
         and:
         recordedRequest.method == "POST"
         recordedRequest.path == "/v1/jobs"
-        recordedRequest.headers.values('X-Nomad-Token').first()=='1234'
+        recordedRequest.headers.values('X-Nomad-Token').first()=='123456789012345678901234567'
     }
 }

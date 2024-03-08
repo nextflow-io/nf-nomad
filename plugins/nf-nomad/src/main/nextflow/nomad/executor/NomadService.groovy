@@ -25,6 +25,7 @@ import io.nomadproject.client.models.Job
 import io.nomadproject.client.models.JobRegisterRequest
 import io.nomadproject.client.models.JobRegisterResponse
 import io.nomadproject.client.models.JobSummary
+import io.nomadproject.client.models.Resources
 import io.nomadproject.client.models.Task
 import io.nomadproject.client.models.TaskGroup
 import io.nomadproject.client.models.TaskGroupSummary
@@ -50,8 +51,10 @@ class NomadService implements Closeable{
         this.config = config
         ApiClient apiClient = new ApiClient()
         apiClient.basePath = config.clientOpts.address
+        log.debug "[NOMAD] Client Address: ${config.clientOpts.address}"
+
         if( config.clientOpts.token ){
-            log.debug "[NOMAD BATCH] Creating Nomad connection using token: ${config.clientOpts.token?.take(5)}.."
+            log.debug "[NOMAD] Client Token: ${config.clientOpts.token?.substring(0,5)}.."
             apiClient.apiKey = config.clientOpts.token
         }
         this.jobsApi = new JobsApi(apiClient);
@@ -64,7 +67,8 @@ class NomadService implements Closeable{
     String submitTask(String id, String name, String image,
                       List<String> args,
                       String workingDir,
-                      Map<String, String>env){
+                      Map<String, String>env,
+                      Map<String, String>resources){
         Job job = new Job();
         job.ID = id
         job.name = name
@@ -72,7 +76,7 @@ class NomadService implements Closeable{
         job.datacenters = this.config.jobOpts.datacenters
         job.namespace = this.config.jobOpts.namespace
 
-        job.taskGroups = [createTaskGroup(id, name, image, args, workingDir, env)]
+        job.taskGroups = [createTaskGroup(id, name, image, args, workingDir, env, resources)]
 
         JobRegisterRequest jobRegisterRequest = new JobRegisterRequest();
         jobRegisterRequest.setJob(job);
@@ -80,8 +84,8 @@ class NomadService implements Closeable{
         jobRegisterResponse.evalID
     }
 
-    TaskGroup createTaskGroup(String id, String name, String image, List<String> args, String workingDir, Map<String, String>env){
-        def task = createTask(id, image, args, workingDir, env)
+    TaskGroup createTaskGroup(String id, String name, String image, List<String> args, String workingDir, Map<String, String>env, Map<String, String>resources){
+        def task = createTask(id, image, args, workingDir, env, resources)
         def taskGroup = new TaskGroup(
                 name: "group",
                 tasks: [ task ]
@@ -98,10 +102,16 @@ class NomadService implements Closeable{
         return taskGroup
     }
 
-    Task createTask(String id, String image, List<String> args, String workingDir, Map<String, String>env) {
+    Task createTask(String id, String image, List<String> args, String workingDir, Map<String, String>env, Map<String, String>taskResources) {
+
         def task = new Task(
                 name: "nf-task",
                 driver: "docker",
+                resources: [
+                        cpus: taskResources.cpus,
+                        memory: taskResources.memory,
+                        disk: taskResources.disk
+                ],
                 config: [
                         image: image,
                         privileged: true,
@@ -109,7 +119,7 @@ class NomadService implements Closeable{
                         command: args.first(),
                         args: args.tail(),
                 ] as Map<String,Object>,
-                env: env
+                env: env,
         )
         if( config.jobOpts.dockerVolume){
             String destinationDir = workingDir.split(File.separator).dropRight(2).join(File.separator)

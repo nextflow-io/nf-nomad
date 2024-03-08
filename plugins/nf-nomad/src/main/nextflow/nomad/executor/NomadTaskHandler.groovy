@@ -74,7 +74,7 @@ class NomadTaskHandler extends TaskHandler implements FusionAwareTask {
 
     @Override
     boolean checkIfCompleted() {
-        if( !nomadService.checkIfCompleted(this.jobName) ){
+        if (!nomadService.checkIfCompleted(this.jobName)) {
             return false
         }
 
@@ -119,7 +119,7 @@ class NomadTaskHandler extends TaskHandler implements FusionAwareTask {
     String submitTask() {
         log.debug "[NOMAD] Submitting task ${task.name} - work-dir=${task.workDirStr}"
         def imageName = task.container
-        if( !imageName )
+        if (!imageName)
             throw new ProcessSubmitException("Missing container image for process `$task.processor.name`")
 
         def builder = createBashWrapper(task)
@@ -131,7 +131,8 @@ class NomadTaskHandler extends TaskHandler implements FusionAwareTask {
 
         nomadService.submitTask(this.jobName, task.name, imageName, launcher,
                 task.workDir.toAbsolutePath().toString(),
-                getEnv(task) )
+                getEnv(task), getResources(task))
+
 
         // submit the task execution
         log.debug "[NOMAD] Submitted task ${task.name} with taskId=${this.jobName}"
@@ -157,12 +158,22 @@ class NomadTaskHandler extends TaskHandler implements FusionAwareTask {
                 : new NomadScriptLauncher(task.toTaskBean())
     }
 
-    protected Map<String, String>getEnv(TaskRun task){
+    protected Map<String, String> getEnv(TaskRun task) {
         Map<String, String> ret = [:]
-        if( fusionEnabled() ) {
+        if (fusionEnabled()) {
             ret += fusionLauncher().fusionEnv()
         }
         return ret
+    }
+
+
+
+    protected Map<String, String> getResources(TaskRun task) {
+        Map<String, String> res = [:]
+        res.cpus = task.processor.config.get("cpus")
+        res.memory = task.processor.config.get("memory")
+        res.disk = task.processor.config.get("disk")
+        return res
     }
 
     protected String taskState0(String taskName) {
