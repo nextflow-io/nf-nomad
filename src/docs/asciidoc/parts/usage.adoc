@@ -1,0 +1,70 @@
+== Usage
+
+Using the `nf-nomad` plugin is relatively straigtforward, once you have access to a development or production `nomad cluster`. Refer development.adoc for creating a local development cluster on a linux machine.
+
+Assuming that you have access to a minimal `Nomad cluster` and would like to evaluate the `nomad` executor and the `nf-nomad` plugin,  you can rely upon Seqera Labs innovative Fusion FileSystem with a
+
+.nextflow.config
+[source,groovy]
+----
+
+// add the relevant plugins
+plugins {
+  id 'nf-nomad'
+  id 'nf-amazon'
+}
+
+// enable the fusion file system and wave service to facilitate fusionfs
+fusion {
+    enabled = true
+    exportstoragecredentials=true
+}
+
+wave {
+    enabled = true
+}
+
+// specify nomad executor and configuration
+process {
+    executor ='nomad'
+}
+
+nomad{
+    client{
+        address = "http://localhost:4646"
+    }
+    jobs{
+        deleteoncompletion = false
+    }
+}
+
+
+----
+
+.main.nf
+[source,groovy]
+----
+process sayHello {
+    container   'ubuntu:20.04'
+
+    input:
+    val x
+    output:
+    stdout
+    script:
+    """
+    echo '$x world!'
+    """
+}
+
+workflow {
+    Channel.of('Bonjour', 'Ciao', 'Hello', 'Hola') | sayHello | view
+}
+----
+
+TIP:: You need to use an S3 bucket as working dir
+
+Run the pipeline
+
+`$ nextflow run main.nf`
+

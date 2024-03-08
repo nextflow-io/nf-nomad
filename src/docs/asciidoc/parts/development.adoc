@@ -1,0 +1,106 @@
+== Development
+
+Firstly you need a `nomad` cluster. See https://developer.hashicorp.com/nomad/intro
+
+In this setup, we have made the following assumptions
+
+- You want to create a minimal `Nomad cluster` for evaluation purpose
+- You have access to an AWS S3-compatible storage or GCP Storage
+- Your linux instance already has `docker` installed
+
+==== Setup local nomad dev cluster with FusionFS
+
+Here's a sample Nomad client configuration, please refer the official https://developer.hashicorp.com/nomad/docs/install[installation ] instructions and https://developer.hashicorp.com/nomad/tutorials/get-started/gs-start-a-cluster[dev cluster] instructions for customizing this for your own linux machine.
+
+.nomad.hcl
+[source,hcl]
+----
+# Full configuration options can be found at https://www.nomadproject.io/docs/configuration
+
+data_dir  = "/opt/nomad/data"
+datacenter = "dc"
+
+server {
+  enabled          = true
+  bootstrap_expect = 1
+}
+
+client {
+  enabled = true
+
+  options = {
+    "driver.allowlist" = "docker,raw_exec"
+  }
+
+  host_volume "scratch" {
+    path      = "/home/<USERNAME>/_nomad_volume_scratch"
+    read_only = false
+  }
+
+}
+
+acl {
+  enabled = true
+}
+
+
+plugin "raw_exec" {
+  config {
+    enabled = true
+  }
+}
+
+
+plugin "docker" {
+  config {
+    allow_privileged = true
+
+    volumes {
+      enabled      = true
+    }
+}
+
+----
+
+
+[source,bash]
+----
+$ sudo nomad agent -dev \
+  -bind 0.0.0.0 \
+  -network-interface='{{ GetDefaultInterfaces | attr "name" }}'
+
+$ export NOMAD_ADDR=http://localhost:4646
+----
+
+
+==== Build and use nf-nomad plugin
+
+If you'd like to contribute to the plugin (yay!), please follow these instructions.
+
+TIP: As of 08-MARCH-2024, we are using Java-19 for the gradle build tasks. We recommend that you setup your Java SDK accordingly.
+
+1. Clone the repository
+
+[source,bash]
+----
+$ git clone https://github.com/nextflow-io/nf-nomad.git
+----
+
+2. Open the project in `IntelliJ`
+
+3. Make your changes to the plugin codebase
+
+4. Run the following gradle tasks on the command line from the project root (or via IntelliJ)
+
+[source,bash]
+----
+$ ./gradlew clean zipPlugin
+----
+
+5. Install the locally built plugin to the `$HOME/.nextflow/plugins` folder
+
+[source,bash]
+----
+$ ./gradlew unzipPlugin
+----
+
