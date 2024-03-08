@@ -7,8 +7,10 @@ This plugin implements a Nextflow executor for [Hashicorp Nomad](https://www.nom
 
 Please note that this is a **community contributed** plugin and is a collaboration between 
 
-1. Abhinav Sharma (@abhi18av) as part of his PhD work at the Stellenbosch University
-2. Matthias de Smet (@matthdsm) and Tomas (@tomiles) from Center For Medical Genetics Ghent 
+1. Abhinav Sharma (@abhi18av) as part of his PhD work at the Stellenbosch University and Jorge Aguilera from Evaluacion y desarrollo de negocios, Spain.
+2. Tomas (@tomiles) and his team from Center For Medical Genetics Ghent, Belgium.
+
+The contribution roles during the development of initial plugin and testing along with the long term commitments have been discussed in [development and infrastructure group](https://github.com/nextflow-io/nf-nomad/issues/2#issue-1703543034).
 
 Feel free to reach out to us on the `#platform-nomad` channel on Slack for discussions and feedbacks.
 
