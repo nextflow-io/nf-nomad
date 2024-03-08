@@ -41,7 +41,7 @@ class SourcesMatcher {
         }
         matcher.collect { file ->
             def source = file.toString() - "$root.absolutePath/src/main/"
-            return source.split('\\.').dropRight(1).join().split(File.separator).drop(1).join('.')
+            return source.split('\\.').dropRight(1).join().split(File.separator).join('.')
         }
     }
 
