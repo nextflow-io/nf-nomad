@@ -4,7 +4,7 @@
 [source,groovy]
 ----
 plugins {
-  id 'nf-nomad@0.0.1'
+  id 'nf-nomad'
   id 'nf-amazon'
 }
 

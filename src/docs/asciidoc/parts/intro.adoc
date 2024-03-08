@@ -1,3 +1,5 @@
 == Introduction
 
-The aim of this plugin
+The aim of this plugin is to integrate `Nextflow` and Hashicorp `Nomad` executor for batch processing of jobs.
+
+The plugin itself, is similar in design and scrope to other executor integrations such as `nf-azure` and `k8s` integration, however as `Nomad` (arguably) offers a simpler setup 
