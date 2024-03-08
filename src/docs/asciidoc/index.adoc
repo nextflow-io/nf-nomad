@@ -3,6 +3,6 @@
 
 include::parts/intro.adoc[]
 
-include::parts/example.adoc[]
+include::parts/development.adoc[]
 
-include::parts/setup.adoc[]
+include::parts/usage.adoc[]
