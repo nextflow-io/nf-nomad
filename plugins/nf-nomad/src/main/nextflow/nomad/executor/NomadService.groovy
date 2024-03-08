@@ -54,7 +54,7 @@ class NomadService implements Closeable{
         log.debug "[NOMAD] Client Address: ${config.clientOpts.address}"
 
         if( config.clientOpts.token ){
-            log.debug "[NOMAD] Client Token: ${config.clientOpts.token?.substring(0,5)}.."
+            log.debug "[NOMAD] Creating Nomad connection using token: ${config.clientOpts.token?.take(5)}.."
             apiClient.apiKey = config.clientOpts.token
         }
         this.jobsApi = new JobsApi(apiClient);
