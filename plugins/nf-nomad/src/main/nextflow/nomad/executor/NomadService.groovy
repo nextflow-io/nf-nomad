@@ -54,7 +54,7 @@ class NomadService implements Closeable{
         log.debug "[NOMAD] Client Address: ${config.clientOpts.address}"
 
         if( config.clientOpts.token ){
-            log.debug "[NOMAD] Creating Nomad connection using token: ${config.clientOpts.token?.take(5)}.."
+            log.debug "[NOMAD] Client Token: ${config.clientOpts.token?.take(5)}.."
             apiClient.apiKey = config.clientOpts.token
         }
         this.jobsApi = new JobsApi(apiClient);
@@ -68,7 +68,7 @@ class NomadService implements Closeable{
                       List<String> args,
                       String workingDir,
                       Map<String, String>env,
-                      Map<String, String>resources){
+                      Resources resources){
         Job job = new Job();
         job.ID = id
         job.name = name
@@ -84,7 +84,7 @@ class NomadService implements Closeable{
         jobRegisterResponse.evalID
     }
 
-    TaskGroup createTaskGroup(String id, String name, String image, List<String> args, String workingDir, Map<String, String>env, Map<String, String>resources){
+    TaskGroup createTaskGroup(String id, String name, String image, List<String> args, String workingDir, Map<String, String>env, Resources resources){
         def task = createTask(id, image, args, workingDir, env, resources)
         def taskGroup = new TaskGroup(
                 name: "group",
@@ -102,16 +102,12 @@ class NomadService implements Closeable{
         return taskGroup
     }
 
-    Task createTask(String id, String image, List<String> args, String workingDir, Map<String, String>env, Map<String, String>taskResources) {
+    Task createTask(String id, String image, List<String> args, String workingDir, Map<String, String>env, Resources taskResources) {
 
         def task = new Task(
                 name: "nf-task",
                 driver: "docker",
-                resources: [
-                        cpus: taskResources.cpus,
-                        memory: taskResources.memory,
-                        disk: taskResources.disk
-                ],
+                resources: taskResources,
                 config: [
                         image: image,
                         privileged: true,

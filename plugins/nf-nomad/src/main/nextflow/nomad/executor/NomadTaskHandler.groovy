@@ -19,6 +19,7 @@ package nextflow.nomad.executor
 
 import groovy.transform.CompileStatic
 import groovy.util.logging.Slf4j
+import io.nomadproject.client.models.Resources
 import io.nomadproject.client.models.TaskGroupSummary
 import nextflow.exception.ProcessSubmitException
 import nextflow.exception.ProcessUnrecoverableException
@@ -30,6 +31,7 @@ import nextflow.processor.TaskHandler
 import nextflow.processor.TaskRun
 import nextflow.processor.TaskStatus
 import nextflow.util.Escape
+import nextflow.util.MemoryUnit
 
 import java.nio.file.Path
 
@@ -168,11 +170,15 @@ class NomadTaskHandler extends TaskHandler implements FusionAwareTask {
 
 
 
-    protected Map<String, String> getResources(TaskRun task) {
-        Map<String, String> res = [:]
-        res.cpus = task.processor.config.get("cpus")
-        res.memory = task.processor.config.get("memory")
-        res.disk = task.processor.config.get("disk")
+    protected Resources getResources(TaskRun task) {
+        final taskCfg = task.getConfig()
+        final taskCores =  !taskCfg.get("cpus") ? 1 :  taskCfg.get("cpus") as Integer
+        final taskMemory = taskCfg.get("memory") ? new MemoryUnit( taskCfg.get("memory") as String ) : new MemoryUnit("300.MB")
+
+        final res = new Resources()
+                .cores(taskCores)
+                .memoryMB(taskMemory.toMega() as Integer)
+
         return res
     }
 
