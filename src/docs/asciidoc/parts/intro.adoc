@@ -2,15 +2,15 @@
 
 The aim of this plugin is to integrate `Nextflow` and Hashicorp `Nomad` executor for batch processing of jobs.
 
-The plugin itself, is similar in design and scrope to other executor integrations such as `nf-azure` and `k8s` integration, however as `Nomad` (arguably) offers a simpler setup, we aimed to address the usability of a Nomad cluster within the Nextflow ecosystem.
+The plugin itself is similar in design and scope to other executor integrations such as `nf-azure` and `k8s`, however as `Nomad` (arguably) offers a simpler setup, we aimed to address the usability of a Nomad cluster within the Nextflow ecosystem.
 
-Hope you enjoy using the plugin and please participate in the development/feedback of the plugin in `platform-nomad` channel on Nextflow Slack instance. We would love to hear your feedback!
+Hope you enjoy using the plugin and please participate in the development/feedback of the plugin in the `platform-nomad` channel on the Nextflow Slack instance. We would love to hear your feedback!
 
 
 
 ==== Some resources for familiarizing yourself with Nomad:
 
--  https://developer.hashicorp.com/nomad/docs?product_intent=nomad[Hashicorp Documentation website for Nomad]
+- https://developer.hashicorp.com/nomad/docs?product_intent=nomad[Hashicorp Documentation website for Nomad]
 
 - https://developer.hashicorp.com/nomad/docs/configuration[Nomad Client/Server Configuration]
 
