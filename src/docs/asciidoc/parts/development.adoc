@@ -4,13 +4,13 @@ Firstly you need a `nomad` cluster. See https://developer.hashicorp.com/nomad/in
 
 In this setup, we have made the following assumptions
 
-- You want to create a minimal `Nomad cluster` for evaluation purpose
+- You want to create a minimal `Nomad cluster` for evaluation purposes
 - You have access to an AWS S3-compatible storage or GCP Storage
 - Your linux instance already has `docker` installed
 
 ==== Setup local nomad dev cluster with FusionFS
 
-Here's a sample Nomad client configuration, please refer the official https://developer.hashicorp.com/nomad/docs/install[installation ] instructions and https://developer.hashicorp.com/nomad/tutorials/get-started/gs-start-a-cluster[dev cluster] instructions for customizing this for your own linux machine.
+Here's a sample Nomad client configuration. Please refer to the official https://developer.hashicorp.com/nomad/docs/install[installation] and https://developer.hashicorp.com/nomad/tutorials/get-started/gs-start-a-cluster[dev cluster] instructions for customizing this for your own linux machine.
 
 .nomad.hcl
 [source,hcl]

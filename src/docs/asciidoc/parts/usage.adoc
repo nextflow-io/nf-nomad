@@ -1,8 +1,8 @@
 == Usage
 
-Using the `nf-nomad` plugin is relatively straigtforward, once you have access to a development or production `nomad cluster`. Refer development.adoc for creating a local development cluster on a linux machine.
+Using the `nf-nomad` plugin is relatively straightforward, once you have access to a development or production `nomad cluster`. Refer to development.adoc for creating a local development cluster on a linux machine.
 
-Assuming that you have access to a minimal `Nomad cluster` and would like to evaluate the `nomad` executor and the `nf-nomad` plugin,  you can rely upon Seqera Labs innovative Fusion FileSystem with a
+Assuming that you have access to a minimal `Nomad cluster` and would like to evaluate the `nomad` executor and the `nf-nomad` plugin,  you can rely upon Seqera innovative Fusion FileSystem with a
 
 .nextflow.config
 [source,groovy]
@@ -45,12 +45,14 @@ nomad{
 [source,groovy]
 ----
 process sayHello {
-    container   'ubuntu:20.04'
+    container 'ubuntu:20.04'
 
     input:
     val x
+
     output:
     stdout
+
     script:
     """
     echo '$x world!'
