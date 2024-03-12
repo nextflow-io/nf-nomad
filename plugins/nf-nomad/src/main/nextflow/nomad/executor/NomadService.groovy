@@ -32,6 +32,8 @@ import io.nomadproject.client.models.TaskGroupSummary
 import io.nomadproject.client.models.VolumeMount
 import io.nomadproject.client.models.VolumeRequest
 import nextflow.nomad.NomadConfig
+import nextflow.processor.TaskRun
+import nextflow.util.MemoryUnit
 
 /**
  * Nomad Service
@@ -60,23 +62,31 @@ class NomadService implements Closeable{
         this.jobsApi = new JobsApi(apiClient);
     }
 
+    protected Resources getResources(TaskRun task) {
+        final taskCfg = task.getConfig()
+        final taskCores =  !taskCfg.get("cpus") ? 1 :  taskCfg.get("cpus") as Integer
+        final taskMemory = taskCfg.get("memory") ? new MemoryUnit( taskCfg.get("memory") as String ) : new MemoryUnit("300.MB")
+
+        final res = new Resources()
+                .cores(taskCores)
+                .memoryMB(taskMemory.toMega() as Integer)
+
+        return res
+    }
+
     @Override
     void close() throws IOException {
     }
 
-    String submitTask(String id, String name, String image,
-                      List<String> args,
-                      String workingDir,
-                      Map<String, String>env,
-                      Resources resources){
+    String submitTask(String id, TaskRun task, List<String> args, Map<String, String>env){
         Job job = new Job();
         job.ID = id
-        job.name = name
+        job.name = task.name
         job.type = "batch"
         job.datacenters = this.config.jobOpts.datacenters
         job.namespace = this.config.jobOpts.namespace
 
-        job.taskGroups = [createTaskGroup(id, name, image, args, workingDir, env, resources)]
+        job.taskGroups = [createTaskGroup(task, args, env)]
 
         JobRegisterRequest jobRegisterRequest = new JobRegisterRequest();
         jobRegisterRequest.setJob(job);
@@ -84,8 +94,8 @@ class NomadService implements Closeable{
         jobRegisterResponse.evalID
     }
 
-    TaskGroup createTaskGroup(String id, String name, String image, List<String> args, String workingDir, Map<String, String>env, Resources resources){
-        def task = createTask(id, image, args, workingDir, env, resources)
+    TaskGroup createTaskGroup(TaskRun taskRun, List<String> args, Map<String, String>env){
+        def task = createTask(taskRun, args, env)
         def taskGroup = new TaskGroup(
                 name: "group",
                 tasks: [ task ]
@@ -102,14 +112,18 @@ class NomadService implements Closeable{
         return taskGroup
     }
 
-    Task createTask(String id, String image, List<String> args, String workingDir, Map<String, String>env, Resources taskResources) {
+    Task createTask(TaskRun task, List<String> args, Map<String, String>env) {
 
-        def task = new Task(
+        def imageName = task.container
+        def workingDir = task.workDir.toAbsolutePath().toString()
+        def taskResources = getResources(task)
+
+        def taskDef = new Task(
                 name: "nf-task",
                 driver: "docker",
                 resources: taskResources,
                 config: [
-                        image: image,
+                        image: imageName,
                         privileged: true,
                         work_dir: workingDir,
                         command: args.first(),
@@ -119,7 +133,7 @@ class NomadService implements Closeable{
         )
         if( config.jobOpts.dockerVolume){
             String destinationDir = workingDir.split(File.separator).dropRight(2).join(File.separator)
-            task.config.mount = [
+            taskDef.config.mount = [
                     type : "volume",
                     target : destinationDir,
                     source : config.jobOpts.dockerVolume,
@@ -128,12 +142,12 @@ class NomadService implements Closeable{
         }
         if( config.jobOpts.volumeSpec){
             String destinationDir = workingDir.split(File.separator).dropRight(2).join(File.separator)
-            task.volumeMounts = [ new VolumeMount(
+            taskDef.volumeMounts = [ new VolumeMount(
                     destination: destinationDir,
                     volume: config.jobOpts.volumeSpec.name
             )]
         }
-        task
+        taskDef
     }
 
 
@@ -157,6 +171,8 @@ class NomadService implements Closeable{
                 TaskGroupSummary.SERIALIZED_NAME_UNKNOWN
         }
     }
+
+
 
     boolean checkIfRunning(String jobId){
         Job job = jobsApi.getJob(jobId, config.jobOpts.region, config.jobOpts.namespace, null, null, null, null, null, null, null)

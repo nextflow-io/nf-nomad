@@ -120,8 +120,7 @@ class NomadTaskHandler extends TaskHandler implements FusionAwareTask {
 
     String submitTask() {
         log.debug "[NOMAD] Submitting task ${task.name} - work-dir=${task.workDirStr}"
-        def imageName = task.container
-        if (!imageName)
+        if (!task.container)
             throw new ProcessSubmitException("Missing container image for process `$task.processor.name`")
 
         def builder = createBashWrapper(task)
@@ -129,12 +128,9 @@ class NomadTaskHandler extends TaskHandler implements FusionAwareTask {
 
         this.jobName = NomadHelper.sanitizeName(task.name + "-" + task.hash)
 
-        final launcher = getSubmitCommand(task)
-
-        nomadService.submitTask(this.jobName, task.name, imageName, launcher,
-                task.workDir.toAbsolutePath().toString(),
-                getEnv(task), getResources(task))
-
+        final taskLauncher = getSubmitCommand(task)
+        final taskEnv = getEnv(task)
+        nomadService.submitTask(this.jobName, task, taskLauncher, taskEnv)
 
         // submit the task execution
         log.debug "[NOMAD] Submitted task ${task.name} with taskId=${this.jobName}"
@@ -166,20 +162,6 @@ class NomadTaskHandler extends TaskHandler implements FusionAwareTask {
             ret += fusionLauncher().fusionEnv()
         }
         return ret
-    }
-
-
-
-    protected Resources getResources(TaskRun task) {
-        final taskCfg = task.getConfig()
-        final taskCores =  !taskCfg.get("cpus") ? 1 :  taskCfg.get("cpus") as Integer
-        final taskMemory = taskCfg.get("memory") ? new MemoryUnit( taskCfg.get("memory") as String ) : new MemoryUnit("300.MB")
-
-        final res = new Resources()
-                .cores(taskCores)
-                .memoryMB(taskMemory.toMega() as Integer)
-
-        return res
     }
 
     protected String taskState0(String taskName) {
