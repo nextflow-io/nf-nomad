@@ -51,7 +51,12 @@ class NomadService implements Closeable{
 
     NomadService(NomadConfig config) {
         this.config = config
-        ApiClient apiClient = new ApiClient()
+
+        final CONNECTION_TIMEOUT_MILLISECONDS = 60000
+        final READ_TIMEOUT_MILLISECONDS = 60000
+        final WRITE_TIMEOUT_MILLISECONDS = 60000
+
+        ApiClient apiClient = new ApiClient( connectTimeout: CONNECTION_TIMEOUT_MILLISECONDS, readTimeout: READ_TIMEOUT_MILLISECONDS, writeTimeout: WRITE_TIMEOUT_MILLISECONDS)
         apiClient.basePath = config.clientOpts.address
         log.debug "[NOMAD] Client Address: ${config.clientOpts.address}"
 
@@ -63,9 +68,12 @@ class NomadService implements Closeable{
     }
 
     protected Resources getResources(TaskRun task) {
+        final DEFAULT_CPUS = 1
+        final DEFAULT_MEMORY = "300.MB"
+
         final taskCfg = task.getConfig()
-        final taskCores =  !taskCfg.get("cpus") ? 1 :  taskCfg.get("cpus") as Integer
-        final taskMemory = taskCfg.get("memory") ? new MemoryUnit( taskCfg.get("memory") as String ) : new MemoryUnit("300.MB")
+        final taskCores =  !taskCfg.get("cpus") ? DEFAULT_CPUS :  taskCfg.get("cpus") as Integer
+        final taskMemory = taskCfg.get("memory") ? new MemoryUnit( taskCfg.get("memory") as String ) : new MemoryUnit(DEFAULT_MEMORY)
 
         final res = new Resources()
                 .cores(taskCores)
