@@ -25,7 +25,9 @@ import io.nomadproject.client.models.Job
 import io.nomadproject.client.models.JobRegisterRequest
 import io.nomadproject.client.models.JobRegisterResponse
 import io.nomadproject.client.models.JobSummary
+import io.nomadproject.client.models.ReschedulePolicy
 import io.nomadproject.client.models.Resources
+import io.nomadproject.client.models.RestartPolicy
 import io.nomadproject.client.models.Task
 import io.nomadproject.client.models.TaskGroup
 import io.nomadproject.client.models.TaskGroupSummary
@@ -103,10 +105,18 @@ class NomadService implements Closeable{
     }
 
     TaskGroup createTaskGroup(TaskRun taskRun, List<String> args, Map<String, String>env){
+        final TASK_RESCHEDULE_ATTEMPTS = 0
+        final TASK_RESTART_ATTEMPTS = 0
+
+        final ReschedulePolicy taskReschedulePolicy  = new ReschedulePolicy().attempts(TASK_RESCHEDULE_ATTEMPTS)
+        final RestartPolicy taskRestartPolicy  = new RestartPolicy().attempts(TASK_RESTART_ATTEMPTS)
+
         def task = createTask(taskRun, args, env)
         def taskGroup = new TaskGroup(
                 name: "group",
-                tasks: [ task ]
+                tasks: [ task ],
+                reschedulePolicy: taskReschedulePolicy,
+                restartPolicy: taskRestartPolicy
         )
 
 
@@ -138,6 +148,7 @@ class NomadService implements Closeable{
         final imageName = task.container
         final workingDir = task.workDir.toAbsolutePath().toString()
         final taskResources = getResources(task)
+
 
         def taskDef = new Task(
                 name: "nf-task",
