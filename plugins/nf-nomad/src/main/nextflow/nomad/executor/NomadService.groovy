@@ -69,7 +69,7 @@ class NomadService implements Closeable{
 
     protected Resources getResources(TaskRun task) {
         final DEFAULT_CPUS = 1
-        final DEFAULT_MEMORY = "300.MB"
+        final DEFAULT_MEMORY = "500.MB"
 
         final taskCfg = task.getConfig()
         final taskCores =  !taskCfg.get("cpus") ? DEFAULT_CPUS :  taskCfg.get("cpus") as Integer
@@ -108,7 +108,9 @@ class NomadService implements Closeable{
                 name: "group",
                 tasks: [ task ]
         )
-        if( config.jobOpts.volumeSpec){
+
+
+        if( config.jobOpts.volumeSpec.type == NomadConfig.VOLUME_CSI_TYPE){
             taskGroup.volumes = [:]
             taskGroup.volumes[config.jobOpts.volumeSpec.name]= new VolumeRequest(
                     type: config.jobOpts.volumeSpec.type,
@@ -117,6 +119,15 @@ class NomadService implements Closeable{
                     accessMode: "multi-node-multi-writer"
             )
         }
+
+        if( config.jobOpts.volumeSpec.type == NomadConfig.VOLUME_HOST_TYPE){
+            taskGroup.volumes = [:]
+            taskGroup.volumes[config.jobOpts.volumeSpec.name]= new VolumeRequest(
+                    type: config.jobOpts.volumeSpec.type,
+                    source: config.jobOpts.volumeSpec.name,
+            )
+        }
+
         return taskGroup
     }
 
