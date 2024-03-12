@@ -21,9 +21,11 @@ import nextflow.exception.ProcessSubmitException
 import nextflow.executor.Executor
 import nextflow.nomad.NomadConfig
 import nextflow.processor.TaskBean
+import nextflow.processor.TaskConfig
 import nextflow.processor.TaskProcessor
 import nextflow.processor.TaskRun
 import nextflow.processor.TaskStatus
+import nextflow.script.ProcessConfig
 import spock.lang.Specification
 
 import java.nio.file.Files
@@ -61,6 +63,7 @@ class NomadTaskHandlerSpec extends Specification{
         new File(workDir.toFile(), TaskRun.CMD_INFILE).text = "infile"
 
         def mockTask = Mock(TaskRun){
+            getConfig() >> Mock(TaskConfig)
             getWorkDir() >> workDir
             getContainer() >> "ubuntu"
             getProcessor() >> Mock(TaskProcessor){

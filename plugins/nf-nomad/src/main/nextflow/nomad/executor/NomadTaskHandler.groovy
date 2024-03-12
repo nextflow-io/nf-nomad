@@ -19,6 +19,7 @@ package nextflow.nomad.executor
 
 import groovy.transform.CompileStatic
 import groovy.util.logging.Slf4j
+import io.nomadproject.client.models.Resources
 import io.nomadproject.client.models.TaskGroupSummary
 import nextflow.exception.ProcessSubmitException
 import nextflow.exception.ProcessUnrecoverableException
@@ -30,6 +31,7 @@ import nextflow.processor.TaskHandler
 import nextflow.processor.TaskRun
 import nextflow.processor.TaskStatus
 import nextflow.util.Escape
+import nextflow.util.MemoryUnit
 
 import java.nio.file.Path
 
@@ -74,7 +76,7 @@ class NomadTaskHandler extends TaskHandler implements FusionAwareTask {
 
     @Override
     boolean checkIfCompleted() {
-        if( !nomadService.checkIfCompleted(this.jobName) ){
+        if (!nomadService.checkIfCompleted(this.jobName)) {
             return false
         }
 
@@ -118,8 +120,7 @@ class NomadTaskHandler extends TaskHandler implements FusionAwareTask {
 
     String submitTask() {
         log.debug "[NOMAD] Submitting task ${task.name} - work-dir=${task.workDirStr}"
-        def imageName = task.container
-        if( !imageName )
+        if (!task.container)
             throw new ProcessSubmitException("Missing container image for process `$task.processor.name`")
 
         def builder = createBashWrapper(task)
@@ -127,11 +128,9 @@ class NomadTaskHandler extends TaskHandler implements FusionAwareTask {
 
         this.jobName = NomadHelper.sanitizeName(task.name + "-" + task.hash)
 
-        final launcher = getSubmitCommand(task)
-
-        nomadService.submitTask(this.jobName, task.name, imageName, launcher,
-                task.workDir.toAbsolutePath().toString(),
-                getEnv(task) )
+        final taskLauncher = getSubmitCommand(task)
+        final taskEnv = getEnv(task)
+        nomadService.submitTask(this.jobName, task, taskLauncher, taskEnv)
 
         // submit the task execution
         log.debug "[NOMAD] Submitted task ${task.name} with taskId=${this.jobName}"
@@ -157,9 +156,9 @@ class NomadTaskHandler extends TaskHandler implements FusionAwareTask {
                 : new NomadScriptLauncher(task.toTaskBean())
     }
 
-    protected Map<String, String>getEnv(TaskRun task){
+    protected Map<String, String> getEnv(TaskRun task) {
         Map<String, String> ret = [:]
-        if( fusionEnabled() ) {
+        if (fusionEnabled()) {
             ret += fusionLauncher().fusionEnv()
         }
         return ret
