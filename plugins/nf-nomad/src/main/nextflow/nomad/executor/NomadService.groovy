@@ -121,18 +121,20 @@ class NomadService implements Closeable{
     }
 
     Task createTask(TaskRun task, List<String> args, Map<String, String>env) {
+        final DRIVER = "docker"
+        final DRIVER_PRIVILEGED = true
 
-        def imageName = task.container
-        def workingDir = task.workDir.toAbsolutePath().toString()
-        def taskResources = getResources(task)
+        final imageName = task.container
+        final workingDir = task.workDir.toAbsolutePath().toString()
+        final taskResources = getResources(task)
 
         def taskDef = new Task(
                 name: "nf-task",
-                driver: "docker",
+                driver: DRIVER,
                 resources: taskResources,
                 config: [
                         image: imageName,
-                        privileged: true,
+                        privileged: DRIVER_PRIVILEGED,
                         work_dir: workingDir,
                         command: args.first(),
                         args: args.tail(),
@@ -148,6 +150,7 @@ class NomadService implements Closeable{
                     readonly : false
             ]
         }
+
         if( config.jobOpts.volumeSpec){
             String destinationDir = workingDir.split(File.separator).dropRight(2).join(File.separator)
             taskDef.volumeMounts = [ new VolumeMount(
