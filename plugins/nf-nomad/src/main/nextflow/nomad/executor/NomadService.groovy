@@ -25,7 +25,6 @@ import io.nomadproject.client.models.AllocationListStub
 import io.nomadproject.client.models.Job
 import io.nomadproject.client.models.JobRegisterRequest
 import io.nomadproject.client.models.JobRegisterResponse
-import io.nomadproject.client.models.JobSummary
 import io.nomadproject.client.models.ReschedulePolicy
 import io.nomadproject.client.models.Resources
 import io.nomadproject.client.models.RestartPolicy
@@ -33,6 +32,7 @@ import io.nomadproject.client.models.Task
 import io.nomadproject.client.models.TaskGroup
 import io.nomadproject.client.models.VolumeMount
 import io.nomadproject.client.models.VolumeRequest
+import nextflow.exception.ProcessSubmitException
 import nextflow.nomad.NomadConfig
 import nextflow.processor.TaskRun
 import nextflow.util.MemoryUnit
@@ -54,6 +54,7 @@ class NomadService implements Closeable{
     NomadService(NomadConfig config) {
         this.config = config
 
+        //TODO: Accommodate these connection level options in clientOpts
         final CONNECTION_TIMEOUT_MILLISECONDS = 60000
         final READ_TIMEOUT_MILLISECONDS = 60000
         final WRITE_TIMEOUT_MILLISECONDS = 60000
@@ -100,13 +101,19 @@ class NomadService implements Closeable{
 
         JobRegisterRequest jobRegisterRequest = new JobRegisterRequest();
         jobRegisterRequest.setJob(job);
-        JobRegisterResponse jobRegisterResponse = jobsApi.registerJob(jobRegisterRequest, config.jobOpts.region, config.jobOpts.namespace, null, null)
-        jobRegisterResponse.evalID
+
+        try {
+            JobRegisterResponse jobRegisterResponse = jobsApi.registerJob(jobRegisterRequest, config.jobOpts.region, config.jobOpts.namespace, null, null)
+            jobRegisterResponse.evalID
+        }
+        catch( Throwable e ) {
+            throw  new ProcessSubmitException("[NOMAD] Failed to submit ${job.name} -- Cause: ${e.message ?: e}", e)
+        }
     }
 
     TaskGroup createTaskGroup(TaskRun taskRun, List<String> args, Map<String, String>env){
 
-        //NOTE: Force a single-allocation with single retry per job
+        //NOTE: Force a single-allocation with no-retries per job
         final TASK_RESCHEDULE_ATTEMPTS = 0
         final TASK_RESTART_ATTEMPTS = 0
 
