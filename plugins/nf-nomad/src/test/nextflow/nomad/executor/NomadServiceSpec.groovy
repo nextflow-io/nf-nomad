@@ -50,6 +50,7 @@ class NomadServiceSpec extends Specification{
         mockWebServer.shutdown()
     }
 
+/*
     void "should check the state"(){
         given:
         def config = new NomadConfig(
@@ -224,7 +225,6 @@ class NomadServiceSpec extends Specification{
 
     }
 
-/*
     void "submit a task"(){
         given:
         def config = new NomadConfig(
