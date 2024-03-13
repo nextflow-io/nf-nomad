@@ -19,8 +19,7 @@ package nextflow.nomad.executor
 
 import groovy.transform.CompileStatic
 import groovy.util.logging.Slf4j
-import io.nomadproject.client.models.Resources
-import io.nomadproject.client.models.TaskGroupSummary
+import nextflow.SysEnv
 import nextflow.exception.ProcessSubmitException
 import nextflow.exception.ProcessUnrecoverableException
 import nextflow.executor.BashWrapperBuilder
@@ -31,7 +30,6 @@ import nextflow.processor.TaskHandler
 import nextflow.processor.TaskRun
 import nextflow.processor.TaskStatus
 import nextflow.util.Escape
-import nextflow.util.MemoryUnit
 
 import java.nio.file.Path
 
@@ -159,9 +157,15 @@ class NomadTaskHandler extends TaskHandler implements FusionAwareTask {
 
     protected Map<String, String> getEnv(TaskRun task) {
         Map<String, String> ret = [:]
+
         if (fusionEnabled()) {
             ret += fusionLauncher().fusionEnv()
         }
+
+        //Add debug env variable
+        if( SysEnv.containsKey('NXF_DEBUG') )
+            ret.put('NXF_DEBUG', SysEnv.get('NXF_DEBUG') )
+
         return ret
     }
 

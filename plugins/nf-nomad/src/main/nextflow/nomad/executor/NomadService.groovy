@@ -181,7 +181,7 @@ class NomadService implements Closeable{
                     volume: config.jobOpts.volumeSpec.name
             )]
         }
-        taskDef
+        return taskDef
     }
 
 
