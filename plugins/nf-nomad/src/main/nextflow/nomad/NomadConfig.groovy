@@ -47,29 +47,37 @@ class NomadConfig {
     }
 
     class NomadClientOpts{
-        final String address
-        final String token
 
-        NomadClientOpts(Map nomadClientOpts){
-            def tmp = (nomadClientOpts.address?.toString() ?: "http://127.0.0.1:4646")
+        private Map<String,String> sysEnv
+        String address
+        String token
+
+        NomadClientOpts(Map nomadClientOpts, Map<String,String> env=null){
+            assert nomadClientOpts!=null
+
+            sysEnv = env==null ? new HashMap<String,String>(System.getenv()) : env
+
+            def tmp = (nomadClientOpts.address?.toString() ?: sysEnv.get('NOMAD_ADDR'))
             if( !tmp.endsWith("/"))
                 tmp +="/"
             this.address = tmp + API_VERSION
-            token = nomadClientOpts.token ?: null
+
+            this.token = nomadClientOpts.token ?: sysEnv.get('NOMAD_TOKEN')
         }
     }
 
     class NomadJobOpts{
-        final boolean deleteOnCompletion
-        final List<String> datacenters
-        final String region
-        final String namespace
-        final String dockerVolume
-        final VolumeSpec volumeSpec
+
+        boolean deleteOnCompletion
+        List<String> datacenters
+        String region
+        String namespace
+        VolumeSpec volumeSpec
 
         NomadJobOpts(Map nomadJobOpts){
             deleteOnCompletion = nomadJobOpts.containsKey("deleteOnCompletion") ?
                     nomadJobOpts.deleteOnCompletion : false
+
             if( nomadJobOpts.containsKey("datacenters") ) {
                 datacenters = ((nomadJobOpts.datacenters instanceof List<String> ?
                         nomadJobOpts.datacenters : nomadJobOpts.datacenters.toString().split(","))
@@ -79,10 +87,7 @@ class NomadConfig {
             }
             region = nomadJobOpts.region ?: null
             namespace = nomadJobOpts.namespace ?: null
-            dockerVolume = nomadJobOpts.dockerVolume ?: null
-            if( dockerVolume ){
-                log.info "dockerVolume config will be deprecated, use volume type:'docker' name:'name' instead"
-            }
+
             if( nomadJobOpts.volume && nomadJobOpts.volume instanceof Closure){
                 this.volumeSpec = new VolumeSpec()
                 def closure = (nomadJobOpts.volume as Closure)

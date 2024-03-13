@@ -105,6 +105,8 @@ class NomadService implements Closeable{
     }
 
     TaskGroup createTaskGroup(TaskRun taskRun, List<String> args, Map<String, String>env){
+
+        //NOTE: Force a single-allocation with single retry per job
         final TASK_RESCHEDULE_ATTEMPTS = 0
         final TASK_RESTART_ATTEMPTS = 0
 
@@ -163,15 +165,7 @@ class NomadService implements Closeable{
                 ] as Map<String,Object>,
                 env: env,
         )
-        if( config.jobOpts.dockerVolume){
-            String destinationDir = workingDir.split(File.separator).dropRight(2).join(File.separator)
-            taskDef.config.mount = [
-                    type : "volume",
-                    target : destinationDir,
-                    source : config.jobOpts.dockerVolume,
-                    readonly : false
-            ]
-        }
+
 
         if( config.jobOpts.volumeSpec){
             String destinationDir = workingDir.split(File.separator).dropRight(2).join(File.separator)

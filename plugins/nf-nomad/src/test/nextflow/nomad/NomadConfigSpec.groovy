@@ -18,6 +18,7 @@
 package nextflow.nomad
 
 import spock.lang.Specification
+import spock.lang.Unroll
 
 /**
  * Unit test for Nomad Config
@@ -35,32 +36,20 @@ class NomadConfigSpec extends Specification {
         config.clientOpts
     }
 
-    void "should use localhost as default address"() {
-        given:
-        def config = new NomadConfig([:])
+
+    @Unroll
+    def 'should derive the correct address' ()  {
 
         expect:
-        config.clientOpts.address == "http://127.0.0.1:4646/v1"
-    }
+        new NomadConfig([
+                client:[address: ADDRESS]
+        ]).clientOpts.address == EXPECTED
 
-    void "should use address if provided"() {
-        given:
-        def config = new NomadConfig([
-                client: [address: "http://nomad"]
-        ])
+        where:
+        ADDRESS                                  |  EXPECTED
+        null                                     | "${System.getenv('NOMAD_ADDR')}/v1"
+        "http://nomad"                           | "http://nomad/v1"
 
-        expect:
-        config.clientOpts.address == "http://nomad/v1"
-    }
-
-    void "should normalize address if provided"() {
-        given:
-        def config = new NomadConfig([
-                client: [address: "http://nomad/"]
-        ])
-
-        expect:
-        config.clientOpts.address == "http://nomad/v1"
     }
 
     void "should use token if provided"() {
