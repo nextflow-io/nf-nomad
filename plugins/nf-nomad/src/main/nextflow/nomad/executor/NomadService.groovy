@@ -25,10 +25,11 @@ import io.nomadproject.client.models.AllocationListStub
 import io.nomadproject.client.models.Job
 import io.nomadproject.client.models.JobRegisterRequest
 import io.nomadproject.client.models.JobRegisterResponse
-import io.nomadproject.client.models.JobSummary
 import io.nomadproject.client.models.Resources
 import io.nomadproject.client.models.Task
 import io.nomadproject.client.models.TaskGroup
+import io.nomadproject.client.models.VolumeMount
+import io.nomadproject.client.models.VolumeRequest
 import nextflow.nomad.NomadConfig
 import nextflow.processor.TaskRun
 import nextflow.util.MemoryUnit
