@@ -53,7 +53,6 @@ class NomadConfig {
         String token
 
         NomadClientOpts(Map nomadClientOpts, Map<String,String> env=null){
-            assert nomadClientOpts!=null
 
             sysEnv = env==null ? new HashMap<String,String>(System.getenv()) : env
 
@@ -63,6 +62,9 @@ class NomadConfig {
             this.address = tmp + API_VERSION
 
             this.token = nomadClientOpts.token ?: sysEnv.get('NOMAD_TOKEN')
+
+            //TODO: Add mTLS properties and env vars
+            // https://developer.hashicorp.com/nomad/docs/commands#mtls-environment-variables
         }
     }
 
