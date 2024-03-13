@@ -120,7 +120,7 @@ class NomadService implements Closeable{
         )
 
 
-        if( config.jobOpts.volumeSpec.type == NomadConfig.VOLUME_CSI_TYPE){
+        if( config.jobOpts.volumeSpec && config.jobOpts.volumeSpec.type == NomadConfig.VOLUME_CSI_TYPE){
             taskGroup.volumes = [:]
             taskGroup.volumes[config.jobOpts.volumeSpec.name]= new VolumeRequest(
                     type: config.jobOpts.volumeSpec.type,
@@ -130,7 +130,7 @@ class NomadService implements Closeable{
             )
         }
 
-        if( config.jobOpts.volumeSpec.type == NomadConfig.VOLUME_HOST_TYPE){
+        if( config.jobOpts.volumeSpec && config.jobOpts.volumeSpec.type == NomadConfig.VOLUME_HOST_TYPE){
             taskGroup.volumes = [:]
             taskGroup.volumes[config.jobOpts.volumeSpec.name]= new VolumeRequest(
                     type: config.jobOpts.volumeSpec.type,
@@ -190,7 +190,7 @@ class NomadService implements Closeable{
             it.modifyIndex
         }?.last()
         String currentState = last?.taskStates?.values()?.last()?.state
-        log.info "Task $jobId , state=$currentState"
+        log.debug "Task $jobId , state=$currentState"
         currentState ?: "Unknown"
     }
 
