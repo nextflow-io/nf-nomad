@@ -21,6 +21,7 @@ import groovy.transform.CompileStatic
 import groovy.util.logging.Slf4j
 import io.nomadproject.client.ApiClient
 import io.nomadproject.client.api.JobsApi
+import io.nomadproject.client.models.AllocationListStub
 import io.nomadproject.client.models.Job
 import io.nomadproject.client.models.JobRegisterRequest
 import io.nomadproject.client.models.JobRegisterResponse
@@ -30,7 +31,6 @@ import io.nomadproject.client.models.Resources
 import io.nomadproject.client.models.RestartPolicy
 import io.nomadproject.client.models.Task
 import io.nomadproject.client.models.TaskGroup
-import io.nomadproject.client.models.TaskGroupSummary
 import io.nomadproject.client.models.VolumeMount
 import io.nomadproject.client.models.VolumeRequest
 import nextflow.nomad.NomadConfig
@@ -120,7 +120,7 @@ class NomadService implements Closeable{
         )
 
 
-        if( config.jobOpts.volumeSpec.type == NomadConfig.VOLUME_CSI_TYPE){
+        if( config.jobOpts.volumeSpec && config.jobOpts.volumeSpec.type == NomadConfig.VOLUME_CSI_TYPE){
             taskGroup.volumes = [:]
             taskGroup.volumes[config.jobOpts.volumeSpec.name]= new VolumeRequest(
                     type: config.jobOpts.volumeSpec.type,
@@ -130,7 +130,7 @@ class NomadService implements Closeable{
             )
         }
 
-        if( config.jobOpts.volumeSpec.type == NomadConfig.VOLUME_HOST_TYPE){
+        if( config.jobOpts.volumeSpec && config.jobOpts.volumeSpec.type == NomadConfig.VOLUME_HOST_TYPE){
             taskGroup.volumes = [:]
             taskGroup.volumes[config.jobOpts.volumeSpec.name]= new VolumeRequest(
                     type: config.jobOpts.volumeSpec.type,
@@ -185,24 +185,13 @@ class NomadService implements Closeable{
 
 
     String state(String jobId){
-        JobSummary summary = jobsApi.getJobSummary(jobId, config.jobOpts.region, config.jobOpts.namespace, null, null, null, null, null, null, null)
-        TaskGroupSummary taskGroupSummary = summary?.summary?.values()?.first()
-        switch (taskGroupSummary){
-            case {taskGroupSummary?.starting }:
-                return TaskGroupSummary.SERIALIZED_NAME_STARTING
-            case {taskGroupSummary?.complete }:
-                return TaskGroupSummary.SERIALIZED_NAME_COMPLETE
-            case {taskGroupSummary?.failed }:
-                return TaskGroupSummary.SERIALIZED_NAME_FAILED
-            case {taskGroupSummary?.lost }:
-                return TaskGroupSummary.SERIALIZED_NAME_LOST
-            case {taskGroupSummary?.queued }:
-                return TaskGroupSummary.SERIALIZED_NAME_QUEUED
-            case {taskGroupSummary?.running }:
-                return TaskGroupSummary.SERIALIZED_NAME_RUNNING
-            default:
-                TaskGroupSummary.SERIALIZED_NAME_UNKNOWN
-        }
+        List<AllocationListStub> allocations = jobsApi.getJobAllocations(jobId, config.jobOpts.region, config.jobOpts.namespace, null, null, null, null, null, null, null, null)
+        AllocationListStub last = allocations?.sort{
+            it.modifyIndex
+        }?.last()
+        String currentState = last?.taskStates?.values()?.last()?.state
+        log.debug "Task $jobId , state=$currentState"
+        currentState ?: "Unknown"
     }
 
 
