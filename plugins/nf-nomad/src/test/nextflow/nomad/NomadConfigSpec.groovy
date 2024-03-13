@@ -62,14 +62,14 @@ class NomadConfigSpec extends Specification {
         config.clientOpts.token == "theToken"
     }
 
-    void "should use an empty list if no datacenters is provided"() {
+    void "should use the NOMAD_DC variable if no datacenters are provided"() {
         given:
         def config = new NomadConfig([
                 jobs: [:]
         ])
 
         expect:
-        !config.jobOpts.datacenters.size()
+        config.jobOpts.datacenters
     }
 
     void "should use datacenters #dc with size #size if provided"() {

@@ -70,13 +70,20 @@ class NomadConfig {
 
     class NomadJobOpts{
 
+        //TODO: Reevaluate the job level env vars, which are perhaps better suited to be sourced in clientOpts
+        // and overridden for job defs using process directives.
+        private Map<String,String> sysEnv
         boolean deleteOnCompletion
         List<String> datacenters
         String region
         String namespace
         VolumeSpec volumeSpec
 
-        NomadJobOpts(Map nomadJobOpts){
+
+        NomadJobOpts(Map nomadJobOpts, Map<String,String> env=null){
+
+            sysEnv = env==null ? new HashMap<String,String>(System.getenv()) : env
+
             deleteOnCompletion = nomadJobOpts.containsKey("deleteOnCompletion") ?
                     nomadJobOpts.deleteOnCompletion : false
 
@@ -85,10 +92,10 @@ class NomadConfig {
                         nomadJobOpts.datacenters : nomadJobOpts.datacenters.toString().split(","))
                         as List<String>).findAll{it.size()}.unique()
             }else{
-                datacenters = []
+                datacenters = List.of(sysEnv.get('NOMAD_DC'))
             }
-            region = nomadJobOpts.region ?: null
-            namespace = nomadJobOpts.namespace ?: null
+            region = nomadJobOpts.region ?: sysEnv.get('NOMAD_REGION')
+            namespace = nomadJobOpts.namespace ?: sysEnv.get('NOMAD_NAMESPACE')
 
             if( nomadJobOpts.volume && nomadJobOpts.volume instanceof Closure){
                 this.volumeSpec = new VolumeSpec()
