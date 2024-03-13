@@ -35,6 +35,7 @@ import io.nomadproject.client.models.VolumeRequest
 import nextflow.exception.ProcessSubmitException
 import nextflow.nomad.NomadConfig
 import nextflow.processor.TaskRun
+import nextflow.trace.TraceRecord
 import nextflow.util.MemoryUnit
 
 /**
@@ -50,6 +51,8 @@ class NomadService implements Closeable{
     private final NomadConfig config
 
     private final JobsApi jobsApi
+
+
 
     NomadService(NomadConfig config) {
         this.config = config
@@ -89,9 +92,9 @@ class NomadService implements Closeable{
     void close() throws IOException {
     }
 
-    String submitTask(String id, TaskRun task, List<String> args, Map<String, String>env){
+    String submitTask(String jobName, TaskRun task, List<String> args, Map<String, String>env){
         Job job = new Job();
-        job.ID = id
+        job.ID = jobName
         job.name = task.name
         job.type = "batch"
         job.datacenters = this.config.jobOpts.datacenters
@@ -185,25 +188,25 @@ class NomadService implements Closeable{
     }
 
 
-    String state(String jobId){
+    String getJobState(String jobId){
+        //NOTE: Since we have the policy of single-allocation per job, we can simply use the only value in the response.
         List<AllocationListStub> allocations = jobsApi.getJobAllocations(jobId, config.jobOpts.region, config.jobOpts.namespace, null, null, null, null, null, null, null, null)
-        AllocationListStub last = allocations?.sort{
-            it.modifyIndex
-        }?.last()
-        String currentState = last?.taskStates?.values()?.last()?.state
-        log.debug "Task $jobId , state=$currentState"
-        currentState ?: "Unknown"
+        AllocationListStub jobAllocation = allocations.first()
+
+        log.debug "[NOMAD] getJobState jobAllocation=$jobAllocation.name ; state : $jobAllocation.clientStatus"
+        String currentState = jobAllocation.clientStatus
+        return currentState ?: "Unknown"
     }
-
-
 
     boolean checkIfRunning(String jobId){
         Job job = jobsApi.getJob(jobId, config.jobOpts.region, config.jobOpts.namespace, null, null, null, null, null, null, null)
+        log.debug "[NOMAD] checkIfRunning jobID=$job.ID; status=$job.status"
         job.status == "running"
     }
 
-    boolean checkIfCompleted(String jobId){
+    boolean checkIfDead(String jobId){
         Job job = jobsApi.getJob(jobId, config.jobOpts.region, config.jobOpts.namespace, null, null, null, null, null, null, null)
+        log.debug "[NOMAD] checkIfDead jobID=$job.ID; status=$job.status"
         job.status == "dead"
     }
 
@@ -217,5 +220,12 @@ class NomadService implements Closeable{
 
     protected void purgeJob(String jobId, boolean purge){
         jobsApi.deleteJob(jobId,config.jobOpts.region, config.jobOpts.namespace,null,null,purge, true)
+    }
+
+
+    String getClientOfJob(String jobId) {
+        List<AllocationListStub> allocations = jobsApi.getJobAllocations(jobId, config.jobOpts.region, config.jobOpts.namespace, null, null, null, null, null, null, null, null)
+        AllocationListStub jobAllocation = allocations.first()
+        return jobAllocation.nodeName
     }
 }
