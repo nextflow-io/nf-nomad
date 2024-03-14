@@ -32,6 +32,7 @@ import io.nomadproject.client.models.Task
 import io.nomadproject.client.models.TaskGroup
 import io.nomadproject.client.models.VolumeMount
 import io.nomadproject.client.models.VolumeRequest
+import nextflow.SysEnv
 import nextflow.exception.ProcessSubmitException
 import nextflow.nomad.NomadConfig
 import nextflow.processor.TaskRun
@@ -46,12 +47,11 @@ import nextflow.util.MemoryUnit
 
 @Slf4j
 @CompileStatic
-class NomadService implements Closeable{
+class NomadService implements Closeable {
 
     private final NomadConfig config
 
     private final JobsApi jobsApi
-
 
 
     NomadService(NomadConfig config) {
@@ -62,11 +62,11 @@ class NomadService implements Closeable{
         final READ_TIMEOUT_MILLISECONDS = 60000
         final WRITE_TIMEOUT_MILLISECONDS = 60000
 
-        ApiClient apiClient = new ApiClient( connectTimeout: CONNECTION_TIMEOUT_MILLISECONDS, readTimeout: READ_TIMEOUT_MILLISECONDS, writeTimeout: WRITE_TIMEOUT_MILLISECONDS)
+        ApiClient apiClient = new ApiClient(connectTimeout: CONNECTION_TIMEOUT_MILLISECONDS, readTimeout: READ_TIMEOUT_MILLISECONDS, writeTimeout: WRITE_TIMEOUT_MILLISECONDS)
         apiClient.basePath = config.clientOpts.address
         log.debug "[NOMAD] Client Address: ${config.clientOpts.address}"
 
-        if( config.clientOpts.token ){
+        if (config.clientOpts.token) {
             log.debug "[NOMAD] Client Token: ${config.clientOpts.token?.take(5)}.."
             apiClient.apiKey = config.clientOpts.token
         }
@@ -78,8 +78,8 @@ class NomadService implements Closeable{
         final DEFAULT_MEMORY = "500.MB"
 
         final taskCfg = task.getConfig()
-        final taskCores =  !taskCfg.get("cpus") ? DEFAULT_CPUS :  taskCfg.get("cpus") as Integer
-        final taskMemory = taskCfg.get("memory") ? new MemoryUnit( taskCfg.get("memory") as String ) : new MemoryUnit(DEFAULT_MEMORY)
+        final taskCores = !taskCfg.get("cpus") ? DEFAULT_CPUS : taskCfg.get("cpus") as Integer
+        final taskMemory = taskCfg.get("memory") ? new MemoryUnit(taskCfg.get("memory") as String) : new MemoryUnit(DEFAULT_MEMORY)
 
         final res = new Resources()
                 .cores(taskCores)
@@ -92,7 +92,7 @@ class NomadService implements Closeable{
     void close() throws IOException {
     }
 
-    String submitTask(String jobName, TaskRun task, List<String> args, Map<String, String>env){
+    String submitTask(String jobName, TaskRun task, List<String> args, Map<String, String> env) {
         Job job = new Job();
         job.ID = jobName
         job.name = task.name
@@ -109,32 +109,32 @@ class NomadService implements Closeable{
             JobRegisterResponse jobRegisterResponse = jobsApi.registerJob(jobRegisterRequest, config.jobOpts.region, config.jobOpts.namespace, null, null)
             jobRegisterResponse.evalID
         }
-        catch( Throwable e ) {
-            throw  new ProcessSubmitException("[NOMAD] Failed to submit ${job.name} -- Cause: ${e.message ?: e}", e)
+        catch (Throwable e) {
+            throw new ProcessSubmitException("[NOMAD] Failed to submit ${job.name} -- Cause: ${e.message ?: e}", e)
         }
     }
 
-    TaskGroup createTaskGroup(TaskRun taskRun, List<String> args, Map<String, String>env){
+    TaskGroup createTaskGroup(TaskRun taskRun, List<String> args, Map<String, String> env) {
 
         //NOTE: Force a single-allocation with no-retries per job
         final TASK_RESCHEDULE_ATTEMPTS = 0
         final TASK_RESTART_ATTEMPTS = 0
 
-        final ReschedulePolicy taskReschedulePolicy  = new ReschedulePolicy().attempts(TASK_RESCHEDULE_ATTEMPTS)
-        final RestartPolicy taskRestartPolicy  = new RestartPolicy().attempts(TASK_RESTART_ATTEMPTS)
+        final ReschedulePolicy taskReschedulePolicy = new ReschedulePolicy().attempts(TASK_RESCHEDULE_ATTEMPTS)
+        final RestartPolicy taskRestartPolicy = new RestartPolicy().attempts(TASK_RESTART_ATTEMPTS)
 
         def task = createTask(taskRun, args, env)
         def taskGroup = new TaskGroup(
                 name: "group",
-                tasks: [ task ],
+                tasks: [task],
                 reschedulePolicy: taskReschedulePolicy,
                 restartPolicy: taskRestartPolicy
         )
 
 
-        if( config.jobOpts.volumeSpec && config.jobOpts.volumeSpec.type == NomadConfig.VOLUME_CSI_TYPE){
+        if (config.jobOpts.volumeSpec && config.jobOpts.volumeSpec.type == NomadConfig.VOLUME_CSI_TYPE) {
             taskGroup.volumes = [:]
-            taskGroup.volumes[config.jobOpts.volumeSpec.name]= new VolumeRequest(
+            taskGroup.volumes[config.jobOpts.volumeSpec.name] = new VolumeRequest(
                     type: config.jobOpts.volumeSpec.type,
                     source: config.jobOpts.volumeSpec.name,
                     attachmentMode: "file-system",
@@ -142,9 +142,9 @@ class NomadService implements Closeable{
             )
         }
 
-        if( config.jobOpts.volumeSpec && config.jobOpts.volumeSpec.type == NomadConfig.VOLUME_HOST_TYPE){
+        if (config.jobOpts.volumeSpec && config.jobOpts.volumeSpec.type == NomadConfig.VOLUME_HOST_TYPE) {
             taskGroup.volumes = [:]
-            taskGroup.volumes[config.jobOpts.volumeSpec.name]= new VolumeRequest(
+            taskGroup.volumes[config.jobOpts.volumeSpec.name] = new VolumeRequest(
                     type: config.jobOpts.volumeSpec.type,
                     source: config.jobOpts.volumeSpec.name,
             )
@@ -153,7 +153,16 @@ class NomadService implements Closeable{
         return taskGroup
     }
 
-    Task createTask(TaskRun task, List<String> args, Map<String, String>env) {
+    private String generateMountNextflowHome() {
+
+        if (SysEnv.get("NXF_HOME")) {
+            return SysEnv.get("NXF_HOME") + ":" + SysEnv.get("NXF_HOME")
+        }
+
+        return SysEnv.get('HOME') + "/.nextflow" + ":" + SysEnv.get('HOME') + "/.nextflow"
+    }
+
+    Task createTask(TaskRun task, List<String> args, Map<String, String> env) {
         final DRIVER = "docker"
         final DRIVER_PRIVILEGED = true
 
@@ -167,28 +176,33 @@ class NomadService implements Closeable{
                 driver: DRIVER,
                 resources: taskResources,
                 config: [
-                        image: imageName,
+                        image     : imageName,
                         privileged: DRIVER_PRIVILEGED,
-                        work_dir: workingDir,
-                        command: args.first(),
-                        args: args.tail(),
-                ] as Map<String,Object>,
+                        work_dir  : workingDir,
+                        command   : args.first(),
+                        args      : args.tail(),
+
+                ] as Map<String, Object>,
                 env: env,
         )
 
+        if (config.jobOpts.mountNextflowHome) {
+            taskDef.config.volumes = List.of( generateMountNextflowHome() )
+        }
 
-        if( config.jobOpts.volumeSpec){
+        if (config.jobOpts.volumeSpec) {
             String destinationDir = workingDir.split(File.separator).dropRight(2).join(File.separator)
-            taskDef.volumeMounts = [ new VolumeMount(
+            taskDef.volumeMounts = [new VolumeMount(
                     destination: destinationDir,
                     volume: config.jobOpts.volumeSpec.name
             )]
         }
+
         return taskDef
     }
 
 
-    String getJobState(String jobId){
+    String getJobState(String jobId) {
         //NOTE: Since we have the policy of single-allocation per job, we can simply use the only value in the response.
         List<AllocationListStub> allocations = jobsApi.getJobAllocations(jobId, config.jobOpts.region, config.jobOpts.namespace, null, null, null, null, null, null, null, null)
         AllocationListStub jobAllocation = allocations.first()
@@ -198,13 +212,13 @@ class NomadService implements Closeable{
         return currentState ?: "Unknown"
     }
 
-    boolean checkIfRunning(String jobId){
+    boolean checkIfRunning(String jobId) {
         Job job = jobsApi.getJob(jobId, config.jobOpts.region, config.jobOpts.namespace, null, null, null, null, null, null, null)
         log.debug "[NOMAD] checkIfRunning jobID=$job.ID; status=$job.status"
         job.status == "running"
     }
 
-    boolean checkIfDead(String jobId){
+    boolean checkIfDead(String jobId) {
         Job job = jobsApi.getJob(jobId, config.jobOpts.region, config.jobOpts.namespace, null, null, null, null, null, null, null)
         log.debug "[NOMAD] checkIfDead jobID=$job.ID; status=$job.status"
         job.status == "dead"
@@ -214,12 +228,12 @@ class NomadService implements Closeable{
         purgeJob(jobId, false)
     }
 
-    void jobPurge(String jobId){
+    void jobPurge(String jobId) {
         purgeJob(jobId, true)
     }
 
-    protected void purgeJob(String jobId, boolean purge){
-        jobsApi.deleteJob(jobId,config.jobOpts.region, config.jobOpts.namespace,null,null,purge, true)
+    protected void purgeJob(String jobId, boolean purge) {
+        jobsApi.deleteJob(jobId, config.jobOpts.region, config.jobOpts.namespace, null, null, purge, true)
     }
 
 

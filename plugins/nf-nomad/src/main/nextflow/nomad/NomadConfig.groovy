@@ -79,6 +79,10 @@ class NomadConfig {
         String namespace
         VolumeSpec volumeSpec
 
+        //TODO: Rethink and refactor the usage and design of this variable.
+        // Perhaps better to ask for a specific list of volumes to be mounted
+        boolean mountNextflowHome
+
 
         NomadJobOpts(Map nomadJobOpts, Map<String,String> env=null){
 
@@ -86,6 +90,10 @@ class NomadConfig {
 
             deleteOnCompletion = nomadJobOpts.containsKey("deleteOnCompletion") ?
                     nomadJobOpts.deleteOnCompletion : false
+
+
+            mountNextflowHome = nomadJobOpts.containsKey("mountNextflowHome") ?
+                    nomadJobOpts.mountNextflowHome : false
 
             if( nomadJobOpts.containsKey("datacenters") ) {
                 datacenters = ((nomadJobOpts.datacenters instanceof List<String> ?
@@ -96,6 +104,7 @@ class NomadConfig {
             }
             region = nomadJobOpts.region ?: sysEnv.get('NOMAD_REGION')
             namespace = nomadJobOpts.namespace ?: sysEnv.get('NOMAD_NAMESPACE')
+
 
             if( nomadJobOpts.volume && nomadJobOpts.volume instanceof Closure){
                 this.volumeSpec = new VolumeSpec()
