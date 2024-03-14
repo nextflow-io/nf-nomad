@@ -47,42 +47,65 @@ class NomadConfig {
     }
 
     class NomadClientOpts{
-        final String address
-        final String token
 
-        NomadClientOpts(Map nomadClientOpts){
-            def tmp = (nomadClientOpts.address?.toString() ?: "http://127.0.0.1:4646")
+        private Map<String,String> sysEnv
+        String address
+        String token
+
+        NomadClientOpts(Map nomadClientOpts, Map<String,String> env=null){
+
+            sysEnv = env==null ? new HashMap<String,String>(System.getenv()) : env
+
+            def tmp = (nomadClientOpts.address?.toString() ?: sysEnv.get('NOMAD_ADDR'))
             if( !tmp.endsWith("/"))
                 tmp +="/"
             this.address = tmp + API_VERSION
-            token = nomadClientOpts.token ?: null
+
+            this.token = nomadClientOpts.token ?: sysEnv.get('NOMAD_TOKEN')
+
+            //TODO: Add mTLS properties and env vars
+            // https://developer.hashicorp.com/nomad/docs/commands#mtls-environment-variables
         }
     }
 
     class NomadJobOpts{
-        final boolean deleteOnCompletion
-        final List<String> datacenters
-        final String region
-        final String namespace
-        final String dockerVolume
-        final VolumeSpec volumeSpec
 
-        NomadJobOpts(Map nomadJobOpts){
+        //TODO: Reevaluate the job level env vars, which are perhaps better suited to be sourced in clientOpts
+        // and overridden for job defs using process directives.
+        private Map<String,String> sysEnv
+        boolean deleteOnCompletion
+        List<String> datacenters
+        String region
+        String namespace
+        VolumeSpec volumeSpec
+
+        //TODO: Rethink and refactor the usage and design of this variable.
+        // Perhaps better to ask for a specific list of volumes to be mounted
+        boolean mountNextflowHome
+
+
+        NomadJobOpts(Map nomadJobOpts, Map<String,String> env=null){
+
+            sysEnv = env==null ? new HashMap<String,String>(System.getenv()) : env
+
             deleteOnCompletion = nomadJobOpts.containsKey("deleteOnCompletion") ?
                     nomadJobOpts.deleteOnCompletion : false
+
+
+            mountNextflowHome = nomadJobOpts.containsKey("mountNextflowHome") ?
+                    nomadJobOpts.mountNextflowHome : false
+
             if( nomadJobOpts.containsKey("datacenters") ) {
                 datacenters = ((nomadJobOpts.datacenters instanceof List<String> ?
                         nomadJobOpts.datacenters : nomadJobOpts.datacenters.toString().split(","))
                         as List<String>).findAll{it.size()}.unique()
             }else{
-                datacenters = []
+                datacenters = List.of(sysEnv.get('NOMAD_DC'))
             }
-            region = nomadJobOpts.region ?: null
-            namespace = nomadJobOpts.namespace ?: null
-            dockerVolume = nomadJobOpts.dockerVolume ?: null
-            if( dockerVolume ){
-                log.info "dockerVolume config will be deprecated, use volume type:'docker' name:'name' instead"
-            }
+            region = nomadJobOpts.region ?: sysEnv.get('NOMAD_REGION')
+            namespace = nomadJobOpts.namespace ?: sysEnv.get('NOMAD_NAMESPACE')
+
+
             if( nomadJobOpts.volume && nomadJobOpts.volume instanceof Closure){
                 this.volumeSpec = new VolumeSpec()
                 def closure = (nomadJobOpts.volume as Closure)
