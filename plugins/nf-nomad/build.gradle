@@ -35,7 +35,6 @@ repositories {
     maven { url = 'https://jitpack.io' }
     maven { url = 'https://s3-eu-west-1.amazonaws.com/maven.seqera.io/releases' }
     maven { url = 'https://s3-eu-west-1.amazonaws.com/maven.seqera.io/snapshots' }
-    maven { url "https://repo.clojars.org" }
 }
 
 configurations {
@@ -67,7 +66,8 @@ dependencies {
 
     // add here plugins depepencies
     // source the custom published version
-    implementation "org.clojars.abhi18av:nomad-client-java:1.1.4"
+   // implementation "org.clojars.abhi18av:nomad-client-java:1.1.4"
+    implementation "es.edn:nomad-client-java:1.7.6"
 
 
     // test configuration
