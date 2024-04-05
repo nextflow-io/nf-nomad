@@ -18,7 +18,7 @@ package nextflow.nomad.executor
 
 import groovy.json.JsonOutput
 import groovy.json.JsonSlurper
-import io.nomadproject.client.models.Resources
+import io.nomadproject.client.model.Resources
 import nextflow.executor.Executor
 import nextflow.nomad.NomadConfig
 import nextflow.processor.TaskBean
