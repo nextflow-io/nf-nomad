@@ -15,3 +15,5 @@ sun-nomadlab
 .project
 .classpath
 .settings
+/validation/nomad_temp/**
+/validation/nomad
