@@ -50,7 +50,7 @@ so Nextflow will use the compiled version
   } 
 ```
 
-the executor will mount the `scracthdir` volume configured by the `start-nomad.sh` command 
+the executor will mount the `scratchdir` volume configured by the `start-nomad.sh` command 
 
 
 ### Bactopia
