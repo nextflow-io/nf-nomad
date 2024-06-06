@@ -16,7 +16,7 @@ cd validation
 sudo ./start-nomad.sh
 ```
 
-`sudo` is required as the client needs to mount a folder as shared volumen
+`sudo` is required as the client needs to mount a folder as shared volume
 
 Basically this command create a `nomad_temp` folder, run a server and a client, and mount `nomad_temp/scratchdir` as a `local` volume
 , so all pipelines can/must use it as working dir 
