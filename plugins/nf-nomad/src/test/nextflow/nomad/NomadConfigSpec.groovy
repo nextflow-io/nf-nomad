@@ -17,6 +17,7 @@
 
 package nextflow.nomad
 
+import nextflow.nomad.config.VolumeSpec
 import spock.lang.Specification
 
 /**
@@ -130,7 +131,7 @@ class NomadConfigSpec extends Specification {
 
         then:
         config.jobOpts.volumeSpec
-        config.jobOpts.volumeSpec.type == NomadConfig.VOLUME_DOCKER_TYPE
+        config.jobOpts.volumeSpec.type == VolumeSpec.VOLUME_DOCKER_TYPE
         config.jobOpts.volumeSpec.name == "test"
 
         when:
@@ -140,7 +141,7 @@ class NomadConfigSpec extends Specification {
 
         then:
         config2.jobOpts.volumeSpec
-        config2.jobOpts.volumeSpec.type == NomadConfig.VOLUME_CSI_TYPE
+        config2.jobOpts.volumeSpec.type == VolumeSpec.VOLUME_CSI_TYPE
         config2.jobOpts.volumeSpec.name == "test"
 
         when:
@@ -150,7 +151,7 @@ class NomadConfigSpec extends Specification {
 
         then:
         config3.jobOpts.volumeSpec
-        config3.jobOpts.volumeSpec.type == NomadConfig.VOLUME_HOST_TYPE
+        config3.jobOpts.volumeSpec.type == VolumeSpec.VOLUME_HOST_TYPE
         config3.jobOpts.volumeSpec.name == "test"
 
         when:
@@ -160,5 +161,24 @@ class NomadConfigSpec extends Specification {
 
         then:
         thrown(IllegalArgumentException)
+    }
+
+    void "should instantiate an affinity spec if specified"() {
+        when:
+        def config = new NomadConfig([
+                jobs: [affinity : {
+                    attribute '${meta.my_custom_value}'
+                    operator  ">"
+                    value     "3"
+                    weight    50
+                }]
+        ])
+
+        then:
+        config.jobOpts.affinitySpec
+        config.jobOpts.affinitySpec.getAttribute() == '${meta.my_custom_value}'
+        config.jobOpts.affinitySpec.getOperator() == '>'
+        config.jobOpts.affinitySpec.getValue() == '3'
+        config.jobOpts.affinitySpec.getWeight() == 50
     }
 }

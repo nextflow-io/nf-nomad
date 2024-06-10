@@ -21,11 +21,11 @@ import groovy.transform.CompileStatic
 import groovy.util.logging.Slf4j
 import io.nomadproject.client.ApiClient
 import io.nomadproject.client.api.JobsApi
+import io.nomadproject.client.model.Affinity
 import io.nomadproject.client.model.AllocationListStub
 import io.nomadproject.client.model.Job
 import io.nomadproject.client.model.JobRegisterRequest
 import io.nomadproject.client.model.JobRegisterResponse
-import io.nomadproject.client.model.JobSummary
 import io.nomadproject.client.model.ReschedulePolicy
 import io.nomadproject.client.model.Resources
 import io.nomadproject.client.model.RestartPolicy
@@ -34,6 +34,7 @@ import io.nomadproject.client.model.TaskGroup
 import io.nomadproject.client.model.VolumeMount
 import io.nomadproject.client.model.VolumeRequest
 import nextflow.nomad.NomadConfig
+import nextflow.nomad.config.VolumeSpec
 import nextflow.processor.TaskRun
 import nextflow.util.MemoryUnit
 
@@ -120,7 +121,7 @@ class NomadService implements Closeable{
         )
 
 
-        if( config.jobOpts.volumeSpec && config.jobOpts.volumeSpec.type == NomadConfig.VOLUME_CSI_TYPE){
+        if( config.jobOpts.volumeSpec && config.jobOpts.volumeSpec.type == VolumeSpec.VOLUME_CSI_TYPE){
             taskGroup.volumes = [:]
             taskGroup.volumes[config.jobOpts.volumeSpec.name]= new VolumeRequest(
                     type: config.jobOpts.volumeSpec.type,
@@ -130,7 +131,7 @@ class NomadService implements Closeable{
             )
         }
 
-        if( config.jobOpts.volumeSpec && config.jobOpts.volumeSpec.type == NomadConfig.VOLUME_HOST_TYPE){
+        if( config.jobOpts.volumeSpec && config.jobOpts.volumeSpec.type == VolumeSpec.VOLUME_HOST_TYPE){
             taskGroup.volumes = [:]
             taskGroup.volumes[config.jobOpts.volumeSpec.name]= new VolumeRequest(
                     type: config.jobOpts.volumeSpec.type,
@@ -179,6 +180,23 @@ class NomadService implements Closeable{
                     destination: destinationDir,
                     volume: config.jobOpts.volumeSpec.name
             )]
+        }
+
+        if( config.jobOpts.affinitySpec ){
+            def affinity = new Affinity()
+            if(config.jobOpts.affinitySpec.attribute){
+                affinity.ltarget(config.jobOpts.affinitySpec.attribute)
+            }
+
+            affinity.operand(config.jobOpts.affinitySpec.operator ?: "=")
+
+            if(config.jobOpts.affinitySpec.value){
+                affinity.rtarget(config.jobOpts.affinitySpec.value)
+            }
+            if(config.jobOpts.affinitySpec.weight != null){
+                affinity.weight(config.jobOpts.affinitySpec.weight)
+            }
+            taskDef.affinities([affinity])
         }
         taskDef
     }
