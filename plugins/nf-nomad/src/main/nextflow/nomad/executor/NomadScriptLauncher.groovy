@@ -31,7 +31,7 @@ import nextflow.util.Escape
 class NomadScriptLauncher extends BashWrapperBuilder {
 
     NomadScriptLauncher(TaskBean taskBean) {
-        super(taskBean, new SimpleFileCopyStrategy(taskBean))
+        super(taskBean)
     }
 
 }
