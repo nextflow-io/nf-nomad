@@ -181,4 +181,21 @@ class NomadConfigSpec extends Specification {
         config.jobOpts.affinitySpec.getValue() == '3'
         config.jobOpts.affinitySpec.getWeight() == 50
     }
+
+    void "should instantiate a constraint spec if specified"() {
+        when:
+        def config = new NomadConfig([
+                jobs: [constraint : {
+                    attribute '${meta.my_custom_value}'
+                    operator  ">"
+                    value     "3"
+                }]
+        ])
+
+        then:
+        config.jobOpts.constraintSpec
+        config.jobOpts.constraintSpec.getAttribute() == '${meta.my_custom_value}'
+        config.jobOpts.constraintSpec.getOperator() == '>'
+        config.jobOpts.constraintSpec.getValue() == '3'
+    }
 }

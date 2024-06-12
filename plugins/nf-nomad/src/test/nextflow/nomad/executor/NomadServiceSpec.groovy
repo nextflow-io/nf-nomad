@@ -30,6 +30,8 @@ import okhttp3.mockwebserver.MockResponse
 import okhttp3.mockwebserver.MockWebServer
 import spock.lang.Specification
 
+import java.nio.file.Path
+
 /**
  * Unit test for Nomad Service
  *
@@ -224,7 +226,6 @@ class NomadServiceSpec extends Specification{
 
     }
 
-/*
     void "submit a task"(){
         given:
         def config = new NomadConfig(
@@ -239,9 +240,10 @@ class NomadServiceSpec extends Specification{
         String image = "theImage"
         List<String> args = ["theCommand", "theArgs"]
         Map<String, String>env = [test:"test"]
-        Resources resources = new Resources().cores(1).memoryMB(1000)
 
         def mockTask = Mock(TaskRun){
+            getName() >> name
+            getContainer() >> image
             getConfig() >> Mock(TaskConfig)
             getWorkDirStr() >> "theWorkingDir"
             getContainer() >> "ubuntu"
@@ -250,8 +252,9 @@ class NomadServiceSpec extends Specification{
                     isFusionEnabled() >> false
                 }
             }
+            getWorkDir() >> Path.of("/tmp")
             toTaskBean() >> Mock(TaskBean){
-                getWorkDir() >> workDir
+                getWorkDir() >> Path.of("/tmp")
                 getScript() >> "theScript"
                 getShell() >> ["bash"]
                 getInputFiles() >> [:]
@@ -285,10 +288,10 @@ class NomadServiceSpec extends Specification{
         body.Job.TaskGroups[0].Tasks.size() == 1
         body.Job.TaskGroups[0].Tasks[0].Name == "nf-task"
         body.Job.TaskGroups[0].Tasks[0].Resources.Cores == 1
-        body.Job.TaskGroups[0].Tasks[0].Resources.MemoryMB == 1000
+        body.Job.TaskGroups[0].Tasks[0].Resources.MemoryMB == 500
         body.Job.TaskGroups[0].Tasks[0].Driver == "docker"
         body.Job.TaskGroups[0].Tasks[0].Config.image == image
-        body.Job.TaskGroups[0].Tasks[0].Config.work_dir == workingDir
+        body.Job.TaskGroups[0].Tasks[0].Config.work_dir == "/tmp"
         body.Job.TaskGroups[0].Tasks[0].Config.command == args[0]
         body.Job.TaskGroups[0].Tasks[0].Config.args == args.drop(1)
 
@@ -311,16 +314,35 @@ class NomadServiceSpec extends Specification{
         String name = "theName"
         String image = "theImage"
         List<String> args = ["theCommand", "theArgs"]
-        String workingDir = "a/b/c"
+        String workingDir = "/a/b/c"
         Map<String, String>env = [test:"test"]
-        Resources resources = new Resources().cores(1).memoryMB(1000)
+
+        def mockTask = Mock(TaskRun){
+            getName() >> name
+            getContainer() >> image
+            getConfig() >> Mock(TaskConfig)
+            getWorkDirStr() >> workingDir
+            getContainer() >> "ubuntu"
+            getProcessor() >> Mock(TaskProcessor){
+                getExecutor() >> Mock(Executor){
+                    isFusionEnabled() >> false
+                }
+            }
+            getWorkDir() >> Path.of(workingDir)
+            toTaskBean() >> Mock(TaskBean){
+                getWorkDir() >> Path.of(workingDir)
+                getScript() >> "theScript"
+                getShell() >> ["bash"]
+                getInputFiles() >> [:]
+            }
+        }
 
         mockWebServer.enqueue(new MockResponse()
                 .setBody(JsonOutput.toJson(["EvalID":"test"]).toString())
                 .addHeader("Content-Type", "application/json"));
         when:
 
-        def idJob = service.submitTask(id, name, image, args, workingDir,env,resources )
+        def idJob = service.submitTask(id, mockTask, args, env)
         def recordedRequest = mockWebServer.takeRequest();
         def body = new JsonSlurper().parseText(recordedRequest.body.readUtf8())
 
@@ -341,6 +363,8 @@ class NomadServiceSpec extends Specification{
         body.Job.TaskGroups[0].Name == "group"
         body.Job.TaskGroups[0].Tasks.size() == 1
         body.Job.TaskGroups[0].Tasks[0].Name == "nf-task"
+        body.Job.TaskGroups[0].Tasks[0].Resources.Cores == 1
+        body.Job.TaskGroups[0].Tasks[0].Resources.MemoryMB == 500
         body.Job.TaskGroups[0].Tasks[0].Driver == "docker"
         body.Job.TaskGroups[0].Tasks[0].Config.image == image
         body.Job.TaskGroups[0].Tasks[0].Config.work_dir == workingDir
@@ -350,19 +374,22 @@ class NomadServiceSpec extends Specification{
         body.Job.TaskGroups[0].Volumes.size() == 1
         body.Job.TaskGroups[0].Volumes['test'] == [AccessMode:"multi-node-multi-writer", AttachmentMode:"file-system", Source:"test", Type:"csi"]
         body.Job.TaskGroups[0].Tasks[0].VolumeMounts.size() == 1
-        body.Job.TaskGroups[0].Tasks[0].VolumeMounts[0] == [Destination:"a", Volume:"test"]
+        body.Job.TaskGroups[0].Tasks[0].VolumeMounts[0] == [Destination:"/a", Volume:"test"]
 
     }
 
-    void "should send the token"(){
+    void "submit a task with an affinity"(){
         given:
         def config = new NomadConfig(
                 client:[
-                        address : "http://${mockWebServer.hostName}:${mockWebServer.port}",
-                        token: "123456789012345678901234567"
+                        address : "http://${mockWebServer.hostName}:${mockWebServer.port}"
                 ],
                 jobs:[
-                        dockerVolume:'test'
+                        affinity: {
+                            attribute '${meta.my_custom_value}'
+                            operator  ">"
+                            value     "3"
+                        }
                 ]
         )
         def service = new NomadService(config)
@@ -371,16 +398,35 @@ class NomadServiceSpec extends Specification{
         String name = "theName"
         String image = "theImage"
         List<String> args = ["theCommand", "theArgs"]
-        String workingDir = "a/b/c"
+        String workingDir = "/a/b/c"
         Map<String, String>env = [test:"test"]
-        Resources resources = new Resources().cores(1).memoryMB(1000)
+
+        def mockTask = Mock(TaskRun){
+            getName() >> name
+            getContainer() >> image
+            getConfig() >> Mock(TaskConfig)
+            getWorkDirStr() >> workingDir
+            getContainer() >> "ubuntu"
+            getProcessor() >> Mock(TaskProcessor){
+                getExecutor() >> Mock(Executor){
+                    isFusionEnabled() >> false
+                }
+            }
+            getWorkDir() >> Path.of(workingDir)
+            toTaskBean() >> Mock(TaskBean){
+                getWorkDir() >> Path.of(workingDir)
+                getScript() >> "theScript"
+                getShell() >> ["bash"]
+                getInputFiles() >> [:]
+            }
+        }
 
         mockWebServer.enqueue(new MockResponse()
                 .setBody(JsonOutput.toJson(["EvalID":"test"]).toString())
                 .addHeader("Content-Type", "application/json"));
         when:
 
-        def idJob = service.submitTask(id, name, image, args, workingDir,env, resources )
+        def idJob = service.submitTask(id, mockTask, args, env)
         def recordedRequest = mockWebServer.takeRequest();
         def body = new JsonSlurper().parseText(recordedRequest.body.readUtf8())
 
@@ -390,8 +436,72 @@ class NomadServiceSpec extends Specification{
         and:
         recordedRequest.method == "POST"
         recordedRequest.path == "/v1/jobs"
-        recordedRequest.headers.values('X-Nomad-Token').first()=='123456789012345678901234567'
+
+        and:
+        body.Job.TaskGroups[0].Tasks[0].Affinities[0].LTarget == '${meta.my_custom_value}'
     }
 
- */
+    void "submit a task with a constraint"(){
+        given:
+        def config = new NomadConfig(
+                client:[
+                        address : "http://${mockWebServer.hostName}:${mockWebServer.port}"
+                ],
+                jobs:[
+                        constraint: {
+                            attribute '${meta.my_custom_value}'
+                            operator  ">"
+                            value     "3"
+                        }
+                ]
+        )
+        def service = new NomadService(config)
+
+        String id = "theId"
+        String name = "theName"
+        String image = "theImage"
+        List<String> args = ["theCommand", "theArgs"]
+        String workingDir = "/a/b/c"
+        Map<String, String>env = [test:"test"]
+
+        def mockTask = Mock(TaskRun){
+            getName() >> name
+            getContainer() >> image
+            getConfig() >> Mock(TaskConfig)
+            getWorkDirStr() >> workingDir
+            getContainer() >> "ubuntu"
+            getProcessor() >> Mock(TaskProcessor){
+                getExecutor() >> Mock(Executor){
+                    isFusionEnabled() >> false
+                }
+            }
+            getWorkDir() >> Path.of(workingDir)
+            toTaskBean() >> Mock(TaskBean){
+                getWorkDir() >> Path.of(workingDir)
+                getScript() >> "theScript"
+                getShell() >> ["bash"]
+                getInputFiles() >> [:]
+            }
+        }
+
+        mockWebServer.enqueue(new MockResponse()
+                .setBody(JsonOutput.toJson(["EvalID":"test"]).toString())
+                .addHeader("Content-Type", "application/json"));
+        when:
+
+        def idJob = service.submitTask(id, mockTask, args, env)
+        def recordedRequest = mockWebServer.takeRequest();
+        def body = new JsonSlurper().parseText(recordedRequest.body.readUtf8())
+
+        then:
+        idJob
+
+        and:
+        recordedRequest.method == "POST"
+        recordedRequest.path == "/v1/jobs"
+
+        and:
+        body.Job.TaskGroups[0].Tasks[0].Constraints[0].LTarget == '${meta.my_custom_value}'
+    }
+
 }

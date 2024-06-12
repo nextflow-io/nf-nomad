@@ -23,6 +23,7 @@ import io.nomadproject.client.ApiClient
 import io.nomadproject.client.api.JobsApi
 import io.nomadproject.client.model.Affinity
 import io.nomadproject.client.model.AllocationListStub
+import io.nomadproject.client.model.Constraint
 import io.nomadproject.client.model.Job
 import io.nomadproject.client.model.JobRegisterRequest
 import io.nomadproject.client.model.JobRegisterResponse
@@ -198,6 +199,21 @@ class NomadService implements Closeable{
             }
             taskDef.affinities([affinity])
         }
+
+        if( config.jobOpts.constraintSpec ){
+            def constraint = new Constraint()
+            if(config.jobOpts.constraintSpec.attribute){
+                constraint.ltarget(config.jobOpts.constraintSpec.attribute)
+            }
+
+            constraint.operand(config.jobOpts.constraintSpec.operator ?: "=")
+
+            if(config.jobOpts.constraintSpec.value){
+                constraint.rtarget(config.jobOpts.constraintSpec.value)
+            }
+            taskDef.constraints([constraint])
+        }
+
         taskDef
     }
 
