@@ -18,6 +18,8 @@ package nextflow.nomad
 
 import groovy.transform.CompileStatic
 import groovy.util.logging.Slf4j
+import nextflow.nomad.config.AffinitySpec
+import nextflow.nomad.config.VolumeSpec
 
 /**
  * Nomad Config
@@ -29,14 +31,6 @@ import groovy.util.logging.Slf4j
 @CompileStatic
 class NomadConfig {
     final static protected API_VERSION = "v1"
-
-    final static public String VOLUME_DOCKER_TYPE = "docker"
-    final static public String VOLUME_CSI_TYPE = "csi"
-    final static public String VOLUME_HOST_TYPE = "host"
-
-    final static protected String[] VOLUME_TYPES = [
-            VOLUME_CSI_TYPE, VOLUME_DOCKER_TYPE, VOLUME_HOST_TYPE
-    ]
 
     final NomadClientOpts clientOpts
     final NomadJobOpts jobOpts
@@ -66,6 +60,7 @@ class NomadConfig {
         final String namespace
         final String dockerVolume
         final VolumeSpec volumeSpec
+        final AffinitySpec affinitySpec
 
         NomadJobOpts(Map nomadJobOpts){
             deleteOnCompletion = nomadJobOpts.containsKey("deleteOnCompletion") ?
@@ -93,39 +88,17 @@ class NomadConfig {
             }else{
                 volumeSpec = null
             }
-        }
-    }
-
-    class VolumeSpec{
-
-        private String type
-        private String name
-
-        String getType() {
-            return type
-        }
-
-        String getName() {
-            return name
-        }
-
-        VolumeSpec type(String type){
-            this.type = type
-            this
-        }
-
-        VolumeSpec name(String name){
-            this.name = name
-            this
-        }
-
-        protected validate(){
-            if( !VOLUME_TYPES.contains(type) ) {
-                throw new IllegalArgumentException("Volume type $type is not supported")
-            }
-            if( !this.name ){
-                throw new IllegalArgumentException("Volume name is required")
+            if( nomadJobOpts.affinity && nomadJobOpts.affinity instanceof Closure){
+                this.affinitySpec = new AffinitySpec()
+                def closure = (nomadJobOpts.affinity as Closure)
+                def clone = closure.rehydrate(this.affinitySpec, closure.owner, closure.thisObject)
+                clone.resolveStrategy = Closure.DELEGATE_FIRST
+                clone()
+                this.affinitySpec.validate()
+            }else{
+                affinitySpec = null
             }
         }
     }
+
 }
