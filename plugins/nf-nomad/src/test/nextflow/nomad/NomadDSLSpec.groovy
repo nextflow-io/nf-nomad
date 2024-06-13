@@ -32,7 +32,10 @@ import spock.lang.Shared
 import spock.lang.Timeout
 import test.Dsl2Spec
 
+import java.nio.file.Files
 import java.nio.file.Path
+import java.util.jar.Manifest
+
 /**
  * Unit test for Nomad DSL
  *
@@ -57,8 +60,13 @@ class NomadDSLSpec  extends Dsl2Spec{
             protected PluginDescriptorFinder createPluginDescriptorFinder() {
                 return new TestPluginDescriptorFinder(){
                     @Override
+                    protected Manifest readManifestFromDirectory(Path pluginPath) {
+                        def manifestPath= getManifestPath(pluginPath)
+                        final input = Files.newInputStream(manifestPath)
+                        return new Manifest(input)
+                    }
                     protected Path getManifestPath(Path pluginPath) {
-                        return pluginPath.resolve('build/resources/main/META-INF/MANIFEST.MF')
+                        return pluginPath.resolve('build/tmp/jar/MANIFEST.MF')
                     }
                 }
             }

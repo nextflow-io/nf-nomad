@@ -71,11 +71,12 @@ class NomadTaskHandlerSpec extends Specification{
                     isFusionEnabled() >> false
                 }
             }
-            toTaskBean() >> Mock(TaskBean){
-                getWorkDir() >> workDir
-                getScript() >> "theScript"
-                getShell() >> ["bash"]
-                getInputFiles() >> [:]
+            toTaskBean() >> Mock(TaskBean) {
+                    getWorkDir() >> workDir
+                    getScript() >> "theScript"
+                    getShell() >> ["bash"]
+                    getInputFiles() >> [:]
+                    getOutputFiles() >> ['dont_know_why_is_required_in_test']
             }
         }
         def mockConfig = Mock(NomadConfig)
