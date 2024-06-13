@@ -19,6 +19,7 @@ package nextflow.nomad
 import groovy.transform.CompileStatic
 import groovy.util.logging.Slf4j
 import nextflow.nomad.config.AffinitySpec
+import nextflow.nomad.config.ConstraintSpec
 import nextflow.nomad.config.VolumeSpec
 
 /**
@@ -61,6 +62,7 @@ class NomadConfig {
         final String dockerVolume
         final VolumeSpec volumeSpec
         final AffinitySpec affinitySpec
+        final ConstraintSpec constraintSpec
 
         NomadJobOpts(Map nomadJobOpts){
             deleteOnCompletion = nomadJobOpts.containsKey("deleteOnCompletion") ?
@@ -78,25 +80,51 @@ class NomadConfig {
             if( dockerVolume ){
                 log.info "dockerVolume config will be deprecated, use volume type:'docker' name:'name' instead"
             }
+
+            this.volumeSpec = parseVolume(nomadJobOpts)
+            this.affinitySpec = parseAffinity(nomadJobOpts)
+            this.constraintSpec = parseConstraint(nomadJobOpts)
+        }
+
+        VolumeSpec parseVolume(Map nomadJobOpts){
             if( nomadJobOpts.volume && nomadJobOpts.volume instanceof Closure){
-                this.volumeSpec = new VolumeSpec()
+                def volumeSpec = new VolumeSpec()
                 def closure = (nomadJobOpts.volume as Closure)
-                def clone = closure.rehydrate(this.volumeSpec, closure.owner, closure.thisObject)
+                def clone = closure.rehydrate(volumeSpec, closure.owner, closure.thisObject)
                 clone.resolveStrategy = Closure.DELEGATE_FIRST
                 clone()
-                this.volumeSpec.validate()
+                volumeSpec.validate()
+                volumeSpec
             }else{
-                volumeSpec = null
+                null
             }
-            if( nomadJobOpts.affinity && nomadJobOpts.affinity instanceof Closure){
-                this.affinitySpec = new AffinitySpec()
+        }
+
+        AffinitySpec parseAffinity(Map nomadJobOpts) {
+            if (nomadJobOpts.affinity && nomadJobOpts.affinity instanceof Closure) {
+                def affinitySpec = new AffinitySpec()
                 def closure = (nomadJobOpts.affinity as Closure)
-                def clone = closure.rehydrate(this.affinitySpec, closure.owner, closure.thisObject)
+                def clone = closure.rehydrate(affinitySpec, closure.owner, closure.thisObject)
                 clone.resolveStrategy = Closure.DELEGATE_FIRST
                 clone()
-                this.affinitySpec.validate()
-            }else{
-                affinitySpec = null
+                affinitySpec.validate()
+                affinitySpec
+            } else {
+                null
+            }
+        }
+
+        ConstraintSpec parseConstraint(Map nomadJobOpts){
+            if (nomadJobOpts.constraint && nomadJobOpts.constraint instanceof Closure) {
+                def constraintSpec = new ConstraintSpec()
+                def closure = (nomadJobOpts.constraint as Closure)
+                def clone = closure.rehydrate(constraintSpec, closure.owner, closure.thisObject)
+                clone.resolveStrategy = Closure.DELEGATE_FIRST
+                clone()
+                constraintSpec.validate()
+                constraintSpec
+            } else {
+                null
             }
         }
     }
