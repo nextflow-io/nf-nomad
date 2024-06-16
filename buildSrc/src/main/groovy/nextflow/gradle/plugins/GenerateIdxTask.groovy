@@ -20,6 +20,7 @@ abstract class GenerateIdxTask extends DefaultTask{
 
     GenerateIdxTask() {
         setGroup('nextflow')
+        dependsOn(project.tasks.findByName('build'))
     }
 
     @TaskAction

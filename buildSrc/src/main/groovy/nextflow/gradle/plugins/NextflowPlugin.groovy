@@ -23,7 +23,6 @@ class NextflowPlugin implements Plugin<Project>{
             project.tasks.register('generateIdx', GenerateIdxTask, {
                 extensionPoints = nextflowPluginExtension.extensionPoints
             })
-            project.tasks.findByName("processResources")?.dependsOn(project.tasks.findByName("generateIdx"))
         }
     }
 }
