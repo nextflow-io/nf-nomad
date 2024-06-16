@@ -6,3 +6,5 @@ include::parts/intro.adoc[]
 include::parts/development.adoc[]
 
 include::parts/usage.adoc[]
+
+include::parts/directives.adoc[]

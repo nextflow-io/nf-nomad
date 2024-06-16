@@ -103,6 +103,8 @@ class NomadService implements Closeable{
 
         job.taskGroups = [createTaskGroup(task, args, env)]
 
+        assignDatacenters(task, job)
+
         JobRegisterRequest jobRegisterRequest = new JobRegisterRequest();
         jobRegisterRequest.setJob(job);
 
@@ -170,14 +172,23 @@ class NomadService implements Closeable{
                 driver: DRIVER,
                 resources: taskResources,
                 config: [
-                        image: imageName,
+                        image     : imageName,
                         privileged: DRIVER_PRIVILEGED,
-                        work_dir: workingDir,
-                        command: args.first(),
-                        args: args.tail(),
-                ] as Map<String,Object>,
+                        work_dir  : workingDir,
+                        command   : args.first(),
+                        args      : args.tail(),
+                ] as Map<String, Object>,
                 env: env,
         )
+
+        volumes(task, taskDef, workingDir)
+        affinity(task, taskDef)
+        constrains(task, taskDef)
+
+        return taskDef
+    }
+
+    protected Task volumes(TaskRun task, Task taskDef, String workingDir){
         if( config.jobOpts.dockerVolume){
             String destinationDir = workingDir.split(File.separator).dropRight(2).join(File.separator)
             taskDef.config.mount = [
@@ -200,23 +211,30 @@ class NomadService implements Closeable{
             }
         }
 
-        if( config.jobOpts.affinitySpec ){
+        taskDef
+    }
+
+    protected Task affinity(TaskRun task, Task taskDef) {
+        if (config.jobOpts.affinitySpec) {
             def affinity = new Affinity()
-            if(config.jobOpts.affinitySpec.attribute){
+            if (config.jobOpts.affinitySpec.attribute) {
                 affinity.ltarget(config.jobOpts.affinitySpec.attribute)
             }
 
             affinity.operand(config.jobOpts.affinitySpec.operator ?: "=")
 
-            if(config.jobOpts.affinitySpec.value){
+            if (config.jobOpts.affinitySpec.value) {
                 affinity.rtarget(config.jobOpts.affinitySpec.value)
             }
-            if(config.jobOpts.affinitySpec.weight != null){
+            if (config.jobOpts.affinitySpec.weight != null) {
                 affinity.weight(config.jobOpts.affinitySpec.weight)
             }
             taskDef.affinities([affinity])
         }
+        taskDef
+    }
 
+    protected Task constrains(TaskRun task, Task taskDef){
         if( config.jobOpts.constraintSpec ){
             def constraint = new Constraint()
             if(config.jobOpts.constraintSpec.attribute){
@@ -234,6 +252,23 @@ class NomadService implements Closeable{
         taskDef
     }
 
+    protected Job assignDatacenters(TaskRun task, Job job){
+        def datacenters = task.processor.config.get("datacenters")
+        if( datacenters ){
+            if( datacenters instanceof List<String>) {
+                job.datacenters( datacenters as List<String>)
+                return job;
+            }
+            if( datacenters instanceof Closure) {
+                String str = datacenters.call().toString()
+                job.datacenters( [str])
+                return job;
+            }
+            job.datacenters( [datacenters.toString()] as List<String>)
+            return job
+        }
+        job
+    }
 
     String state(String jobId){
         List<AllocationListStub> allocations = jobsApi.getJobAllocations(jobId, config.jobOpts.region, config.jobOpts.namespace, null, null, null, null, null, null, null, null)
