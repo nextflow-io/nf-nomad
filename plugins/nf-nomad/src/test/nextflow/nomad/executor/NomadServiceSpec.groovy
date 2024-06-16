@@ -18,7 +18,6 @@ package nextflow.nomad.executor
 
 import groovy.json.JsonOutput
 import groovy.json.JsonSlurper
-import io.nomadproject.client.model.Resources
 import nextflow.executor.Executor
 import nextflow.nomad.NomadConfig
 import nextflow.processor.TaskBean
@@ -26,7 +25,6 @@ import nextflow.processor.TaskConfig
 import nextflow.processor.TaskProcessor
 import nextflow.processor.TaskRun
 import nextflow.script.ProcessConfig
-import nextflow.util.MemoryUnit
 import okhttp3.mockwebserver.MockResponse
 import okhttp3.mockwebserver.MockWebServer
 import spock.lang.Specification

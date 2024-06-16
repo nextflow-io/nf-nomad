@@ -20,12 +20,7 @@ package nextflow.nomad.executor
 import nextflow.exception.ProcessSubmitException
 import nextflow.executor.Executor
 import nextflow.nomad.NomadConfig
-import nextflow.processor.TaskBean
-import nextflow.processor.TaskConfig
-import nextflow.processor.TaskProcessor
-import nextflow.processor.TaskRun
-import nextflow.processor.TaskStatus
-import nextflow.script.ProcessConfig
+import nextflow.processor.*
 import spock.lang.Specification
 
 import java.nio.file.Files

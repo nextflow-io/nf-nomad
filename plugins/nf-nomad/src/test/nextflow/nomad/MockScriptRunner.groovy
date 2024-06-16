@@ -15,7 +15,7 @@
  */
 package nextflow.nomad
 
-import groovy.util.logging.Slf4j
+
 import groovyx.gpars.dataflow.DataflowBroadcast
 import nextflow.Session
 import nextflow.executor.Executor
@@ -23,14 +23,10 @@ import nextflow.executor.ExecutorFactory
 import nextflow.nomad.executor.NomadExecutor
 import nextflow.processor.TaskHandler
 import nextflow.processor.TaskMonitor
-import nextflow.processor.TaskRun
-import nextflow.processor.TaskStatus
 import nextflow.script.BaseScript
 import nextflow.script.ChannelOut
 import nextflow.script.ScriptRunner
 import nextflow.script.ScriptType
-
-import java.nio.file.Paths
 
 /**
  * Mock runner for test

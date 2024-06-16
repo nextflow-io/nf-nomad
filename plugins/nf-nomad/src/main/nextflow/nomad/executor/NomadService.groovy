@@ -21,19 +21,7 @@ import groovy.transform.CompileStatic
 import groovy.util.logging.Slf4j
 import io.nomadproject.client.ApiClient
 import io.nomadproject.client.api.JobsApi
-import io.nomadproject.client.model.Affinity
-import io.nomadproject.client.model.AllocationListStub
-import io.nomadproject.client.model.Constraint
-import io.nomadproject.client.model.Job
-import io.nomadproject.client.model.JobRegisterRequest
-import io.nomadproject.client.model.JobRegisterResponse
-import io.nomadproject.client.model.ReschedulePolicy
-import io.nomadproject.client.model.Resources
-import io.nomadproject.client.model.RestartPolicy
-import io.nomadproject.client.model.Task
-import io.nomadproject.client.model.TaskGroup
-import io.nomadproject.client.model.VolumeMount
-import io.nomadproject.client.model.VolumeRequest
+import io.nomadproject.client.model.*
 import nextflow.nomad.NomadConfig
 import nextflow.nomad.config.VolumeSpec
 import nextflow.processor.TaskRun
@@ -253,7 +241,7 @@ class NomadService implements Closeable{
     }
 
     protected Job assignDatacenters(TaskRun task, Job job){
-        def datacenters = task.processor.config.get("datacenters")
+        def datacenters = task.processor?.config?.get("datacenters")
         if( datacenters ){
             if( datacenters instanceof List<String>) {
                 job.datacenters( datacenters as List<String>)
