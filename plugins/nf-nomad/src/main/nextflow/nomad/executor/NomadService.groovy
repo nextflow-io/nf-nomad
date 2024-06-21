@@ -38,6 +38,9 @@ import nextflow.nomad.NomadConfig
 import nextflow.nomad.config.VolumeSpec
 import nextflow.processor.TaskRun
 import nextflow.util.MemoryUnit
+import org.yaml.snakeyaml.Yaml
+
+import java.nio.file.Path
 
 /**
  * Nomad Service
@@ -90,7 +93,7 @@ class NomadService implements Closeable{
     void close() throws IOException {
     }
 
-    String submitTask(String id, TaskRun task, List<String> args, Map<String, String>env){
+    String submitTask(String id, TaskRun task, List<String> args, Map<String, String>env, Path saveJsonPath=null){
         Job job = new Job();
         job.ID = id
         job.name = task.name
@@ -102,6 +105,14 @@ class NomadService implements Closeable{
 
         JobRegisterRequest jobRegisterRequest = new JobRegisterRequest();
         jobRegisterRequest.setJob(job);
+
+        if( saveJsonPath ) try {
+            saveJsonPath.text = job.toString()
+        }
+        catch( Exception e ) {
+            log.debug "WARN: unable to save request json -- cause: ${e.message ?: e}"
+        }
+
         JobRegisterResponse jobRegisterResponse = jobsApi.registerJob(jobRegisterRequest, config.jobOpts.region, config.jobOpts.namespace, null, null)
         jobRegisterResponse.evalID
     }

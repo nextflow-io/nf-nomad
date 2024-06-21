@@ -16,7 +16,7 @@
  */
 package nextflow.nomad.executor
 
-
+import groovy.transform.CompileDynamic
 import groovy.transform.CompileStatic
 import groovy.util.logging.Slf4j
 import io.nomadproject.client.model.Resources
@@ -131,12 +131,17 @@ class NomadTaskHandler extends TaskHandler implements FusionAwareTask {
 
         final taskLauncher = getSubmitCommand(task)
         final taskEnv = getEnv(task)
-        nomadService.submitTask(this.jobName, task, taskLauncher, taskEnv)
+        nomadService.submitTask(this.jobName, task, taskLauncher, taskEnv, debugPath())
 
         // submit the task execution
         log.debug "[NOMAD] Submitted task ${task.name} with taskId=${this.jobName}"
         // update the status
         this.status = TaskStatus.SUBMITTED
+    }
+
+    protected Path debugPath() {
+        boolean debug = config.debug?.getJson()
+        return debug ? task.workDir.resolve('.job.json') : null
     }
 
     protected List<String> getSubmitCommand(TaskRun task) {

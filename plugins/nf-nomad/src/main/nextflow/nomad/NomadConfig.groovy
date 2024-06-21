@@ -35,10 +35,12 @@ class NomadConfig {
 
     final NomadClientOpts clientOpts
     final NomadJobOpts jobOpts
+    final NomadDebug debug
 
     NomadConfig(Map nomadConfigMap) {
         clientOpts = new NomadClientOpts((nomadConfigMap?.client ?: Collections.emptyMap()) as Map)
         jobOpts = new NomadJobOpts((nomadConfigMap?.jobs ?: Collections.emptyMap()) as Map)
+        debug = new NomadDebug((nomadConfigMap?.debug ?:  Collections.emptyMap()) as Map)
     }
 
     class NomadClientOpts{
@@ -129,4 +131,15 @@ class NomadConfig {
         }
     }
 
+    static class NomadDebug {
+
+        @Delegate
+        Map<String,Object> target
+
+        NomadDebug(Map<String,Object> debug) {
+            this.target = debug ?: Collections.<String,Object>emptyMap()
+        }
+
+        boolean getJson() { Boolean.valueOf( target.json as String ) }
+    }
 }
