@@ -122,24 +122,26 @@ class NomadService implements Closeable{
         )
 
 
-        if( config.jobOpts.volumeSpec && config.jobOpts.volumeSpec.type == VolumeSpec.VOLUME_CSI_TYPE){
+        if( config.jobOpts.volumeSpec ) {
             taskGroup.volumes = [:]
-            taskGroup.volumes[config.jobOpts.volumeSpec.name]= new VolumeRequest(
-                    type: config.jobOpts.volumeSpec.type,
-                    source: config.jobOpts.volumeSpec.name,
-                    attachmentMode: "file-system",
-                    accessMode: "multi-node-multi-writer"
-            )
-        }
+            config.jobOpts.volumeSpec.eachWithIndex { volumeSpec , idx->
+                if (volumeSpec && volumeSpec.type == VolumeSpec.VOLUME_CSI_TYPE) {
+                    taskGroup.volumes["vol_${idx}".toString()] = new VolumeRequest(
+                            type: volumeSpec.type,
+                            source: volumeSpec.name,
+                            attachmentMode: "file-system",
+                            accessMode: "multi-node-multi-writer"
+                    )
+                }
 
-        if( config.jobOpts.volumeSpec && config.jobOpts.volumeSpec.type == VolumeSpec.VOLUME_HOST_TYPE){
-            taskGroup.volumes = [:]
-            taskGroup.volumes[config.jobOpts.volumeSpec.name]= new VolumeRequest(
-                    type: config.jobOpts.volumeSpec.type,
-                    source: config.jobOpts.volumeSpec.name,
-            )
+                if (volumeSpec && volumeSpec.type == VolumeSpec.VOLUME_HOST_TYPE) {
+                    taskGroup.volumes["vol_${idx}".toString()] = new VolumeRequest(
+                            type: volumeSpec.type,
+                            source: volumeSpec.name,
+                    )
+                }
+            }
         }
-
         return taskGroup
     }
 
@@ -176,11 +178,15 @@ class NomadService implements Closeable{
         }
 
         if( config.jobOpts.volumeSpec){
-            String destinationDir = workingDir.split(File.separator).dropRight(2).join(File.separator)
-            taskDef.volumeMounts = [ new VolumeMount(
-                    destination: destinationDir,
-                    volume: config.jobOpts.volumeSpec.name
-            )]
+            taskDef.volumeMounts = []
+            config.jobOpts.volumeSpec.eachWithIndex { volumeSpec, idx ->
+                String destinationDir = volumeSpec.workDir ?
+                        workingDir.split(File.separator).dropRight(2).join(File.separator) : volumeSpec.path
+                taskDef.volumeMounts.add new VolumeMount(
+                        destination: destinationDir,
+                        volume: "vol_${idx}".toString()
+                )
+            }
         }
 
         if( config.jobOpts.affinitySpec ){

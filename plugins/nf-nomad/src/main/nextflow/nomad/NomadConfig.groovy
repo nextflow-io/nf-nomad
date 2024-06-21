@@ -60,7 +60,7 @@ class NomadConfig {
         final String region
         final String namespace
         final String dockerVolume
-        final VolumeSpec volumeSpec
+        final VolumeSpec[] volumeSpec
         final AffinitySpec affinitySpec
         final ConstraintSpec constraintSpec
 
@@ -81,23 +81,46 @@ class NomadConfig {
                 log.info "dockerVolume config will be deprecated, use volume type:'docker' name:'name' instead"
             }
 
-            this.volumeSpec = parseVolume(nomadJobOpts)
+            this.volumeSpec = parseVolumes(nomadJobOpts)
             this.affinitySpec = parseAffinity(nomadJobOpts)
             this.constraintSpec = parseConstraint(nomadJobOpts)
         }
 
-        VolumeSpec parseVolume(Map nomadJobOpts){
+        VolumeSpec[] parseVolumes(Map nomadJobOpts){
+            List<VolumeSpec> ret = []
             if( nomadJobOpts.volume && nomadJobOpts.volume instanceof Closure){
                 def volumeSpec = new VolumeSpec()
                 def closure = (nomadJobOpts.volume as Closure)
                 def clone = closure.rehydrate(volumeSpec, closure.owner, closure.thisObject)
                 clone.resolveStrategy = Closure.DELEGATE_FIRST
                 clone()
-                volumeSpec.validate()
-                volumeSpec
-            }else{
-                null
+                volumeSpec.workDir(true)
+                ret.add volumeSpec
             }
+
+            if( nomadJobOpts.volumes && nomadJobOpts.volumes instanceof List){
+                nomadJobOpts.volumes.each{ closure ->
+                    if( closure instanceof Closure){
+                        def volumeSpec = new VolumeSpec()
+                        def clone = closure.rehydrate(volumeSpec, closure.owner, closure.thisObject)
+                        clone.resolveStrategy = Closure.DELEGATE_FIRST
+                        clone()
+                        ret.add volumeSpec
+                    }
+                }
+            }
+
+            if( ret.size() && !ret.find{ it.workDir } ){
+                ret.first().workDir(true)
+            }
+
+            ret*.validate()
+
+            if( ret.findAll{ it.workDir}.size() > 1 ){
+                throw new IllegalArgumentException("No more than a workdir volume allowed")
+            }
+
+            return ret as VolumeSpec[]
         }
 
         AffinitySpec parseAffinity(Map nomadJobOpts) {

@@ -372,9 +372,9 @@ class NomadServiceSpec extends Specification{
         body.Job.TaskGroups[0].Tasks[0].Config.args == args.drop(1)
 
         body.Job.TaskGroups[0].Volumes.size() == 1
-        body.Job.TaskGroups[0].Volumes['test'] == [AccessMode:"multi-node-multi-writer", AttachmentMode:"file-system", Source:"test", Type:"csi"]
+        body.Job.TaskGroups[0].Volumes['vol_0'] == [AccessMode:"multi-node-multi-writer", AttachmentMode:"file-system", Source:"test", Type:"csi"]
         body.Job.TaskGroups[0].Tasks[0].VolumeMounts.size() == 1
-        body.Job.TaskGroups[0].Tasks[0].VolumeMounts[0] == [Destination:"/a", Volume:"test"]
+        body.Job.TaskGroups[0].Tasks[0].VolumeMounts[0] == [Destination:"/a", Volume:"vol_0"]
 
     }
 

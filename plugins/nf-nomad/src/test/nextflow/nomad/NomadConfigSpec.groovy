@@ -131,8 +131,8 @@ class NomadConfigSpec extends Specification {
 
         then:
         config.jobOpts.volumeSpec
-        config.jobOpts.volumeSpec.type == VolumeSpec.VOLUME_DOCKER_TYPE
-        config.jobOpts.volumeSpec.name == "test"
+        config.jobOpts.volumeSpec[0].type == VolumeSpec.VOLUME_DOCKER_TYPE
+        config.jobOpts.volumeSpec[0].name == "test"
 
         when:
         def config2 = new NomadConfig([
@@ -141,8 +141,8 @@ class NomadConfigSpec extends Specification {
 
         then:
         config2.jobOpts.volumeSpec
-        config2.jobOpts.volumeSpec.type == VolumeSpec.VOLUME_CSI_TYPE
-        config2.jobOpts.volumeSpec.name == "test"
+        config2.jobOpts.volumeSpec[0].type == VolumeSpec.VOLUME_CSI_TYPE
+        config2.jobOpts.volumeSpec[0].name == "test"
 
         when:
         def config3 = new NomadConfig([
@@ -151,8 +151,8 @@ class NomadConfigSpec extends Specification {
 
         then:
         config3.jobOpts.volumeSpec
-        config3.jobOpts.volumeSpec.type == VolumeSpec.VOLUME_HOST_TYPE
-        config3.jobOpts.volumeSpec.name == "test"
+        config3.jobOpts.volumeSpec[0].type == VolumeSpec.VOLUME_HOST_TYPE
+        config3.jobOpts.volumeSpec[0].name == "test"
 
         when:
         new NomadConfig([
@@ -197,5 +197,75 @@ class NomadConfigSpec extends Specification {
         config.jobOpts.constraintSpec.getAttribute() == '${meta.my_custom_value}'
         config.jobOpts.constraintSpec.getOperator() == '>'
         config.jobOpts.constraintSpec.getValue() == '3'
+    }
+
+    void "should instantiate multiple volumes spec if specified"() {
+        when:
+        def config = new NomadConfig([
+                jobs: [
+                        volumes : [
+                                { type "docker" name "test" }
+                        ]
+                ]
+        ])
+
+        then:
+        config.jobOpts.volumeSpec
+        config.jobOpts.volumeSpec[0].type == VolumeSpec.VOLUME_DOCKER_TYPE
+        config.jobOpts.volumeSpec[0].name == "test"
+        config.jobOpts.volumeSpec[0].workDir
+
+        when:
+        new NomadConfig([
+                jobs: [
+                        volumes : [
+                                { type "csi" name "test" },
+                                { type "docker" name "test" },
+                        ]
+                ]
+        ])
+
+        then:
+        thrown(IllegalArgumentException)
+
+        when:
+        def config2 = new NomadConfig([
+                jobs: [
+                        volumes : [
+                                { type "csi" name "test" },
+                                { type "docker" name "test" path '/data' },
+                        ]
+                ]
+        ])
+
+        then:
+        config2.jobOpts.volumeSpec.size()==2
+        config2.jobOpts.volumeSpec[0].type == VolumeSpec.VOLUME_CSI_TYPE
+        config2.jobOpts.volumeSpec[0].name == "test"
+        config2.jobOpts.volumeSpec[1].type == VolumeSpec.VOLUME_DOCKER_TYPE
+        config2.jobOpts.volumeSpec[1].name == "test"
+
+        config.jobOpts.volumeSpec[0].workDir
+        config.jobOpts.volumeSpec.findAll{ it.workDir}.size() == 1
+
+        when:
+        def config3 = new NomadConfig([
+                jobs: [
+                        volumes : [
+                                { type "csi" name "test" path '/data'},
+                                { type "docker" name "test" path '/data'},
+                        ],
+                        volume  : { type "host" name "test" },
+                ]
+        ])
+
+        then:
+        config3.jobOpts.volumeSpec.size()==3
+        config3.jobOpts.volumeSpec[0].type == VolumeSpec.VOLUME_HOST_TYPE
+        config3.jobOpts.volumeSpec[1].type == VolumeSpec.VOLUME_CSI_TYPE
+        config3.jobOpts.volumeSpec[2].type == VolumeSpec.VOLUME_DOCKER_TYPE
+
+        config.jobOpts.volumeSpec[0].workDir
+        config.jobOpts.volumeSpec.findAll{ it.workDir}.size() == 1
     }
 }

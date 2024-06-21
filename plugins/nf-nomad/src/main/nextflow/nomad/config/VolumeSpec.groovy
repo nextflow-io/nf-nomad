@@ -1,7 +1,5 @@
 package nextflow.nomad.config
 
-import nextflow.nomad.NomadConfig
-
 class VolumeSpec {
 
     final static public String VOLUME_DOCKER_TYPE = "docker"
@@ -14,6 +12,8 @@ class VolumeSpec {
 
     private String type
     private String name
+    private String path
+    private boolean workDir = false
 
     String getType() {
         return type
@@ -21,6 +21,14 @@ class VolumeSpec {
 
     String getName() {
         return name
+    }
+
+    boolean getWorkDir() {
+        return workDir
+    }
+
+    String getPath() {
+        return path
     }
 
     VolumeSpec type(String type){
@@ -33,12 +41,25 @@ class VolumeSpec {
         this
     }
 
+    VolumeSpec workDir(boolean b){
+        this.workDir = b
+        this
+    }
+
+    VolumeSpec path(String path){
+        this.path = path
+        this
+    }
+
     void validate(){
         if( !VOLUME_TYPES.contains(type) ) {
             throw new IllegalArgumentException("Volume type $type is not supported")
         }
         if( !this.name ){
-            throw new IllegalArgumentException("Volume name is required")
+            throw new IllegalArgumentException("Volume name is required (type $type)")
+        }
+        if( !this.workDir && !this.path ){
+            throw new IllegalArgumentException("Volume path is required in secondary volumes")
         }
     }
 }
