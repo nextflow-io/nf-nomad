@@ -18,14 +18,13 @@ package nextflow.nomad.executor
 
 import groovy.json.JsonOutput
 import groovy.json.JsonSlurper
-import io.nomadproject.client.model.Resources
 import nextflow.executor.Executor
 import nextflow.nomad.NomadConfig
 import nextflow.processor.TaskBean
 import nextflow.processor.TaskConfig
 import nextflow.processor.TaskProcessor
 import nextflow.processor.TaskRun
-import nextflow.util.MemoryUnit
+import nextflow.script.ProcessConfig
 import okhttp3.mockwebserver.MockResponse
 import okhttp3.mockwebserver.MockWebServer
 import spock.lang.Specification
@@ -560,5 +559,69 @@ class NomadServiceSpec extends Specification{
         outputJson.text.indexOf(" Job {") != -1
     }
 
+    void "submit a task with a datasource directive"(){
+        given:
+        def config = new NomadConfig(
+                client:[
+                        address : "http://${mockWebServer.hostName}:${mockWebServer.port}"
+                ],
+        )
+        def service = new NomadService(config)
 
+        String id = "theId"
+        String name = "theName"
+        String image = "theImage"
+        List<String> args = ["theCommand", "theArgs"]
+        String workingDir = "/a/b/c"
+        Map<String, String>env = [test:"test"]
+
+        def mockTask = Mock(TaskRun){
+            getName() >> name
+            getContainer() >> image
+            getConfig() >> Mock(TaskConfig)
+            getWorkDirStr() >> workingDir
+            getContainer() >> "ubuntu"
+            getProcessor() >> Mock(TaskProcessor){
+                getExecutor() >> Mock(Executor){
+                    isFusionEnabled() >> false
+                }
+                getConfig() >> Mock(ProcessConfig){
+                    get("datacenters") >> datacenter
+                }
+            }
+            getWorkDir() >> Path.of(workingDir)
+            toTaskBean() >> Mock(TaskBean){
+                getWorkDir() >> Path.of(workingDir)
+                getScript() >> "theScript"
+                getShell() >> ["bash"]
+                getInputFiles() >> [:]
+            }
+        }
+
+        mockWebServer.enqueue(new MockResponse()
+                .setBody(JsonOutput.toJson(["EvalID":"test"]).toString())
+                .addHeader("Content-Type", "application/json"));
+        when:
+
+        def idJob = service.submitTask(id, mockTask, args, env)
+        def recordedRequest = mockWebServer.takeRequest();
+        def body = new JsonSlurper().parseText(recordedRequest.body.readUtf8())
+
+        then:
+        idJob
+
+        and:
+        recordedRequest.method == "POST"
+        recordedRequest.path == "/v1/jobs"
+
+        and:
+        body.Job.Datacenters == valid
+
+        where:
+        datacenter      | valid
+        "test"          | ["test"]
+        ['b','a']       | ['b', 'a']
+        1               | ['1']
+        ({ 'a'*10 })    | ['aaaaaaaaaa']
+    }
 }

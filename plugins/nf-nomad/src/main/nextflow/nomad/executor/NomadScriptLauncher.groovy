@@ -17,11 +17,8 @@
 
 package nextflow.nomad.executor
 
-
 import nextflow.executor.BashWrapperBuilder
-import nextflow.executor.SimpleFileCopyStrategy
 import nextflow.processor.TaskBean
-import nextflow.util.Escape
 
 /**
  * Custom bash wrapper builder for Nomad jobs/tasks

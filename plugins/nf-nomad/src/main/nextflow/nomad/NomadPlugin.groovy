@@ -18,7 +18,9 @@
 package nextflow.nomad
 
 import groovy.transform.CompileStatic
+import nextflow.nomad.executor.TaskDirectives
 import nextflow.plugin.BasePlugin
+import nextflow.script.ProcessConfig
 import org.pf4j.PluginWrapper
 
 /**
@@ -32,5 +34,10 @@ class NomadPlugin extends BasePlugin {
 
     NomadPlugin(PluginWrapper wrapper) {
         super(wrapper)
+        addCustomDirectives()
+    }
+
+    private static void addCustomDirectives() {
+        ProcessConfig.DIRECTIVES.addAll(TaskDirectives.ALL)
     }
 }

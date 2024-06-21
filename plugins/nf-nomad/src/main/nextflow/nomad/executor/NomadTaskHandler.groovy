@@ -19,8 +19,6 @@ package nextflow.nomad.executor
 import groovy.transform.CompileDynamic
 import groovy.transform.CompileStatic
 import groovy.util.logging.Slf4j
-import io.nomadproject.client.model.Resources
-import io.nomadproject.client.model.TaskGroupSummary
 import nextflow.exception.ProcessSubmitException
 import nextflow.exception.ProcessUnrecoverableException
 import nextflow.executor.BashWrapperBuilder
@@ -31,7 +29,6 @@ import nextflow.processor.TaskHandler
 import nextflow.processor.TaskRun
 import nextflow.processor.TaskStatus
 import nextflow.util.Escape
-import nextflow.util.MemoryUnit
 
 import java.nio.file.Path
 
