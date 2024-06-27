@@ -1,5 +1,5 @@
 Manifest-Version: 1.0
-Plugin-Id: nf-hello
+Plugin-Id: nf-nomad
 Plugin-Version: 0.1.0
 Plugin-Class: nextflow.nomad.NomadPlugin
 Plugin-Provider: nextflow
