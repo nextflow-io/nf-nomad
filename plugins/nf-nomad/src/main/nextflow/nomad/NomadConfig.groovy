@@ -44,19 +44,31 @@ class NomadConfig {
     }
 
     class NomadClientOpts{
+        private Map<String,String> sysEnv
         final String address
         final String token
 
-        NomadClientOpts(Map nomadClientOpts){
-            def tmp = (nomadClientOpts.address?.toString() ?: "http://127.0.0.1:4646")
+        NomadClientOpts(Map nomadClientOpts, Map<String,String> env=null){
+
+            sysEnv = env==null ? new HashMap<String,String>(System.getenv()) : env
+
+            def tmp = (nomadClientOpts.address?.toString() ?: sysEnv.get('NOMAD_ADDR'))
+
             if( !tmp.endsWith("/"))
                 tmp +="/"
             this.address = tmp + API_VERSION
-            token = nomadClientOpts.token ?: null
+            this.token = nomadClientOpts.token ?: sysEnv.get('NOMAD_TOKEN')
+
+            //TODO: Add mTLS properties and env vars
+            // https://developer.hashicorp.com/nomad/docs/commands#mtls-environment-variables
         }
     }
 
     class NomadJobOpts{
+        //TODO: Reevaluate the job level env vars, which are perhaps better suited to be sourced in clientOpts
+        // and overridden for job defs using process directives.
+        private Map<String,String> sysEnv
+
         final boolean deleteOnCompletion
         final List<String> datacenters
         final String region
@@ -66,7 +78,10 @@ class NomadConfig {
         final AffinitySpec affinitySpec
         final ConstraintSpec constraintSpec
 
-        NomadJobOpts(Map nomadJobOpts){
+        NomadJobOpts(Map nomadJobOpts, Map<String,String> env=null){
+
+            sysEnv = env==null ? new HashMap<String,String>(System.getenv()) : env
+
             deleteOnCompletion = nomadJobOpts.containsKey("deleteOnCompletion") ?
                     nomadJobOpts.deleteOnCompletion : false
             if( nomadJobOpts.containsKey("datacenters") ) {
@@ -74,10 +89,12 @@ class NomadConfig {
                         nomadJobOpts.datacenters : nomadJobOpts.datacenters.toString().split(","))
                         as List<String>).findAll{it.size()}.unique()
             }else{
-                datacenters = []
+                datacenters = List.of(sysEnv.get('NOMAD_DC'))
             }
-            region = nomadJobOpts.region ?: null
-            namespace = nomadJobOpts.namespace ?: null
+
+            region = nomadJobOpts.region ?: sysEnv.get('NOMAD_REGION')
+            namespace = nomadJobOpts.namespace ?: sysEnv.get('NOMAD_NAMESPACE')
+
             dockerVolume = nomadJobOpts.dockerVolume ?: null
             if( dockerVolume ){
                 log.info "dockerVolume config will be deprecated, use volume type:'docker' name:'name' instead"
