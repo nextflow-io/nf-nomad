@@ -26,6 +26,8 @@ import nextflow.nomad.NomadConfig
 import nextflow.nomad.config.VolumeSpec
 import nextflow.processor.TaskRun
 import nextflow.util.MemoryUnit
+import nextflow.SysEnv
+import nextflow.exception.ProcessSubmitException
 import org.yaml.snakeyaml.Yaml
 
 import java.nio.file.Path
@@ -47,6 +49,7 @@ class NomadService implements Closeable{
     NomadService(NomadConfig config) {
         this.config = config
 
+        //TODO: Accommodate these connection level options in clientOpts
         final CONNECTION_TIMEOUT_MILLISECONDS = 60000
         final READ_TIMEOUT_MILLISECONDS = 60000
         final WRITE_TIMEOUT_MILLISECONDS = 60000
@@ -59,7 +62,7 @@ class NomadService implements Closeable{
             log.debug "[NOMAD] Client Token: ${config.clientOpts.token?.take(5)}.."
             apiClient.apiKey = config.clientOpts.token
         }
-        this.jobsApi = new JobsApi(apiClient);
+        this.jobsApi = new JobsApi(apiClient)
     }
 
     protected Resources getResources(TaskRun task) {
@@ -93,8 +96,8 @@ class NomadService implements Closeable{
 
         assignDatacenters(task, job)
 
-        JobRegisterRequest jobRegisterRequest = new JobRegisterRequest();
-        jobRegisterRequest.setJob(job);
+        JobRegisterRequest jobRegisterRequest = new JobRegisterRequest()
+        jobRegisterRequest.setJob(job)
 
         if( saveJsonPath ) try {
             saveJsonPath.text = job.toString()
@@ -103,11 +106,18 @@ class NomadService implements Closeable{
             log.debug "WARN: unable to save request json -- cause: ${e.message ?: e}"
         }
 
-        JobRegisterResponse jobRegisterResponse = jobsApi.registerJob(jobRegisterRequest, config.jobOpts.region, config.jobOpts.namespace, null, null)
-        jobRegisterResponse.evalID
+
+        try {
+            JobRegisterResponse jobRegisterResponse = jobsApi.registerJob(jobRegisterRequest, config.jobOpts.region, config.jobOpts.namespace, null, null)
+            jobRegisterResponse.evalID
+        } catch (Throwable e) {
+            throw new ProcessSubmitException("[NOMAD] Failed to submit ${job.name} -- Cause: ${e.message ?: e}", e)
+        }
+
     }
 
     TaskGroup createTaskGroup(TaskRun taskRun, List<String> args, Map<String, String>env){
+        //NOTE: Force a single-allocation with no-retries per nomad job definition
         final TASK_RESCHEDULE_ATTEMPTS = 0
         final TASK_RESTART_ATTEMPTS = 0
 
@@ -258,7 +268,7 @@ class NomadService implements Closeable{
         job
     }
 
-    String state(String jobId){
+    String getJobState(String jobId){
         List<AllocationListStub> allocations = jobsApi.getJobAllocations(jobId, config.jobOpts.region, config.jobOpts.namespace, null, null, null, null, null, null, null, null)
         AllocationListStub last = allocations?.sort{
             it.modifyIndex
@@ -272,11 +282,13 @@ class NomadService implements Closeable{
 
     boolean checkIfRunning(String jobId){
         Job job = jobsApi.getJob(jobId, config.jobOpts.region, config.jobOpts.namespace, null, null, null, null, null, null, null)
+        log.debug "[NOMAD] checkIfRunning jobID=$job.ID; status=$job.status"
         job.status == "running"
     }
 
-    boolean checkIfCompleted(String jobId){
+    boolean checkIfDead(String jobId){
         Job job = jobsApi.getJob(jobId, config.jobOpts.region, config.jobOpts.namespace, null, null, null, null, null, null, null)
+        log.debug "[NOMAD] checkIfDead jobID=$job.ID; status=$job.status"
         job.status == "dead"
     }
 
@@ -290,5 +302,11 @@ class NomadService implements Closeable{
 
     protected void purgeJob(String jobId, boolean purge){
         jobsApi.deleteJob(jobId,config.jobOpts.region, config.jobOpts.namespace,null,null,purge, true)
+    }
+
+    String getClientOfJob(String jobId) {
+        List<AllocationListStub> allocations = jobsApi.getJobAllocations(jobId, config.jobOpts.region, config.jobOpts.namespace, null, null, null, null, null, null, null, null)
+        AllocationListStub jobAllocation = allocations.first()
+        return jobAllocation.nodeName
     }
 }

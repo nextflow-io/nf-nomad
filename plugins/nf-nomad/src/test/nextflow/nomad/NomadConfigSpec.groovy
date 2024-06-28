@@ -19,6 +19,7 @@ package nextflow.nomad
 
 import nextflow.nomad.config.VolumeSpec
 import spock.lang.Specification
+import spock.lang.Unroll
 
 /**
  * Unit test for Nomad Config
@@ -36,12 +37,18 @@ class NomadConfigSpec extends Specification {
         config.clientOpts
     }
 
-    void "should use localhost as default address"() {
-        given:
-        def config = new NomadConfig([:])
+    @Unroll
+    void "should derive the default address"() {
 
         expect:
-        config.clientOpts.address == "http://127.0.0.1:4646/v1"
+        new NomadConfig([
+                client:[address: ADDRESS]
+        ]).clientOpts.address == EXPECTED
+
+        where:
+        ADDRESS                                  |  EXPECTED
+        null                                     | "${System.getenv('NOMAD_ADDR')}/v1"
+        "http://nomad"                           | "http://nomad/v1"
     }
 
     void "should use address if provided"() {
@@ -74,14 +81,14 @@ class NomadConfigSpec extends Specification {
         config.clientOpts.token == "theToken"
     }
 
-    void "should use an empty list if no datacenters is provided"() {
+    void "should use the NOMAD_DC variable if no datacenters are provided"() {
         given:
         def config = new NomadConfig([
                 jobs: [:]
         ])
 
         expect:
-        !config.jobOpts.datacenters.size()
+        config.jobOpts.datacenters
     }
 
     void "should use datacenters #dc with size #size if provided"() {
