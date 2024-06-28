@@ -301,6 +301,7 @@ class NomadService implements Closeable{
     }
 
     protected void purgeJob(String jobId, boolean purge){
+        log.debug "[NOMAD] purgeJob with jobId=${jobId}"
         jobsApi.deleteJob(jobId,config.jobOpts.region, config.jobOpts.namespace,null,null,purge, true)
     }
 
