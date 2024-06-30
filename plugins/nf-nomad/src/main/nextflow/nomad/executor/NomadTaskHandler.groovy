@@ -23,7 +23,7 @@ import nextflow.exception.ProcessSubmitException
 import nextflow.exception.ProcessUnrecoverableException
 import nextflow.executor.BashWrapperBuilder
 import nextflow.fusion.FusionAwareTask
-import nextflow.nomad.NomadConfig
+import nextflow.nomad.config.NomadConfig
 import nextflow.nomad.NomadHelper
 import nextflow.processor.TaskHandler
 import nextflow.processor.TaskRun
@@ -144,7 +144,7 @@ class NomadTaskHandler extends TaskHandler implements FusionAwareTask {
     }
 
     protected Path debugPath() {
-        boolean debug = config.debug?.getJson()
+        boolean debug = config.debug()?.getJson()
         return debug ? task.workDir.resolve('.job.json') : null
     }
 
@@ -206,7 +206,7 @@ class NomadTaskHandler extends TaskHandler implements FusionAwareTask {
     }
 
     private Boolean shouldDelete() {
-        config.jobOpts.deleteOnCompletion
+        config.jobOpts().deleteOnCompletion
     }
 
 

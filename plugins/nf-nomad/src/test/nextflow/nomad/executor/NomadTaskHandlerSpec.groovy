@@ -19,7 +19,7 @@ package nextflow.nomad.executor
 
 import nextflow.exception.ProcessSubmitException
 import nextflow.executor.Executor
-import nextflow.nomad.NomadConfig
+import nextflow.nomad.config.NomadConfig
 import nextflow.processor.*
 import spock.lang.Specification
 

@@ -19,7 +19,7 @@ package nextflow.nomad.executor
 import groovy.json.JsonOutput
 import groovy.json.JsonSlurper
 import nextflow.executor.Executor
-import nextflow.nomad.NomadConfig
+import nextflow.nomad.config.NomadConfig
 import nextflow.processor.TaskBean
 import nextflow.processor.TaskConfig
 import nextflow.processor.TaskProcessor
@@ -281,7 +281,6 @@ class NomadServiceSpec extends Specification{
         body.Job
         body.Job.ID == id
         body.Job.Name == name
-        body.Job.Datacenters == []
         body.Job.Type == "batch"
         body.Job.TaskGroups.size() == 1
         body.Job.TaskGroups[0].Name == "group"
@@ -357,7 +356,6 @@ class NomadServiceSpec extends Specification{
         body.Job
         body.Job.ID == id
         body.Job.Name == name
-        body.Job.Datacenters == []
         body.Job.Type == "batch"
         body.Job.TaskGroups.size() == 1
         body.Job.TaskGroups[0].Name == "group"

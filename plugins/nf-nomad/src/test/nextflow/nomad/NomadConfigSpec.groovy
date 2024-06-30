@@ -17,6 +17,7 @@
 
 package nextflow.nomad
 
+import nextflow.nomad.config.NomadConfig
 import nextflow.nomad.config.VolumeSpec
 import spock.lang.Specification
 import spock.lang.Unroll
@@ -25,6 +26,7 @@ import spock.lang.Unroll
  * Unit test for Nomad Config
  *
  * @author : Jorge Aguilera <jagedn@gmail.com>
+ * @author : Abhinav Sharma <abhi18av@outlook.com>
  */
 class NomadConfigSpec extends Specification {
 

@@ -22,13 +22,11 @@ import groovy.util.logging.Slf4j
 import io.nomadproject.client.ApiClient
 import io.nomadproject.client.api.JobsApi
 import io.nomadproject.client.model.*
-import nextflow.nomad.NomadConfig
+import nextflow.nomad.config.NomadConfig
 import nextflow.nomad.config.VolumeSpec
 import nextflow.processor.TaskRun
 import nextflow.util.MemoryUnit
-import nextflow.SysEnv
 import nextflow.exception.ProcessSubmitException
-import org.yaml.snakeyaml.Yaml
 
 import java.nio.file.Path
 
@@ -42,25 +40,25 @@ import java.nio.file.Path
 @CompileStatic
 class NomadService implements Closeable{
 
-    private final NomadConfig config
+    NomadConfig config
 
-    private final JobsApi jobsApi
+    JobsApi jobsApi
 
     NomadService(NomadConfig config) {
         this.config = config
 
-        //TODO: Accommodate these connection level options in clientOpts
+        //TODO: Accommodate these connection level options in clientOpts()
         final CONNECTION_TIMEOUT_MILLISECONDS = 60000
         final READ_TIMEOUT_MILLISECONDS = 60000
         final WRITE_TIMEOUT_MILLISECONDS = 60000
 
         ApiClient apiClient = new ApiClient( connectTimeout: CONNECTION_TIMEOUT_MILLISECONDS, readTimeout: READ_TIMEOUT_MILLISECONDS, writeTimeout: WRITE_TIMEOUT_MILLISECONDS)
-        apiClient.basePath = config.clientOpts.address
-        log.debug "[NOMAD] Client Address: ${config.clientOpts.address}"
+        apiClient.basePath = config.clientOpts().address
+        log.debug "[NOMAD] Client Address: ${config.clientOpts().address}"
 
-        if( config.clientOpts.token ){
-            log.debug "[NOMAD] Client Token: ${config.clientOpts.token?.take(5)}.."
-            apiClient.apiKey = config.clientOpts.token
+        if( config.clientOpts().token ){
+            log.debug "[NOMAD] Client Token: ${config.clientOpts().token?.take(5)}.."
+            apiClient.apiKey = config.clientOpts().token
         }
         this.jobsApi = new JobsApi(apiClient)
     }
@@ -89,8 +87,8 @@ class NomadService implements Closeable{
         job.ID = id
         job.name = task.name
         job.type = "batch"
-        job.datacenters = this.config.jobOpts.datacenters
-        job.namespace = this.config.jobOpts.namespace
+        job.datacenters = this.config.jobOpts().datacenters
+        job.namespace = this.config.jobOpts().namespace
 
         job.taskGroups = [createTaskGroup(task, args, env)]
 
@@ -108,7 +106,7 @@ class NomadService implements Closeable{
 
 
         try {
-            JobRegisterResponse jobRegisterResponse = jobsApi.registerJob(jobRegisterRequest, config.jobOpts.region, config.jobOpts.namespace, null, null)
+            JobRegisterResponse jobRegisterResponse = jobsApi.registerJob(jobRegisterRequest, config.jobOpts().region, config.jobOpts().namespace, null, null)
             jobRegisterResponse.evalID
         } catch (Throwable e) {
             throw new ProcessSubmitException("[NOMAD] Failed to submit ${job.name} -- Cause: ${e.message ?: e}", e)
@@ -133,9 +131,9 @@ class NomadService implements Closeable{
         )
 
 
-        if( config.jobOpts.volumeSpec ) {
+        if( config.jobOpts().volumeSpec ) {
             taskGroup.volumes = [:]
-            config.jobOpts.volumeSpec.eachWithIndex { volumeSpec , idx->
+            config.jobOpts().volumeSpec.eachWithIndex { volumeSpec , idx->
                 if (volumeSpec && volumeSpec.type == VolumeSpec.VOLUME_CSI_TYPE) {
                     taskGroup.volumes["vol_${idx}".toString()] = new VolumeRequest(
                             type: volumeSpec.type,
@@ -187,19 +185,19 @@ class NomadService implements Closeable{
     }
 
     protected Task volumes(TaskRun task, Task taskDef, String workingDir){
-        if( config.jobOpts.dockerVolume){
+        if( config.jobOpts().dockerVolume){
             String destinationDir = workingDir.split(File.separator).dropRight(2).join(File.separator)
             taskDef.config.mount = [
                     type : "volume",
                     target : destinationDir,
-                    source : config.jobOpts.dockerVolume,
+                    source : config.jobOpts().dockerVolume,
                     readonly : false
             ]
         }
 
-        if( config.jobOpts.volumeSpec){
+        if( config.jobOpts().volumeSpec){
             taskDef.volumeMounts = []
-            config.jobOpts.volumeSpec.eachWithIndex { volumeSpec, idx ->
+            config.jobOpts().volumeSpec.eachWithIndex { volumeSpec, idx ->
                 String destinationDir = volumeSpec.workDir ?
                         workingDir.split(File.separator).dropRight(2).join(File.separator) : volumeSpec.path
                 taskDef.volumeMounts.add new VolumeMount(
@@ -213,19 +211,19 @@ class NomadService implements Closeable{
     }
 
     protected Task affinity(TaskRun task, Task taskDef) {
-        if (config.jobOpts.affinitySpec) {
+        if (config.jobOpts().affinitySpec) {
             def affinity = new Affinity()
-            if (config.jobOpts.affinitySpec.attribute) {
-                affinity.ltarget(config.jobOpts.affinitySpec.attribute)
+            if (config.jobOpts().affinitySpec.attribute) {
+                affinity.ltarget(config.jobOpts().affinitySpec.attribute)
             }
 
-            affinity.operand(config.jobOpts.affinitySpec.operator ?: "=")
+            affinity.operand(config.jobOpts().affinitySpec.operator ?: "=")
 
-            if (config.jobOpts.affinitySpec.value) {
-                affinity.rtarget(config.jobOpts.affinitySpec.value)
+            if (config.jobOpts().affinitySpec.value) {
+                affinity.rtarget(config.jobOpts().affinitySpec.value)
             }
-            if (config.jobOpts.affinitySpec.weight != null) {
-                affinity.weight(config.jobOpts.affinitySpec.weight)
+            if (config.jobOpts().affinitySpec.weight != null) {
+                affinity.weight(config.jobOpts().affinitySpec.weight)
             }
             taskDef.affinities([affinity])
         }
@@ -233,16 +231,16 @@ class NomadService implements Closeable{
     }
 
     protected Task constrains(TaskRun task, Task taskDef){
-        if( config.jobOpts.constraintSpec ){
+        if( config.jobOpts().constraintSpec ){
             def constraint = new Constraint()
-            if(config.jobOpts.constraintSpec.attribute){
-                constraint.ltarget(config.jobOpts.constraintSpec.attribute)
+            if(config.jobOpts().constraintSpec.attribute){
+                constraint.ltarget(config.jobOpts().constraintSpec.attribute)
             }
 
-            constraint.operand(config.jobOpts.constraintSpec.operator ?: "=")
+            constraint.operand(config.jobOpts().constraintSpec.operator ?: "=")
 
-            if(config.jobOpts.constraintSpec.value){
-                constraint.rtarget(config.jobOpts.constraintSpec.value)
+            if(config.jobOpts().constraintSpec.value){
+                constraint.rtarget(config.jobOpts().constraintSpec.value)
             }
             taskDef.constraints([constraint])
         }
@@ -269,7 +267,7 @@ class NomadService implements Closeable{
     }
 
     String getJobState(String jobId){
-        List<AllocationListStub> allocations = jobsApi.getJobAllocations(jobId, config.jobOpts.region, config.jobOpts.namespace, null, null, null, null, null, null, null, null)
+        List<AllocationListStub> allocations = jobsApi.getJobAllocations(jobId, config.jobOpts().region, config.jobOpts().namespace, null, null, null, null, null, null, null, null)
         AllocationListStub last = allocations?.sort{
             it.modifyIndex
         }?.last()
@@ -281,13 +279,13 @@ class NomadService implements Closeable{
 
 
     boolean checkIfRunning(String jobId){
-        Job job = jobsApi.getJob(jobId, config.jobOpts.region, config.jobOpts.namespace, null, null, null, null, null, null, null)
+        Job job = jobsApi.getJob(jobId, config.jobOpts().region, config.jobOpts().namespace, null, null, null, null, null, null, null)
         log.debug "[NOMAD] checkIfRunning jobID=$job.ID; status=$job.status"
         job.status == "running"
     }
 
     boolean checkIfDead(String jobId){
-        Job job = jobsApi.getJob(jobId, config.jobOpts.region, config.jobOpts.namespace, null, null, null, null, null, null, null)
+        Job job = jobsApi.getJob(jobId, config.jobOpts().region, config.jobOpts().namespace, null, null, null, null, null, null, null)
         log.debug "[NOMAD] checkIfDead jobID=$job.ID; status=$job.status"
         job.status == "dead"
     }
@@ -302,11 +300,11 @@ class NomadService implements Closeable{
 
     protected void purgeJob(String jobId, boolean purge){
         log.debug "[NOMAD] purgeJob with jobId=${jobId}"
-        jobsApi.deleteJob(jobId,config.jobOpts.region, config.jobOpts.namespace,null,null,purge, true)
+        jobsApi.deleteJob(jobId,config.jobOpts().region, config.jobOpts().namespace,null,null,purge, true)
     }
 
     String getClientOfJob(String jobId) {
-        List<AllocationListStub> allocations = jobsApi.getJobAllocations(jobId, config.jobOpts.region, config.jobOpts.namespace, null, null, null, null, null, null, null, null)
+        List<AllocationListStub> allocations = jobsApi.getJobAllocations(jobId, config.jobOpts().region, config.jobOpts().namespace, null, null, null, null, null, null, null, null)
         AllocationListStub jobAllocation = allocations.first()
         return jobAllocation.nodeName
     }
