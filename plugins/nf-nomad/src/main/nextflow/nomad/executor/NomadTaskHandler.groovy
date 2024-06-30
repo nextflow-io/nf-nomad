@@ -16,19 +16,21 @@
  */
 package nextflow.nomad.executor
 
-import groovy.transform.CompileDynamic
+
 import groovy.transform.CompileStatic
 import groovy.util.logging.Slf4j
 import nextflow.exception.ProcessSubmitException
 import nextflow.exception.ProcessUnrecoverableException
 import nextflow.executor.BashWrapperBuilder
 import nextflow.fusion.FusionAwareTask
-import nextflow.nomad.NomadConfig
+import nextflow.nomad.config.NomadConfig
 import nextflow.nomad.NomadHelper
 import nextflow.processor.TaskHandler
 import nextflow.processor.TaskRun
 import nextflow.processor.TaskStatus
+import nextflow.trace.TraceRecord
 import nextflow.util.Escape
+import nextflow.SysEnv
 
 import java.nio.file.Path
 
@@ -46,6 +48,8 @@ class NomadTaskHandler extends TaskHandler implements FusionAwareTask {
     private final NomadService nomadService
 
     private String jobName
+
+    private String clientName = null
 
     private String state
 
@@ -68,32 +72,35 @@ class NomadTaskHandler extends TaskHandler implements FusionAwareTask {
 
     @Override
     boolean checkIfRunning() {
+        if(isActive()) {
+            determineClientNode()
+        }
         nomadService.checkIfRunning(this.jobName)
     }
 
     @Override
     boolean checkIfCompleted() {
-        if (!nomadService.checkIfCompleted(this.jobName)) {
+        if (!nomadService.checkIfDead(this.jobName)) {
             return false
         }
 
         state = taskState0(this.jobName)
 
-        final isDone = [
+        final isFinished = [
                 "complete",
                 "failed",
                 "dead",
                 "lost"].contains(state)
 
-        log.debug "[NOMAD] Task status $task.name taskId=${this.jobName}; state=$state completed=$isDone"
+        log.debug "[NOMAD] checkIfCompleted task.name=$task.name; state=$state completed=$isFinished"
 
-        if (isDone) {
+        if (isFinished) {
             // finalize the task
             task.exitStatus = readExitFile()
             task.stdout = outputFile
             task.stderr = errorFile
             this.status = TaskStatus.COMPLETED
-            if (state == "Failed" || state == "Lost" || state == "Unknown")
+            if (state == "failed" || state == "lost" || state == "unknown")
                 task.error = new ProcessUnrecoverableException()
 
             if (shouldDelete()) {
@@ -137,7 +144,7 @@ class NomadTaskHandler extends TaskHandler implements FusionAwareTask {
     }
 
     protected Path debugPath() {
-        boolean debug = config.debug?.getJson()
+        boolean debug = config.debug()?.getJson()
         return debug ? task.workDir.resolve('.job.json') : null
     }
 
@@ -164,6 +171,11 @@ class NomadTaskHandler extends TaskHandler implements FusionAwareTask {
         if (fusionEnabled()) {
             ret += fusionLauncher().fusionEnv()
         }
+
+        //Add debug env variable
+        if( SysEnv.containsKey('NXF_DEBUG') )
+            ret.put('NXF_DEBUG', SysEnv.get('NXF_DEBUG') )
+
         return ret
     }
 
@@ -171,8 +183,10 @@ class NomadTaskHandler extends TaskHandler implements FusionAwareTask {
         final now = System.currentTimeMillis()
         final delta = now - timestamp;
         if (!status || delta >= 1_000) {
-            def newState = nomadService.state(jobName)
-            log.debug "[NOMAD] Task: $taskName state=$state newState=$newState"
+
+            def newState = nomadService.getJobState(jobName)
+            log.debug "[NOMAD] Check jobState: jobName=$jobName currentState=$state newState=$newState"
+
             if (newState) {
                 state = newState
                 timestamp = now
@@ -192,6 +206,26 @@ class NomadTaskHandler extends TaskHandler implements FusionAwareTask {
     }
 
     private Boolean shouldDelete() {
-        config.jobOpts.deleteOnCompletion
+        config.jobOpts().deleteOnCompletion
     }
+
+
+
+    private void determineClientNode(){
+        try {
+            if ( !clientName )
+                clientName = nomadService.getClientOfJob( jobName )
+            log.debug "[NOMAD] determineClientNode: jobName:$jobName; clientName:$clientName"
+        } catch ( Exception e ){
+            log.warn ("[NOMAD] Unable to get the client name of job $jobName -- see the log file for details", e)
+        }
+    }
+
+    TraceRecord getTraceRecord() {
+        final result = super.getTraceRecord()
+        result.put('native_id', jobName)
+        result.put( 'hostname', clientName )
+        return result
+    }
+
 }

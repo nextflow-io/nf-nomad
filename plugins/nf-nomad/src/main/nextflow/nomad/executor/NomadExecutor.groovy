@@ -20,7 +20,7 @@ import groovy.transform.CompileStatic
 import groovy.util.logging.Slf4j
 import nextflow.executor.Executor
 import nextflow.fusion.FusionHelper
-import nextflow.nomad.NomadConfig
+import nextflow.nomad.config.NomadConfig
 import nextflow.processor.TaskHandler
 import nextflow.processor.TaskMonitor
 import nextflow.processor.TaskPollingMonitor
