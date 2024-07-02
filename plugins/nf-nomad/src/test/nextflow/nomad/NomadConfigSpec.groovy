@@ -90,7 +90,7 @@ class NomadConfigSpec extends Specification {
         ])
 
         expect:
-        config.jobOpts.datacenters
+        config.jobOpts.datacenters == List.of('dc-test')
     }
 
     void "should use datacenters #dc with size #size if provided"() {
