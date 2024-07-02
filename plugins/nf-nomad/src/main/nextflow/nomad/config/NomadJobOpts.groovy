@@ -53,7 +53,9 @@ class NomadJobOpts{
                     nomadJobOpts.datacenters : nomadJobOpts.datacenters.toString().split(","))
                     as List<String>).findAll{it.size()}.unique()
         }else{
-            datacenters = (sysEnv.get('NOMAD_DC')?:"").split(",") as List<String>
+            if( sysEnv.containsKey('NOMAD_DC')) {
+                datacenters = sysEnv.get('NOMAD_DC').split(",") as List<String>
+            }
         }
 
         region = nomadJobOpts.region ?: sysEnv.get('NOMAD_REGION')
