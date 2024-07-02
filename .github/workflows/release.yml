@@ -2,14 +2,13 @@ name: release
 on:
   push:
     tags:
-      - 'v[0-9]+.[0-9]+.[0-9]+'
+      - '[0-9]+.[0-9]+.[0-9]+'
 
 permissions:
   contents: write
 
 jobs:
   build:
-    if: github.ref == 'refs/heads/master'
     name: Build
     runs-on: ubuntu-latest
     timeout-minutes: 90
@@ -34,6 +33,9 @@ jobs:
           java-version: ${{matrix.java_version}}
           architecture: x64
 
+      - name: Compile
+        run: ./gradlew assemble
+
       - name: Tests
         run: ./gradlew check
         env:
@@ -50,28 +52,15 @@ jobs:
           java-version: '19'
           distribution: 'temurin'
           architecture: x64
-      - name: version
-        run: echo "::set-output name=version::$(./gradlew properties -q | awk '/^version:/ {print $2}')"
-        id: version
 
-      - name: release
-        uses: actions/create-release@v1
-        id: create_release
+      - name: build artifacts
+        run: ./gradlew clean jsonPlugin -x test -P version=${GITHUB_REF#refs/tags/}
+
+      - name: Upload artifact and release
+        uses: softprops/action-gh-release@v2
         with:
           draft: false
           prerelease: false
-          release_name: ${{ steps.version.outputs.version }}
-          tag_name: ${{ github.ref }}
           body_path: CHANGELOG.md
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN  }}
-
-      - name: build artifacts
-        run: ./gradlew jsonPlugin
-
-      - name: Upload artifact and release
-        uses: softprops/action-gh-release@v1
-        if: startsWith(github.ref, 'refs/tags/')
-        with:
           files: |
             ./plugins/nf-nomad/build/plugin/*
