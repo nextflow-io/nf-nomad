@@ -43,11 +43,12 @@ class NomadClientOpts{
 
         sysEnv = env==null ? new HashMap<String,String>(System.getenv()) : env
 
-        def tmp = (nomadClientOpts.address?.toString() ?: sysEnv.get('NOMAD_ADDR'))
+        def address = (nomadClientOpts.address?.toString() ?: sysEnv.get('NOMAD_ADDR'))
+        assert address != null, "Nomad Address is required"
 
-        if( !tmp.endsWith("/"))
-            tmp +="/"
-        this.address = tmp + API_VERSION
+        if( !address.endsWith("/"))
+            address +="/"
+        this.address = address + API_VERSION
         this.token = nomadClientOpts.token ?: sysEnv.get('NOMAD_TOKEN')
 
         //TODO: Add mTLS properties and env vars
