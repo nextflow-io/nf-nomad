@@ -44,7 +44,7 @@ class NomadJobOpts{
     NomadJobOpts(Map nomadJobOpts, Map<String,String> env=null){
         assert nomadJobOpts!=null
 
-        sysEnv = env==null ? new HashMap<String,String>(System.getenv()) : env
+        sysEnv = env ?: new HashMap<String,String>(System.getenv())
 
         deleteOnCompletion = nomadJobOpts.containsKey("deleteOnCompletion") ?
                 nomadJobOpts.deleteOnCompletion : false
@@ -53,7 +53,7 @@ class NomadJobOpts{
                     nomadJobOpts.datacenters : nomadJobOpts.datacenters.toString().split(","))
                     as List<String>).findAll{it.size()}.unique()
         }else{
-            datacenters = List.of(sysEnv.get('NOMAD_DC'))
+            datacenters = (sysEnv.get('NOMAD_DC')?:"").split(",") as List<String>
         }
 
         region = nomadJobOpts.region ?: sysEnv.get('NOMAD_REGION')

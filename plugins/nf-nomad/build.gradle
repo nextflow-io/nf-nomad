@@ -96,6 +96,7 @@ dependencies {
 test {
     useJUnitPlatform()
     jvmArgs '--add-opens=java.base/java.lang=ALL-UNNAMED'
+    environment 'NOMAD_ADDR', 'http://test-nf-nomad'
 }
 
 jar {

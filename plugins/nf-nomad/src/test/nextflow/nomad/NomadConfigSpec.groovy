@@ -49,7 +49,7 @@ class NomadConfigSpec extends Specification {
 
         where:
         ADDRESS                                  |  EXPECTED
-        null                                     | "${System.getenv('NOMAD_ADDR')}/v1"
+        null                                     | "http://test-nf-nomad/v1" // see build.gradle
         "http://nomad"                           | "http://nomad/v1"
     }
 
