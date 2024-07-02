@@ -93,14 +93,16 @@ Follow these steps to package, upload and publish the plugin:
 1. Create a file named `gradle.properties` in the project root containing the following attributes (this file should not be committed to Git):
 
    - `github_organization`: the GitHub organisation where the plugin repository is hosted.
-   - `github_username`: The GitHub username granting access to the plugin repository.
-   - `github_access_token`: The GitHub access token required to upload and commit changes to the plugin repository.
-   - `github_commit_email`: The email address associated with your GitHub account.
 
-2. Use the following command to package and create a release for your plugin on GitHub:
 
-    ```bash
-    ./gradlew :plugins:nf-nomad:upload
-    ```
+2. Use the following steps to package and create a release for your plugin on GitHub:
+
+    - set the desired `version` value in `gradle.properties` and commit the change in the `master` branch
+    - tag the repo with the version
+    - push *all* changes (the tag fill fire the `release` GH action)
+
+    Once the action is finished a new release is created and all related artifacts attached to it
 
 3. Create a pull request against [nextflow-io/plugins](https://github.com/nextflow-io/plugins/blob/main/plugins.json) to make the plugin accessible to Nextflow.
+    
+    Use the `json` file created in previous steps
