@@ -21,6 +21,9 @@ sudo ./start-nomad.sh
 Basically this command create a `nomad_temp` folder, run a server and a client, and mount `nomad_temp/scratchdir` as a `local` volume
 , so all pipelines can/must use it as working dir 
 
+Use `--secure` argument if you want to create a secured cluster. The script will bootstrap an ACL and a NOMAD_TOKEN
+will be generated (see the output of the script)
+
 ## Run pipelines examples
 
 open another terminal and execute:
