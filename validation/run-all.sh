@@ -1,13 +1,17 @@
 #!/bin/bash
 
+set -uex
+
 BUILD=0
 SKIPLOCAL=0
 NFAZURE=0
+NFSUN=0
 
 [[ "$@" =~ '--build' ]] && BUILD=1
 [[ -f $HOME/.nextflow/plugins/nf-nomad-latest/ ]]  && BUILD=1
 [[ "$@" =~ '--skiplocal' ]] && SKIPLOCAL=1
 [[ "$@" =~ '--nfazure' ]] && NFAZURE=1
+[[ "$@" =~ '--nfsun' ]] && NFSUN=1
 
 if [ "$BUILD" == 1 ]; then
   pushd ..
@@ -46,4 +50,20 @@ if [ "$NFAZURE" == 1 ]; then
     'cd ~/integration-tests/az-nomadlab; NXF_ASSETS=/projects/assets nextflow run bactopia/bactopia -c nextflow.config -w /projects -profile test,docker --outdir /projects/bactopia/outdir --accession SRX4563634 --coverage 100 --genome_size 2800000 --datasets_cache /projects/bactopia/datasets'
 else
   echo "skip nfazure"
+fi
+
+
+#NOTE: In this use-case, the default login user is not a sudoer.
+if [ "$NFSUN" == 1 ]; then
+  ssh nomad01 'rm -rf ~/.nextflow/plugins/nf-nomad-latest'
+  rsync -Pr ~/.nextflow/plugins/nf-nomad-latest nomad01:~/.nextflow/plugins/
+  rsync -Pr sun-nomadlab nomad01:~/integration-tests/
+
+  ssh nomad01 \
+    'cd ~/integration-tests/sun-nomadlab; NXF_ASSETS=~/abhinav/jfs/nomad/projects/assets nextflow run hello -w ~/abhinav/jfs/nomad/workdir -c ~/integration-tests/sun-nomadlab/nextflow.config'
+
+#  ssh nomad01 \
+#    'cd ~/integration-tests/sun-nomadlab; NXF_ASSETS=/projects/assets nextflow run bactopia/bactopia -c nextflow.config -w /projects -profile test,docker --outdir /projects/bactopia/outdir --accession SRX4563634 --coverage 100 --genome_size 2800000 --datasets_cache /projects/bactopia/datasets'
+else
+  echo "skip nfsun"
 fi

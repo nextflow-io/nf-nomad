@@ -1,8 +1,13 @@
 #!/bin/bash
+set -uex
+
+export NOMAD_VERSION="1.8.1"
+export NOMAD_PLATFORM="linux_amd64"
+
 if [ ! -f ./nomad ]; then
-  curl -O https://releases.hashicorp.com/nomad/1.7.3/nomad_1.7.3_linux_amd64.zip
-  unzip nomad_1.7.3_linux_amd64.zip
-  rm -f nomad_1.7.3_linux_amd64.zip
+  curl -O "https://releases.hashicorp.com/nomad/${NOMAD_VERSION}/nomad_${NOMAD_VERSION}_${NOMAD_PLATFORM}.zip"
+  unzip nomad_${NOMAD_VERSION}_${NOMAD_PLATFORM}.zip
+  rm -f nomad_${NOMAD_VERSION}_${NOMAD_PLATFORM}.zip
 fi
 
 mkdir -p nomad_temp
