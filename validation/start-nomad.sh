@@ -1,4 +1,9 @@
 #!/bin/bash
+if [ ! -f ./nomad ]; then
+  curl -O https://releases.hashicorp.com/nomad/1.7.3/nomad_1.7.3_linux_amd64.zip
+  unzip nomad_1.7.3_linux_amd64.zip
+  rm -f nomad_1.7.3_linux_amd64.zip
+fi
 
 mkdir -p nomad_temp
 cd nomad_temp
