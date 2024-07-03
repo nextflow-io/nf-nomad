@@ -108,7 +108,7 @@ jar {
                 'Plugin-Version': archiveVersion,
                 'Plugin-Class': "nextflow.nomad.NomadPlugin",
                 'Plugin-Provider': 'nextflow',
-                'Plugin-Requires': '>=23.10.0',
+                'Plugin-Requires': '>=24.04.0',
         )
     }
 }

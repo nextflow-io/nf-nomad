@@ -7,9 +7,9 @@ Before to run the validation tests you must to "recompile" the plugin using `lat
 this command will build and install current code of the plugin with the version name `latest` used by this validation
 tests
 
-## Start a cluster
+## Start a local "cluster"
 
-open a terminal a execute
+open a terminal an execute
 
 ```shell
 cd validation
@@ -53,24 +53,36 @@ so Nextflow will use the compiled version
 the executor will mount the `scratchdir` volume configured by the `start-nomad.sh` command 
 
 
-### Bactopia
+### Test pipelines
 
-A more elaborate example:
+You can run a set of predefined pipelines as `hello`, `nf-core/demo`, etc:
 
-```shell
-cd validation
-./run-pipeline.sh bactopia/bactopia \
-  -c basic/nextflow.config \
-  -profile test,docker \
-  --outdir $(pwd)/nomad_temp/scratchdir/out \
-  --accession SRX4563634     \
-  --coverage 100     \
-  --genome_size 2800000     \
-  --max_cpus 2 \
-  --datasets_cache $(pwd)/nomad_temp/scratchdir/cache
-```
+In a terminal run `./run-all.sh`
 
-See how we set the `datasets_cache` params, so it'll use the shared volume
+this command will run all these pipelines against your local cluster
+
+__You can force to rebuild latest version of the plugins with the `--build` argument__
+
+__You can skip local tests with `--skiplocal` argument__
+
+### Test remote cluster
+
+We've created a cluster with 3 nodes in azure called `nfazure` and, if you have access to it, 
+you can test some pipelines from your terminal using the `--nfazure` argument
+
+(`--nfazure` will scp the `az-nomadlab` directory and execute different pipelines using ssh remote command)
+
+### Examples
+
+- `./run-all.sh` use current last version and run pipelines using local cluster
+
+- `./run-all.sh --build --skiplocal` build and deploy last version
+
+- `./run-all.sh --nfazure` run local and remote pipelines
+
+- `./run-all.sh --skiplocal --nfazure` run only remote pipelines
+
+
 
 
 ## Stop the cluster
