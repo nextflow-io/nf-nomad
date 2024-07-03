@@ -124,7 +124,7 @@ class MockExecutor extends NomadExecutor {
     @Override
     void signal() { }
 
-    protected TaskMonitor createTaskMonitor2() {
+    protected TaskMonitor createTaskMonitor() {
         new MockMonitor()
     }
 
