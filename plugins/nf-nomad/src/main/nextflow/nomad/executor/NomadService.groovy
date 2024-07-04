@@ -109,7 +109,7 @@ class NomadService implements Closeable{
             JobRegisterResponse jobRegisterResponse = jobsApi.registerJob(jobRegisterRequest, config.jobOpts().region, config.jobOpts().namespace, null, null)
             jobRegisterResponse.evalID
         } catch (Throwable e) {
-            log.error("[NOMAD] Failed to submit ${job.name} -- Cause: ${e.message ?: e}", e)
+            log.debug("[NOMAD] Failed to submit ${job.name} -- Cause: ${e.message ?: e}", e)
             throw new ProcessSubmitException("[NOMAD] Failed to submit ${job.name} -- Cause: ${e.message ?: e}", e)
         }
 
@@ -277,7 +277,7 @@ class NomadService implements Closeable{
             log.debug "Task $jobId , state=$currentState"
             currentState ?: "Unknown"
         }catch(Exception e){
-            log.error("[NOMAD] Failed to get jobState ${jobId} -- Cause: ${e.message ?: e}", e)
+            log.debug("[NOMAD] Failed to get jobState ${jobId} -- Cause: ${e.message ?: e}", e)
             "dead"
         }
     }
@@ -290,7 +290,7 @@ class NomadService implements Closeable{
             log.debug "[NOMAD] checkIfRunning jobID=$job.ID; status=$job.status"
             job.status == "running"
         }catch (Exception e){
-            log.error("[NOMAD] Failed to get jobState ${jobId} -- Cause: ${e.message ?: e}", e)
+            log.debug("[NOMAD] Failed to get jobState ${jobId} -- Cause: ${e.message ?: e}", e)
             false
         }
     }
@@ -301,7 +301,7 @@ class NomadService implements Closeable{
             log.debug "[NOMAD] checkIfDead jobID=$job.ID; status=$job.status"
             job.status == "dead"
         }catch (Exception e){
-            log.error("[NOMAD] Failed to get job ${jobId} -- Cause: ${e.message ?: e}", e)
+            log.debug("[NOMAD] Failed to get job ${jobId} -- Cause: ${e.message ?: e}", e)
             true
         }
     }
@@ -319,7 +319,7 @@ class NomadService implements Closeable{
         try {
             jobsApi.deleteJob(jobId, config.jobOpts().region, config.jobOpts().namespace, null, null, purge, true)
         }catch(Exception e){
-            log.error("[NOMAD] Failed to delete job ${jobId} -- Cause: ${e.message ?: e}", e)
+            log.debug("[NOMAD] Failed to delete job ${jobId} -- Cause: ${e.message ?: e}", e)
         }
     }
 
@@ -329,7 +329,7 @@ class NomadService implements Closeable{
             AllocationListStub jobAllocation = allocations.first()
             return jobAllocation.nodeName
         }catch (Exception e){
-            log.error("[NOMAD] Failed to get job allocations ${jobId} -- Cause: ${e.message ?: e}", e)
+            log.debug("[NOMAD] Failed to get job allocations ${jobId} -- Cause: ${e.message ?: e}", e)
             throw new ProcessSubmitException("[NOMAD] Failed to get alloactions ${jobId} -- Cause: ${e.message ?: e}", e)
         }
     }
