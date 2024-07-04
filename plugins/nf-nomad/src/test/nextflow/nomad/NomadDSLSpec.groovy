@@ -31,6 +31,7 @@ import org.pf4j.PluginDescriptorFinder
 import spock.lang.Shared
 import spock.lang.Timeout
 import test.Dsl2Spec
+import test.OutputCapture
 
 import java.nio.file.Files
 import java.nio.file.Path
@@ -156,5 +157,51 @@ class NomadDSLSpec  extends Dsl2Spec{
         thrown(AbortRunException) //it fails because no real task is executed
 //        submitted
 //        summary
+    }
+
+    @org.junit.Rule
+    OutputCapture capture = new OutputCapture()
+
+    def 'should catch a remote exception' () {
+        given:
+        mockWebServer.dispatcher = new Dispatcher() {
+            @Override
+            MockResponse dispatch(@NotNull RecordedRequest recordedRequest) throws InterruptedException {
+                new MockResponse().setResponseCode(500).setBody("Dummy exception")
+            }
+        }
+
+        when:
+        def SCRIPT = '''     
+            process sayHello{
+                container 'ubuntu:22.0.4'
+                input:
+                    val x
+                output:
+                    stdout
+                script:
+                    """
+                    echo '$x world!\'
+                    """
+            }       
+            workflow {
+                channel.of('hi!') | sayHello | view
+            } 
+            '''
+        and:
+        def result = new MockScriptRunner([
+                process:[executor:'nomad'],
+                nomad:
+                        [
+                                client:
+                                        [
+                                                address : "http://${mockWebServer.hostName}:${mockWebServer.port}"
+                                        ]
+                        ]
+        ]).setScript(SCRIPT).execute()
+
+        then:
+        thrown(AbortRunException) //it fails because no real task is executed
+        capture.toString().indexOf("io.nomadproject.client.ApiException: Server Error") != -1
     }
 }

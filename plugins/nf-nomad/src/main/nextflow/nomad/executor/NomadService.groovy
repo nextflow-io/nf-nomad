@@ -109,6 +109,7 @@ class NomadService implements Closeable{
             JobRegisterResponse jobRegisterResponse = jobsApi.registerJob(jobRegisterRequest, config.jobOpts().region, config.jobOpts().namespace, null, null)
             jobRegisterResponse.evalID
         } catch (Throwable e) {
+            log.debug("[NOMAD] Failed to submit ${job.name} -- Cause: ${e.message ?: e}", e)
             throw new ProcessSubmitException("[NOMAD] Failed to submit ${job.name} -- Cause: ${e.message ?: e}", e)
         }
 
@@ -267,27 +268,42 @@ class NomadService implements Closeable{
     }
 
     String getJobState(String jobId){
-        List<AllocationListStub> allocations = jobsApi.getJobAllocations(jobId, config.jobOpts().region, config.jobOpts().namespace, null, null, null, null, null, null, null, null)
-        AllocationListStub last = allocations?.sort{
-            it.modifyIndex
-        }?.last()
-        String currentState = last?.taskStates?.values()?.last()?.state
-        log.debug "Task $jobId , state=$currentState"
-        currentState ?: "Unknown"
+        try {
+            List<AllocationListStub> allocations = jobsApi.getJobAllocations(jobId, config.jobOpts().region, config.jobOpts().namespace, null, null, null, null, null, null, null, null)
+            AllocationListStub last = allocations?.sort {
+                it.modifyIndex
+            }?.last()
+            String currentState = last?.taskStates?.values()?.last()?.state
+            log.debug "Task $jobId , state=$currentState"
+            currentState ?: "Unknown"
+        }catch(Exception e){
+            log.debug("[NOMAD] Failed to get jobState ${jobId} -- Cause: ${e.message ?: e}", e)
+            "dead"
+        }
     }
 
 
 
     boolean checkIfRunning(String jobId){
-        Job job = jobsApi.getJob(jobId, config.jobOpts().region, config.jobOpts().namespace, null, null, null, null, null, null, null)
-        log.debug "[NOMAD] checkIfRunning jobID=$job.ID; status=$job.status"
-        job.status == "running"
+        try {
+            Job job = jobsApi.getJob(jobId, config.jobOpts().region, config.jobOpts().namespace, null, null, null, null, null, null, null)
+            log.debug "[NOMAD] checkIfRunning jobID=$job.ID; status=$job.status"
+            job.status == "running"
+        }catch (Exception e){
+            log.debug("[NOMAD] Failed to get jobState ${jobId} -- Cause: ${e.message ?: e}", e)
+            false
+        }
     }
 
     boolean checkIfDead(String jobId){
-        Job job = jobsApi.getJob(jobId, config.jobOpts().region, config.jobOpts().namespace, null, null, null, null, null, null, null)
-        log.debug "[NOMAD] checkIfDead jobID=$job.ID; status=$job.status"
-        job.status == "dead"
+        try{
+            Job job = jobsApi.getJob(jobId, config.jobOpts().region, config.jobOpts().namespace, null, null, null, null, null, null, null)
+            log.debug "[NOMAD] checkIfDead jobID=$job.ID; status=$job.status"
+            job.status == "dead"
+        }catch (Exception e){
+            log.debug("[NOMAD] Failed to get job ${jobId} -- Cause: ${e.message ?: e}", e)
+            true
+        }
     }
 
     void kill(String jobId) {
@@ -300,12 +316,21 @@ class NomadService implements Closeable{
 
     protected void purgeJob(String jobId, boolean purge){
         log.debug "[NOMAD] purgeJob with jobId=${jobId}"
-        jobsApi.deleteJob(jobId,config.jobOpts().region, config.jobOpts().namespace,null,null,purge, true)
+        try {
+            jobsApi.deleteJob(jobId, config.jobOpts().region, config.jobOpts().namespace, null, null, purge, true)
+        }catch(Exception e){
+            log.debug("[NOMAD] Failed to delete job ${jobId} -- Cause: ${e.message ?: e}", e)
+        }
     }
 
     String getClientOfJob(String jobId) {
-        List<AllocationListStub> allocations = jobsApi.getJobAllocations(jobId, config.jobOpts().region, config.jobOpts().namespace, null, null, null, null, null, null, null, null)
-        AllocationListStub jobAllocation = allocations.first()
-        return jobAllocation.nodeName
+        try{
+            List<AllocationListStub> allocations = jobsApi.getJobAllocations(jobId, config.jobOpts().region, config.jobOpts().namespace, null, null, null, null, null, null, null, null)
+            AllocationListStub jobAllocation = allocations.first()
+            return jobAllocation.nodeName
+        }catch (Exception e){
+            log.debug("[NOMAD] Failed to get job allocations ${jobId} -- Cause: ${e.message ?: e}", e)
+            throw new ProcessSubmitException("[NOMAD] Failed to get alloactions ${jobId} -- Cause: ${e.message ?: e}", e)
+        }
     }
 }
