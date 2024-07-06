@@ -35,6 +35,7 @@ class VolumeSpec {
     private String name
     private String path
     private boolean workDir = false
+    private boolean readOnly = false
 
     String getType() {
         return type
@@ -50,6 +51,10 @@ class VolumeSpec {
 
     String getPath() {
         return path
+    }
+
+    boolean getReadOnly(){
+        return readOnly
     }
 
     VolumeSpec type(String type){
@@ -72,6 +77,29 @@ class VolumeSpec {
         this
     }
 
+    VolumeSpec readOnly(boolean readOnly){
+        this.readOnly = readOnly
+        this
+    }
+
+    String getAccessMode(){
+        return switch (this.type){
+            case VOLUME_CSI_TYPE->
+                readOnly ?
+                        "multi-node-reader-only"
+                        :
+                        "multi-node-multi-writer";
+            default -> ""
+        }
+    }
+
+    String getAttachmentMode(){
+        return switch (this.type){
+            case VOLUME_CSI_TYPE->"file-system";
+            default -> ""
+        }
+    }
+
     void validate(){
         if( !VOLUME_TYPES.contains(type) ) {
             throw new IllegalArgumentException("Volume type $type is not supported")
@@ -81,6 +109,9 @@ class VolumeSpec {
         }
         if( !this.workDir && !this.path ){
             throw new IllegalArgumentException("Volume path is required in secondary volumes")
+        }
+        if( this.workDir && this.readOnly ){
+            throw new IllegalArgumentException("WorkingDir Volume can't be readOnly")
         }
     }
 }

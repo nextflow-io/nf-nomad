@@ -25,6 +25,12 @@ if [ "$SKIPLOCAL" == 0 ]; then
 
   ./run-pipeline.sh -c basic/nextflow.config basic/main.nf
 
+  ./run-pipeline.sh -c directives/nextflow.config directives/main.nf
+
+  ./run-pipeline.sh -c multiple-volumes/2-volumes.config multiple-volumes/main.nf
+
+  ./run-pipeline.sh -c multiple-volumes/3-volumes.config multiple-volumes/main.nf
+
   ./run-pipeline.sh -c basic/nextflow.config nf-core/demo \
     -r dev -profile test,docker \
     --outdir $(pwd)/nomad_temp/scratchdir/out
@@ -45,6 +51,9 @@ if [ "$NFAZURE" == 1 ]; then
 
   ssh manager@nfazure \
     'cd ~/integration-tests/az-nomadlab; NXF_ASSETS=/projects/assets nextflow run hello -w /projects/ -c nextflow.config'
+
+  ssh manager@nfazure \
+    'cd ~/integration-tests/az-nomadlab; NXF_ASSETS=/projects/assets nextflow run hello -w /projects/ -c 2-volumes.config'
 
   ssh manager@nfazure \
     'cd ~/integration-tests/az-nomadlab; NXF_ASSETS=/projects/assets nextflow run bactopia/bactopia -c nextflow.config -w /projects -profile test,docker --outdir /projects/bactopia/outdir --accession SRX4563634 --coverage 100 --genome_size 2800000 --datasets_cache /projects/bactopia/datasets'
