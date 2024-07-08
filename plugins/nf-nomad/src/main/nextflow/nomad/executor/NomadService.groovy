@@ -139,8 +139,9 @@ class NomadService implements Closeable{
                     taskGroup.volumes["vol_${idx}".toString()] = new VolumeRequest(
                             type: volumeSpec.type,
                             source: volumeSpec.name,
-                            attachmentMode: "file-system",
-                            accessMode: "multi-node-multi-writer"
+                            attachmentMode: volumeSpec.attachmentMode,
+                            accessMode: volumeSpec.accessMode,
+                            readOnly: volumeSpec.readOnly,
                     )
                 }
 
@@ -148,6 +149,7 @@ class NomadService implements Closeable{
                     taskGroup.volumes["vol_${idx}".toString()] = new VolumeRequest(
                             type: volumeSpec.type,
                             source: volumeSpec.name,
+                            readOnly: volumeSpec.readOnly,
                     )
                 }
             }
@@ -326,6 +328,9 @@ class NomadService implements Closeable{
     String getClientOfJob(String jobId) {
         try{
             List<AllocationListStub> allocations = jobsApi.getJobAllocations(jobId, config.jobOpts().region, config.jobOpts().namespace, null, null, null, null, null, null, null, null)
+            if( !allocations ){
+                return null
+            }
             AllocationListStub jobAllocation = allocations.first()
             return jobAllocation.nodeName
         }catch (Exception e){

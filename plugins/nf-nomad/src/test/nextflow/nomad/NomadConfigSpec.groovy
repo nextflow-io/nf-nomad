@@ -261,20 +261,38 @@ class NomadConfigSpec extends Specification {
         def config3 = new NomadConfig([
                 jobs: [
                         volumes : [
-                                { type "csi" name "test" path '/data'},
+                                { type "csi" name "test" path '/data' readOnly true},
                                 { type "docker" name "test" path '/data'},
                         ],
-                        volume  : { type "host" name "test" },
+                        volume  : { type "csi" name "test" },
                 ]
         ])
 
         then:
         config3.jobOpts.volumeSpec.size()==3
-        config3.jobOpts.volumeSpec[0].type == VolumeSpec.VOLUME_HOST_TYPE
+        config3.jobOpts.volumeSpec[0].type == VolumeSpec.VOLUME_CSI_TYPE
         config3.jobOpts.volumeSpec[1].type == VolumeSpec.VOLUME_CSI_TYPE
         config3.jobOpts.volumeSpec[2].type == VolumeSpec.VOLUME_DOCKER_TYPE
 
-        config.jobOpts.volumeSpec[0].workDir
-        config.jobOpts.volumeSpec.findAll{ it.workDir}.size() == 1
+        config3.jobOpts.volumeSpec[0].workDir
+        config3.jobOpts.volumeSpec.findAll{ it.workDir}.size() == 1
+        config3.jobOpts.volumeSpec[0].accessMode == "multi-node-multi-writer"
+
+        config3.jobOpts.volumeSpec[1].readOnly
+        config3.jobOpts.volumeSpec[1].accessMode == "multi-node-reader-only"
+
+        when:
+        new NomadConfig([
+                jobs: [
+                        volumes : [
+                                { type "csi" name "test" path '/data' readOnly true},
+                                { type "docker" name "test" path '/data'},
+                        ],
+                        volume  : { type "csi" name "test" readOnly true},
+                ]
+        ])
+
+        then:
+        thrown(IllegalArgumentException)
     }
 }
