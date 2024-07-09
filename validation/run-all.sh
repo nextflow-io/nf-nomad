@@ -25,11 +25,13 @@ if [ "$SKIPLOCAL" == 0 ]; then
 
   ./run-pipeline.sh -c basic/nextflow.config basic/main.nf
 
-  ./run-pipeline.sh -c directives/nextflow.config directives/main.nf
+  ./run-pipeline.sh -c directives/nextflow.config directives/main.nf -profile localnomad
 
   ./run-pipeline.sh -c multiple-volumes/2-volumes.config multiple-volumes/main.nf
 
   ./run-pipeline.sh -c multiple-volumes/3-volumes.config multiple-volumes/main.nf
+
+  ./run-pipeline.sh -c constraints/node-nextflow.config constraints/main.nf -profile localnomad --RUN_IN_NODE $HOSTNAME
 
   ./run-pipeline.sh -c basic/nextflow.config nf-core/demo \
     -r dev -profile test,docker \

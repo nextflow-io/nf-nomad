@@ -22,6 +22,8 @@ import groovy.util.logging.Slf4j
 import io.nomadproject.client.ApiClient
 import io.nomadproject.client.api.JobsApi
 import io.nomadproject.client.model.*
+import nextflow.nomad.config.ConstraintNodeSpec
+import nextflow.nomad.config.ConstraintsSpec
 import nextflow.nomad.config.NomadConfig
 import nextflow.nomad.config.VolumeSpec
 import nextflow.processor.TaskRun
@@ -182,7 +184,8 @@ class NomadService implements Closeable{
 
         volumes(task, taskDef, workingDir)
         affinity(task, taskDef)
-        constrains(task, taskDef)
+        constrain(task, taskDef)
+        constraints(task, taskDef)
 
         return taskDef
     }
@@ -233,7 +236,7 @@ class NomadService implements Closeable{
         taskDef
     }
 
-    protected Task constrains(TaskRun task, Task taskDef){
+    protected Task constrain(TaskRun task, Task taskDef){
         if( config.jobOpts().constraintSpec ){
             def constraint = new Constraint()
             if(config.jobOpts().constraintSpec.attribute){
@@ -251,8 +254,84 @@ class NomadService implements Closeable{
         taskDef
     }
 
+    protected Task constraints(TaskRun task, Task taskDef){
+        def constraints = [] as List<Constraint>
+
+        if( config.jobOpts().constraintsSpec ){
+            def list = constraintsSpecToList(config.jobOpts().constraintsSpec)
+            constraints.addAll(list)
+        }
+
+        if( task.processor?.config?.get(TaskDirectives.CONSTRAINTS) &&
+                task.processor?.config?.get(TaskDirectives.CONSTRAINTS) instanceof Closure) {
+            Closure closure = task.processor?.config?.get(TaskDirectives.CONSTRAINTS) as Closure
+            ConstraintsSpec constraintsSpec = ConstraintsSpec.parse(closure)
+            def list = constraintsSpecToList(constraintsSpec)
+            constraints.addAll(list)
+        }
+
+        if( constraints.size()) {
+            taskDef.constraints(constraints)
+        }
+        taskDef
+    }
+
+    protected List<Constraint> constraintsSpecToList(ConstraintsSpec spec){
+        def constraints = [] as List<Constraint>
+        if( spec?.nodeSpecs ){
+            def nodes = config.jobOpts()
+                    .constraintsSpec
+                    ?.nodeSpecs
+                    ?.collect({ nodeConstraints(it)})
+                    ?.flatten() as List<Constraint>
+            constraints.addAll(nodes)
+        }
+        return constraints
+    }
+
+    protected List<Constraint> nodeConstraints(ConstraintNodeSpec nodeSpec){
+        def ret = [] as List<Constraint>
+        if( nodeSpec.id ){
+            ret.add new Constraint()
+                    .ltarget('${node.unique.id}')
+                    .operand("=")
+                    .rtarget(nodeSpec.id)
+        }
+        if( nodeSpec.name ){
+            ret.add new Constraint()
+                    .ltarget('${node.unique.name}')
+                    .operand("=")
+                    .rtarget(nodeSpec.name)
+        }
+        if( nodeSpec.clientClass ){
+            ret.add new Constraint()
+                    .ltarget('${node.class}')
+                    .operand("=")
+                    .rtarget(nodeSpec.clientClass)
+        }
+        if( nodeSpec.dataCenter ){
+            ret.add new Constraint()
+                    .ltarget('${node.datacenter}')
+                    .operand("=")
+                    .rtarget(nodeSpec.dataCenter)
+        }
+        if( nodeSpec.region ){
+            ret.add new Constraint()
+                    .ltarget('${node.region}')
+                    .operand("=")
+                    .rtarget(nodeSpec.region)
+        }
+        if( nodeSpec.pool ){
+            ret.add new Constraint()
+                    .ltarget('${node.pool}')
+                    .operand("=")
+                    .rtarget(nodeSpec.pool)
+        }
+        ret
+    }
+
     protected Job assignDatacenters(TaskRun task, Job job){
-        def datacenters = task.processor?.config?.get("datacenters")
+        def datacenters = task.processor?.config?.get(TaskDirectives.DATACENTERS)
         if( datacenters ){
             if( datacenters instanceof List<String>) {
                 job.datacenters( datacenters as List<String>)

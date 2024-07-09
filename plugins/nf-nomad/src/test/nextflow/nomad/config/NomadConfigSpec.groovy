@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package nextflow.nomad
+package nextflow.nomad.config
 
 import nextflow.nomad.config.NomadConfig
 import nextflow.nomad.config.VolumeSpec

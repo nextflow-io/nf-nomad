@@ -622,4 +622,70 @@ class NomadServiceSpec extends Specification{
         1               | ['1']
         ({ 'a'*10 })    | ['aaaaaaaaaa']
     }
+
+    void "submit a task with a node constraint"(){
+        given:
+        def config = new NomadConfig(
+                client:[
+                        address : "http://${mockWebServer.hostName}:${mockWebServer.port}"
+                ],
+                jobs:[
+                        constraints: {
+                            node {
+                                unique = [name:'test']
+                            }
+                        }
+                ]
+        )
+        def service = new NomadService(config)
+
+        String id = "theId"
+        String name = "theName"
+        String image = "theImage"
+        List<String> args = ["theCommand", "theArgs"]
+        String workingDir = "/a/b/c"
+        Map<String, String>env = [test:"test"]
+
+        def mockTask = Mock(TaskRun){
+            getName() >> name
+            getContainer() >> image
+            getConfig() >> Mock(TaskConfig)
+            getWorkDirStr() >> workingDir
+            getContainer() >> "ubuntu"
+            getProcessor() >> Mock(TaskProcessor){
+                getExecutor() >> Mock(Executor){
+                    isFusionEnabled() >> false
+                }
+            }
+            getWorkDir() >> Path.of(workingDir)
+            toTaskBean() >> Mock(TaskBean){
+                getWorkDir() >> Path.of(workingDir)
+                getScript() >> "theScript"
+                getShell() >> ["bash"]
+                getInputFiles() >> [:]
+            }
+        }
+
+        mockWebServer.enqueue(new MockResponse()
+                .setBody(JsonOutput.toJson(["EvalID":"test"]).toString())
+                .addHeader("Content-Type", "application/json"));
+        when:
+
+        def idJob = service.submitTask(id, mockTask, args, env)
+        def recordedRequest = mockWebServer.takeRequest();
+        def body = new JsonSlurper().parseText(recordedRequest.body.readUtf8())
+
+        then:
+        idJob
+
+        and:
+        recordedRequest.method == "POST"
+        recordedRequest.path == "/v1/jobs"
+
+        and:
+        body.Job.TaskGroups[0].Tasks[0].Constraints[0].LTarget == '${node.unique.name}'
+        body.Job.TaskGroups[0].Tasks[0].Constraints[0].RTarget == 'test'
+        body.Job.TaskGroups[0].Tasks[0].Constraints[0].Operand == '='
+    }
+
 }
