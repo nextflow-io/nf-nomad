@@ -131,7 +131,7 @@ class NomadTaskHandler extends TaskHandler implements FusionAwareTask {
         def builder = createBashWrapper(task)
         builder.build()
 
-        this.jobName = NomadHelper.sanitizeName(task.hash + "-" + task.name)
+        this.jobName = NomadHelper.sanitizeName(task.hash?.toString() + "-" + task.name)
 
         final taskLauncher = getSubmitCommand(task)
         final taskEnv = getEnv(task)
