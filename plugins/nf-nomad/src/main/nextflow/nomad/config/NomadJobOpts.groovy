@@ -41,6 +41,8 @@ class NomadJobOpts{
     AffinitySpec affinitySpec
     ConstraintSpec constraintSpec
 
+    ConstraintsSpec constraintsSpec
+
     NomadJobOpts(Map nomadJobOpts, Map<String,String> env=null){
         assert nomadJobOpts!=null
 
@@ -69,6 +71,7 @@ class NomadJobOpts{
         this.volumeSpec = parseVolumes(nomadJobOpts)
         this.affinitySpec = parseAffinity(nomadJobOpts)
         this.constraintSpec = parseConstraint(nomadJobOpts)
+        this.constraintsSpec = parseConstraints(nomadJobOpts)
     }
 
     VolumeSpec[] parseVolumes(Map nomadJobOpts){
@@ -110,6 +113,7 @@ class NomadJobOpts{
 
     AffinitySpec parseAffinity(Map nomadJobOpts) {
         if (nomadJobOpts.affinity && nomadJobOpts.affinity instanceof Closure) {
+            log.info "affinity config will be deprecated, use affinities closure instead"
             def affinitySpec = new AffinitySpec()
             def closure = (nomadJobOpts.affinity as Closure)
             def clone = closure.rehydrate(affinitySpec, closure.owner, closure.thisObject)
@@ -124,6 +128,7 @@ class NomadJobOpts{
 
     ConstraintSpec parseConstraint(Map nomadJobOpts){
         if (nomadJobOpts.constraint && nomadJobOpts.constraint instanceof Closure) {
+            log.info "constraint config will be deprecated, use constraints closure instead"
             def constraintSpec = new ConstraintSpec()
             def closure = (nomadJobOpts.constraint as Closure)
             def clone = closure.rehydrate(constraintSpec, closure.owner, closure.thisObject)
@@ -132,6 +137,20 @@ class NomadJobOpts{
             constraintSpec.validate()
             constraintSpec
         } else {
+            null
+        }
+    }
+
+    ConstraintsSpec parseConstraints(Map nomadJobOpts){
+        if (nomadJobOpts.constraints && nomadJobOpts.constraints instanceof Closure) {
+            def constraintsSpec = new ConstraintsSpec()
+            def closure = (nomadJobOpts.constraints as Closure)
+            def clone = closure.rehydrate(constraintsSpec, closure.owner, closure.thisObject)
+            clone.resolveStrategy = Closure.DELEGATE_FIRST
+            clone()
+            constraintsSpec.validate()
+            constraintsSpec
+        }else{
             null
         }
     }
