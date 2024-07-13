@@ -62,17 +62,19 @@ else
 fi
 
 
-#NOTE: In this use-case, the default login user is not a sudoer.
+#NOTE: In this use-case you need to be in the same network of sun-nomadlab server, for example using a tailscale connection
+#NOTE2: You need to have 2 secrets stored in your Nextlow: SUN_NOMADLAB_ACCESS_KEY and SUN_NOMADLAB_SECRET_KEY
 if [ "$NFSUN" == 1 ]; then
-  ssh nomad01 'rm -rf ~/.nextflow/plugins/nf-nomad-latest'
-  rsync -Pr ~/.nextflow/plugins/nf-nomad-latest nomad01:~/.nextflow/plugins/
-  rsync -Pr sun-nomadlab nomad01:~/integration-tests/
 
-  ssh nomad01 \
-    'cd ~/integration-tests/sun-nomadlab; NXF_ASSETS=~/abhinav/jfs/nomad/projects/assets nextflow run hello -w ~/abhinav/jfs/nomad/workdir -c ~/integration-tests/sun-nomadlab/nextflow.config'
+ nextflow run -w s3://juicefs/integration-test -c sun-nomadlab/nextflow.config hello
 
-#  ssh nomad01 \
-#    'cd ~/integration-tests/sun-nomadlab; NXF_ASSETS=/projects/assets nextflow run bactopia/bactopia -c nextflow.config -w /projects -profile test,docker --outdir /projects/bactopia/outdir --accession SRX4563634 --coverage 100 --genome_size 2800000 --datasets_cache /projects/bactopia/datasets'
+ NXF_ASSETS=s3://juicefs/assets nextflow run bactopia/bactopia \
+    -w s3://juicefs/integration-test -c sun-nomadlab/nextflow.config \
+    -profile test,docker --outdir s3://juicefs/bactopia/outdir \
+    --accession SRX4563634 --coverage 100 --genome_size 2800000 \
+    --datasets_cache s3://juicefs/bactopia/assets
+
+
 else
   echo "skip nfsun"
 fi
