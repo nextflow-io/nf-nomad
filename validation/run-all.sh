@@ -68,7 +68,7 @@ if [ "$NFSUN" == 1 ]; then
 
  nextflow run -w s3://juicefs/integration-test -c sun-nomadlab/nextflow.config hello
 
- NXF_ASSETS=s3://juicefs/assets nextflow run bactopia/bactopia \
+ nextflow run bactopia/bactopia \
     -w s3://juicefs/integration-test -c sun-nomadlab/nextflow.config \
     -profile test,docker --outdir s3://juicefs/bactopia/outdir \
     --accession SRX4563634 --coverage 100 --genome_size 2800000 \
