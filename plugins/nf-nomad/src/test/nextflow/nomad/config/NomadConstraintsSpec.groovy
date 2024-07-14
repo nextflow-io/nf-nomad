@@ -40,19 +40,25 @@ class NomadConstraintsSpec extends Specification {
                                 dataCenter = 'dc1'
                                 region = 'us'
                             }
+                            attr{
+                                cpu = [arch:'286']
+                            }
                         }
                 ]
         ])
 
         then:
         config.jobOpts.constraintsSpec
-        config.jobOpts.constraintsSpec.nodeSpecs.size()
+        config.jobOpts.constraintsSpec.nodeSpecs.size() == 1
         config.jobOpts.constraintsSpec.nodeSpecs[0].id == "node-id"
         config.jobOpts.constraintsSpec.nodeSpecs[0].name == "node-name"
         config.jobOpts.constraintsSpec.nodeSpecs[0].clientClass == "linux-64bit"
         config.jobOpts.constraintsSpec.nodeSpecs[0].pool == "custom-pool"
         config.jobOpts.constraintsSpec.nodeSpecs[0].dataCenter == "dc1"
         config.jobOpts.constraintsSpec.nodeSpecs[0].region == "us"
+
+        config.jobOpts.constraintsSpec.attrSpecs.size() == 1
+        config.jobOpts.constraintsSpec.attrSpecs[0].arch == '286'
     }
 
     void "should instantiate a no completed constraints spec"() {
