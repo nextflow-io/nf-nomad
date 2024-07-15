@@ -6,12 +6,16 @@ BUILD=0
 SKIPLOCAL=0
 NFAZURE=0
 NFSUN=0
+NFSLEEP=0
+NFDEMO=0
 
 [[ "$@" =~ '--build' ]] && BUILD=1
 [[ -f $HOME/.nextflow/plugins/nf-nomad-latest/ ]]  && BUILD=1
 [[ "$@" =~ '--skiplocal' ]] && SKIPLOCAL=1
 [[ "$@" =~ '--nfazure' ]] && NFAZURE=1
 [[ "$@" =~ '--nfsun' ]] && NFSUN=1
+[[ "$@" =~ '--sleep' ]] && NFSLEEP=1
+[[ "$@" =~ '--demo' ]] && NFDEMO=1
 
 if [ "$BUILD" == 1 ]; then
   pushd ..
@@ -66,14 +70,22 @@ fi
 #NOTE2: You need to have 2 secrets stored in your Nextlow: SUN_NOMADLAB_ACCESS_KEY and SUN_NOMADLAB_SECRET_KEY
 if [ "$NFSUN" == 1 ]; then
 
- nextflow run -w s3://juicefs/integration-test -c sun-nomadlab/nextflow.config hello
+ if [ "$NFSLEEP" == 1 ]; then 
+   nextflow run -w s3://fusionfs/integration-test/work -c sun-nomadlab/nextflow.config abhi18av/nf-sleep --timeout 360
 
- nextflow run bactopia/bactopia \
-    -w s3://juicefs/integration-test -c sun-nomadlab/nextflow.config \
-    -profile test,docker --outdir s3://juicefs/bactopia/outdir \
-    --accession SRX4563634 --coverage 100 --genome_size 2800000 \
-    --datasets_cache s3://juicefs/bactopia/assets
+ elif [ "$NFDEMO" == 1 ]; then
+   nextflow run nf-core/demo \
+      -w s3://fusionfs/integration-test/work -c sun-nomadlab/nextflow.config \
+      -profile test,docker --outdir s3://fusionfs/integration-test/nf-core-demo/outdir
+ else
+   nextflow run -w s3://fusionfs/integration-test/work -c sun-nomadlab/nextflow.config hello
 
+   nextflow run bactopia/bactopia \
+      -w s3://fusionfs/integration-test/work -c sun-nomadlab/nextflow.config \
+      -profile test,docker --outdir s3://fusionfs/integration-test/bactopia/outdir \
+      --accession SRX4563634 --coverage 100 --genome_size 2800000 \
+      --datasets_cache s3://fusionfs/integration-test/bactopia/assets
+ fi
 
 else
   echo "skip nfsun"

@@ -200,7 +200,7 @@ class NomadTaskHandler extends TaskHandler implements FusionAwareTask {
             exitFile.text as Integer
         }
         catch (Exception e) {
-            log.debug "[NOMAD] Cannot read exit status for task: `$task.name` | ${e.message}"
+            log.warn "[NOMAD] Cannot read exit status for task: `$task.name` | ${e.message}"
             return Integer.MAX_VALUE
         }
     }
@@ -217,7 +217,7 @@ class NomadTaskHandler extends TaskHandler implements FusionAwareTask {
                 clientName = nomadService.getClientOfJob( jobName )
             log.debug "[NOMAD] determineClientNode: jobName:$jobName; clientName:$clientName"
         } catch ( Exception e ){
-            log.warn ("[NOMAD] Unable to get the client name of job $jobName -- see the log file for details", e)
+            log.debug ("[NOMAD] Unable to get the client name of job $jobName -- awaiting for a client to be assigned.")
         }
     }
 
