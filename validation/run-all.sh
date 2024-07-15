@@ -71,8 +71,8 @@ fi
 #NOTE: In this use-case you need to be in the same network of sun-nomadlab server, for example using a tailscale connection
 #NOTE2: You need to have 2 secrets stored in your Nextlow: SUN_NOMADLAB_ACCESS_KEY and SUN_NOMADLAB_SECRET_KEY
 if [ "$NFSUN" == 1 ]; then
-
- if [ "$NFSLEEP" == 1 ]; then 
+ NXF_CLOUDCACHE_PATH="s3://fusionfs/integration-test/cache"
+ if [ "$NFSLEEP" == 1 ]; then
    nextflow run -w s3://fusionfs/integration-test/work -c sun-nomadlab/nextflow.config abhi18av/nf-sleep --timeout 360
 
  elif [ "$NFDEMO" == 1 ]; then
@@ -86,7 +86,7 @@ if [ "$NFSUN" == 1 ]; then
       -w s3://fusionfs/integration-test/work -c sun-nomadlab/nextflow.config \
       -profile test,docker --outdir s3://fusionfs/integration-test/bactopia/outdir \
       --accession SRX4563634 --coverage 100 --genome_size 2800000 \
-      --datasets_cache s3://fusionfs/integration-test/bactopia/assets
+      --datasets_cache s3://fusionfs/integration-test/bactopia/assets -resume
  fi
 
 else
