@@ -22,6 +22,7 @@ import groovy.util.logging.Slf4j
 import io.nomadproject.client.ApiClient
 import io.nomadproject.client.api.JobsApi
 import io.nomadproject.client.model.*
+import nextflow.nomad.models.ConstraintsBuilder
 import nextflow.nomad.models.JobConstraints
 import nextflow.nomad.config.NomadConfig
 import nextflow.nomad.models.JobVolume

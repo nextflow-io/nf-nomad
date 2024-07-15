@@ -1,4 +1,4 @@
-package nextflow.nomad.executor
+package nextflow.nomad.models
 
 import io.nomadproject.client.model.Constraint
 import nextflow.nomad.models.JobConstraintsAttr
@@ -7,7 +7,7 @@ import nextflow.nomad.models.JobConstraints
 
 class ConstraintsBuilder {
 
-    protected static List<Constraint> constraintsSpecToList(JobConstraints spec){
+    static List<Constraint> constraintsSpecToList(JobConstraints spec){
         def constraints = [] as List<Constraint>
         if( spec?.nodeSpecs ){
             def nodes = spec.nodeSpecs
