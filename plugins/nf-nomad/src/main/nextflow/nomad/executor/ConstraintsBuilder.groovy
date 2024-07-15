@@ -1,13 +1,13 @@
 package nextflow.nomad.executor
 
 import io.nomadproject.client.model.Constraint
-import nextflow.nomad.config.ConstraintAttrSpec
-import nextflow.nomad.config.ConstraintNodeSpec
-import nextflow.nomad.config.ConstraintsSpec
+import nextflow.nomad.models.JobConstraintsAttr
+import nextflow.nomad.models.JobConstraintsNode
+import nextflow.nomad.models.JobConstraints
 
 class ConstraintsBuilder {
 
-    protected static List<Constraint> constraintsSpecToList(ConstraintsSpec spec){
+    protected static List<Constraint> constraintsSpecToList(JobConstraints spec){
         def constraints = [] as List<Constraint>
         if( spec?.nodeSpecs ){
             def nodes = spec.nodeSpecs
@@ -24,7 +24,7 @@ class ConstraintsBuilder {
         return constraints
     }
 
-    protected static List<Constraint> nodeConstraints(ConstraintNodeSpec nodeSpec){
+    protected static List<Constraint> nodeConstraints(JobConstraintsNode nodeSpec){
         def ret = [] as List<Constraint>
         if( nodeSpec.id ){
             ret.add new Constraint()
@@ -65,7 +65,7 @@ class ConstraintsBuilder {
         ret
     }
 
-    protected static List<Constraint> attrConstraints(ConstraintAttrSpec nodeSpec) {
+    protected static List<Constraint> attrConstraints(JobConstraintsAttr nodeSpec) {
         def ret = [] as List<Constraint>
         if (nodeSpec.arch) {
             ret.add new Constraint()

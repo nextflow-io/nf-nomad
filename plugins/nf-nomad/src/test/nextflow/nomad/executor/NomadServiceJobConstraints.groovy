@@ -39,7 +39,7 @@ import java.nio.file.Path
  *
  * @author : Jorge Aguilera <jagedn@gmail.com>
  */
-class NomadServiceConstraintsSpec extends Specification{
+class NomadServiceJobConstraints extends Specification{
 
     MockWebServer mockWebServer
 

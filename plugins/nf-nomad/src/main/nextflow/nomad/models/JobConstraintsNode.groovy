@@ -1,6 +1,6 @@
-package nextflow.nomad.config
+package nextflow.nomad.models
 
-class ConstraintNodeSpec {
+class JobConstraintsNode {
 
     private String id = null
     private String name = null
@@ -33,48 +33,48 @@ class ConstraintNodeSpec {
         return region
     }
 
-    ConstraintNodeSpec setUnique(Map map){
+    JobConstraintsNode setUnique(Map map){
         unique(map)
     }
 
-    ConstraintNodeSpec unique(Map map){
+    JobConstraintsNode unique(Map map){
         this.id = map.containsKey("id") ? map["id"].toString() : null
         this.name = map.containsKey("name") ? map["name"].toString() : null
         this
     }
 
-    ConstraintNodeSpec setClientClass(Object map){
+    JobConstraintsNode setClientClass(Object map){
         clientClass(map)
     }
 
-    ConstraintNodeSpec clientClass(Object clientClass){
+    JobConstraintsNode clientClass(Object clientClass){
         this.clientClass = clientClass.toString()
         this
     }
 
-    ConstraintNodeSpec setPool(Object map){
+    JobConstraintsNode setPool(Object map){
         pool(map)
     }
 
-    ConstraintNodeSpec pool(Object pool){
+    JobConstraintsNode pool(Object pool){
         this.pool = pool.toString()
         this
     }
 
-    ConstraintNodeSpec setDataCenter(Object map){
+    JobConstraintsNode setDataCenter(Object map){
         dataCenter(map)
     }
 
-    ConstraintNodeSpec dataCenter(Object dataCenter){
+    JobConstraintsNode dataCenter(Object dataCenter){
         this.dataCenter = dataCenter.toString()
         this
     }
 
-    ConstraintNodeSpec setRegion(Object map){
+    JobConstraintsNode setRegion(Object map){
         region(map)
     }
 
-    ConstraintNodeSpec region(Object region){
+    JobConstraintsNode region(Object region){
         this.region = region.toString()
         this
     }

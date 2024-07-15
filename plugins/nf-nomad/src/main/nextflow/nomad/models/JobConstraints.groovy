@@ -1,12 +1,12 @@
-package nextflow.nomad.config
+package nextflow.nomad.models
 
-class ConstraintsSpec {
+class JobConstraints {
 
-    List<ConstraintNodeSpec> nodeSpecs = []
-    List<ConstraintAttrSpec> attrSpecs = []
+    List<JobConstraintsNode> nodeSpecs = []
+    List<JobConstraintsAttr> attrSpecs = []
 
-    ConstraintsSpec node( @DelegatesTo(ConstraintNodeSpec)Closure closure){
-        ConstraintNodeSpec constraintSpec = new ConstraintNodeSpec()
+    JobConstraints node(@DelegatesTo(JobConstraintsNode)Closure closure){
+        JobConstraintsNode constraintSpec = new JobConstraintsNode()
         def clone = closure.rehydrate(constraintSpec, closure.owner, closure.thisObject)
         clone.resolveStrategy = Closure.DELEGATE_FIRST
         clone()
@@ -14,8 +14,8 @@ class ConstraintsSpec {
         this
     }
 
-    ConstraintsSpec attr( @DelegatesTo(ConstraintAttrSpec)Closure closure){
-        ConstraintAttrSpec constraintSpec = new ConstraintAttrSpec()
+    JobConstraints attr(@DelegatesTo(JobConstraintsAttr)Closure closure){
+        JobConstraintsAttr constraintSpec = new JobConstraintsAttr()
         def clone = closure.rehydrate(constraintSpec, closure.owner, closure.thisObject)
         clone.resolveStrategy = Closure.DELEGATE_FIRST
         clone()
@@ -27,8 +27,8 @@ class ConstraintsSpec {
 
     }
 
-    static ConstraintsSpec parse(@DelegatesTo(ConstraintsSpec)Closure closure){
-        ConstraintsSpec constraintsSpec = new ConstraintsSpec()
+    static JobConstraints parse(@DelegatesTo(JobConstraints)Closure closure){
+        JobConstraints constraintsSpec = new JobConstraints()
         def clone = closure.rehydrate(constraintsSpec, closure.owner, closure.thisObject)
         clone.resolveStrategy = Closure.DELEGATE_FIRST
         clone()
