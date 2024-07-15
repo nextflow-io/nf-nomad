@@ -25,7 +25,7 @@ import spock.lang.Specification
  * @author : Jorge Aguilera <jagedn@gmail.com>
  * @author : Abhinav Sharma <abhi18av@outlook.com>
  */
-class NomadConstraintsSpec extends Specification {
+class NomadJobConstraints extends Specification {
 
 
     void "should instantiate a constraints spec if specified"() {

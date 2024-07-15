@@ -22,9 +22,9 @@ import groovy.util.logging.Slf4j
 import io.nomadproject.client.ApiClient
 import io.nomadproject.client.api.JobsApi
 import io.nomadproject.client.model.*
-import nextflow.nomad.config.ConstraintsSpec
+import nextflow.nomad.models.JobConstraints
 import nextflow.nomad.config.NomadConfig
-import nextflow.nomad.config.VolumeSpec
+import nextflow.nomad.models.JobVolume
 import nextflow.processor.TaskRun
 import nextflow.util.MemoryUnit
 import nextflow.exception.ProcessSubmitException
@@ -136,7 +136,7 @@ class NomadService implements Closeable{
         if( config.jobOpts().volumeSpec ) {
             taskGroup.volumes = [:]
             config.jobOpts().volumeSpec.eachWithIndex { volumeSpec , idx->
-                if (volumeSpec && volumeSpec.type == VolumeSpec.VOLUME_CSI_TYPE) {
+                if (volumeSpec && volumeSpec.type == JobVolume.VOLUME_CSI_TYPE) {
                     taskGroup.volumes["vol_${idx}".toString()] = new VolumeRequest(
                             type: volumeSpec.type,
                             source: volumeSpec.name,
@@ -146,7 +146,7 @@ class NomadService implements Closeable{
                     )
                 }
 
-                if (volumeSpec && volumeSpec.type == VolumeSpec.VOLUME_HOST_TYPE) {
+                if (volumeSpec && volumeSpec.type == JobVolume.VOLUME_HOST_TYPE) {
                     taskGroup.volumes["vol_${idx}".toString()] = new VolumeRequest(
                             type: volumeSpec.type,
                             source: volumeSpec.name,
@@ -183,7 +183,7 @@ class NomadService implements Closeable{
 
         volumes(task, taskDef, workingDir)
         affinity(task, taskDef)
-        constrain(task, taskDef)
+        constraint(task, taskDef)
         constraints(task, taskDef)
 
         return taskDef
@@ -235,7 +235,7 @@ class NomadService implements Closeable{
         taskDef
     }
 
-    protected Task constrain(TaskRun task, Task taskDef){
+    protected Task constraint(TaskRun task, Task taskDef){
         if( config.jobOpts().constraintSpec ){
             def constraint = new Constraint()
             if(config.jobOpts().constraintSpec.attribute){
@@ -264,7 +264,7 @@ class NomadService implements Closeable{
         if( task.processor?.config?.get(TaskDirectives.CONSTRAINTS) &&
                 task.processor?.config?.get(TaskDirectives.CONSTRAINTS) instanceof Closure) {
             Closure closure = task.processor?.config?.get(TaskDirectives.CONSTRAINTS) as Closure
-            ConstraintsSpec constraintsSpec = ConstraintsSpec.parse(closure)
+            JobConstraints constraintsSpec = JobConstraints.parse(closure)
             def list = ConstraintsBuilder.constraintsSpecToList(constraintsSpec)
             constraints.addAll(list)
         }

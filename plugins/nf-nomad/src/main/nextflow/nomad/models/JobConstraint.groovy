@@ -15,14 +15,14 @@
  * limitations under the License.
  */
 
-package nextflow.nomad.config
+package nextflow.nomad.models
 /**
  * Nomad Job Constraint Spec
  *
  * @author Jorge Aguilera <jagedn@gmail.com>
  */
 
-class ConstraintSpec {
+class JobConstraint {
 
     private String attribute
     private String operator
@@ -40,17 +40,17 @@ class ConstraintSpec {
         return value
     }
 
-    ConstraintSpec attribute(String attribute){
+    JobConstraint attribute(String attribute){
         this.attribute=attribute
         this
     }
 
-    ConstraintSpec operator(String operator){
+    JobConstraint operator(String operator){
         this.operator = operator
         this
     }
 
-    ConstraintSpec value(String value){
+    JobConstraint value(String value){
         this.value = value
         this
     }

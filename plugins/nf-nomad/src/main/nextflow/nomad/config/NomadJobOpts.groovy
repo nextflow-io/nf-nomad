@@ -19,6 +19,10 @@ package nextflow.nomad.config
 
 import groovy.transform.CompileStatic
 import groovy.util.logging.Slf4j
+import nextflow.nomad.models.JobAffinity
+import nextflow.nomad.models.JobConstraint
+import nextflow.nomad.models.JobConstraints
+import nextflow.nomad.models.JobVolume
 
 
 /**
@@ -37,11 +41,11 @@ class NomadJobOpts{
     String region
     String namespace
     String dockerVolume
-    VolumeSpec[] volumeSpec
-    AffinitySpec affinitySpec
-    ConstraintSpec constraintSpec
+    JobVolume[] volumeSpec
+    JobAffinity affinitySpec
+    JobConstraint constraintSpec
 
-    ConstraintsSpec constraintsSpec
+    JobConstraints constraintsSpec
 
     NomadJobOpts(Map nomadJobOpts, Map<String,String> env=null){
         assert nomadJobOpts!=null
@@ -74,10 +78,10 @@ class NomadJobOpts{
         this.constraintsSpec = parseConstraints(nomadJobOpts)
     }
 
-    VolumeSpec[] parseVolumes(Map nomadJobOpts){
-        List<VolumeSpec> ret = []
+    JobVolume[] parseVolumes(Map nomadJobOpts){
+        List<JobVolume> ret = []
         if( nomadJobOpts.volume && nomadJobOpts.volume instanceof Closure){
-            def volumeSpec = new VolumeSpec()
+            def volumeSpec = new JobVolume()
             def closure = (nomadJobOpts.volume as Closure)
             def clone = closure.rehydrate(volumeSpec, closure.owner, closure.thisObject)
             clone.resolveStrategy = Closure.DELEGATE_FIRST
@@ -89,7 +93,7 @@ class NomadJobOpts{
         if( nomadJobOpts.volumes && nomadJobOpts.volumes instanceof List){
             nomadJobOpts.volumes.each{ closure ->
                 if( closure instanceof Closure){
-                    def volumeSpec = new VolumeSpec()
+                    def volumeSpec = new JobVolume()
                     def clone = closure.rehydrate(volumeSpec, closure.owner, closure.thisObject)
                     clone.resolveStrategy = Closure.DELEGATE_FIRST
                     clone()
@@ -108,13 +112,13 @@ class NomadJobOpts{
             throw new IllegalArgumentException("No more than a workdir volume allowed")
         }
 
-        return ret as VolumeSpec[]
+        return ret as JobVolume[]
     }
 
-    AffinitySpec parseAffinity(Map nomadJobOpts) {
+    JobAffinity parseAffinity(Map nomadJobOpts) {
         if (nomadJobOpts.affinity && nomadJobOpts.affinity instanceof Closure) {
             log.info "affinity config will be deprecated, use affinities closure instead"
-            def affinitySpec = new AffinitySpec()
+            def affinitySpec = new JobAffinity()
             def closure = (nomadJobOpts.affinity as Closure)
             def clone = closure.rehydrate(affinitySpec, closure.owner, closure.thisObject)
             clone.resolveStrategy = Closure.DELEGATE_FIRST
@@ -126,10 +130,10 @@ class NomadJobOpts{
         }
     }
 
-    ConstraintSpec parseConstraint(Map nomadJobOpts){
+    JobConstraint parseConstraint(Map nomadJobOpts){
         if (nomadJobOpts.constraint && nomadJobOpts.constraint instanceof Closure) {
             log.info "constraint config will be deprecated, use constraints closure instead"
-            def constraintSpec = new ConstraintSpec()
+            def constraintSpec = new JobConstraint()
             def closure = (nomadJobOpts.constraint as Closure)
             def clone = closure.rehydrate(constraintSpec, closure.owner, closure.thisObject)
             clone.resolveStrategy = Closure.DELEGATE_FIRST
@@ -141,9 +145,9 @@ class NomadJobOpts{
         }
     }
 
-    ConstraintsSpec parseConstraints(Map nomadJobOpts){
+    JobConstraints parseConstraints(Map nomadJobOpts){
         if (nomadJobOpts.constraints && nomadJobOpts.constraints instanceof Closure) {
-            def constraintsSpec = new ConstraintsSpec()
+            def constraintsSpec = new JobConstraints()
             def closure = (nomadJobOpts.constraints as Closure)
             def clone = closure.rehydrate(constraintsSpec, closure.owner, closure.thisObject)
             clone.resolveStrategy = Closure.DELEGATE_FIRST

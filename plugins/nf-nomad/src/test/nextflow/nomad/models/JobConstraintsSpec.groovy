@@ -14,12 +14,14 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package nextflow.nomad.executor
+
+package nextflow.nomad.models
 
 import groovy.json.JsonOutput
 import groovy.json.JsonSlurper
 import nextflow.executor.Executor
 import nextflow.nomad.config.NomadConfig
+import nextflow.nomad.executor.NomadService
 import nextflow.processor.TaskBean
 import nextflow.processor.TaskConfig
 import nextflow.processor.TaskProcessor
@@ -39,7 +41,7 @@ import java.nio.file.Path
  *
  * @author : Jorge Aguilera <jagedn@gmail.com>
  */
-class NomadServiceConstraintsSpec extends Specification{
+class JobConstraintsSpec extends Specification{
 
     MockWebServer mockWebServer
 
