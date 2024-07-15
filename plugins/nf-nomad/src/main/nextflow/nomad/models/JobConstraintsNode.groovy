@@ -18,6 +18,8 @@
 
 package nextflow.nomad.models
 
+import org.apache.commons.lang3.tuple.Triple
+
 /**
  * Nomad Job Constraint Spec
  *
@@ -26,35 +28,10 @@ package nextflow.nomad.models
 
 class JobConstraintsNode {
 
-    private String id = null
-    private String name = null
-    private String clientClass = null
-    private String pool = null
-    private String dataCenter = null
-    private String region = null
+    private List<Triple<String, String, String>> raws= []
 
-    String getId() {
-        return id
-    }
-
-    String getName() {
-        return name
-    }
-
-    String getClientClass() {
-        return clientClass
-    }
-
-    String getPool() {
-        return pool
-    }
-
-    String getDataCenter() {
-        return dataCenter
-    }
-
-    String getRegion() {
-        return region
+    List<Triple<String, String, String>> getRaws() {
+        return raws
     }
 
     JobConstraintsNode setUnique(Map map){
@@ -62,17 +39,19 @@ class JobConstraintsNode {
     }
 
     JobConstraintsNode unique(Map map){
-        this.id = map.containsKey("id") ? map["id"].toString() : null
-        this.name = map.containsKey("name") ? map["name"].toString() : null
+        ['id', 'name'].each { key->
+            if( map.containsKey(key))
+                raw("unique.${key}","=", map[key].toString())
+        }
         this
     }
 
-    JobConstraintsNode setClientClass(Object map){
-        clientClass(map)
+    JobConstraintsNode setClazz(Object map){ // class is a reserved word, in java we used clazz
+        clazz(map)
     }
 
-    JobConstraintsNode clientClass(Object clientClass){
-        this.clientClass = clientClass.toString()
+    JobConstraintsNode clazz(Object cls){
+        raw("class","=", cls.toString())
         this
     }
 
@@ -81,7 +60,7 @@ class JobConstraintsNode {
     }
 
     JobConstraintsNode pool(Object pool){
-        this.pool = pool.toString()
+        raw("pool","=", pool.toString())
         this
     }
 
@@ -90,7 +69,7 @@ class JobConstraintsNode {
     }
 
     JobConstraintsNode dataCenter(Object dataCenter){
-        this.dataCenter = dataCenter.toString()
+        raw("datacenter","=", dataCenter.toString())
         this
     }
 
@@ -99,7 +78,12 @@ class JobConstraintsNode {
     }
 
     JobConstraintsNode region(Object region){
-        this.region = region.toString()
+        raw("region","=", region.toString())
+        this
+    }
+
+    JobConstraintsNode raw(String attr, String operator, String value){
+        raws.add Triple.of("node."+attr, operator, value)
         this
     }
 }

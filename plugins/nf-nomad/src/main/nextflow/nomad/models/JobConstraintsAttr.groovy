@@ -18,6 +18,8 @@
 
 package nextflow.nomad.models
 
+import org.apache.commons.lang3.tuple.Triple
+
 /**
  * Nomad Job Constraint Spec
  *
@@ -26,25 +28,10 @@ package nextflow.nomad.models
 
 class JobConstraintsAttr {
 
-    private String arch = null
-    private Integer numcores= null
-    private Integer reservablecores= null
-    private Double totalcompute= null
+    private List<Triple<String, String, String>> raws= []
 
-    String getArch() {
-        return arch
-    }
-
-    Integer getNumcores() {
-        return numcores
-    }
-
-    Integer getReservablecores() {
-        return reservablecores
-    }
-
-    Double getTotalcompute() {
-        return totalcompute
+    List<Triple<String, String, String>> getRaws() {
+        return raws
     }
 
     JobConstraintsAttr setCpu(Map map){
@@ -52,11 +39,45 @@ class JobConstraintsAttr {
     }
 
     JobConstraintsAttr cpu(Map map){
-        this.arch = map.containsKey("arch") ? map["arch"].toString() : null
-        this.numcores = map.containsKey("numcores") ? map["numcores"] as int : null
-        this.reservablecores = map.containsKey("reservablecores") ? map["reservablecores"] as int : null
-        this.totalcompute = map.containsKey("totalcompute") ? map["totalcompute"] as double : null
+        if( map.containsKey('arch'))
+            raw("cpu.arch","=", map['arch'].toString())
+        if( map.containsKey('numcores'))
+            raw("cpu.numcores",">=", map['numcores'].toString())
+        if( map.containsKey('reservablecores'))
+            raw("cpu.reservablecores",">=", map['reservablecores'].toString())
+        if( map.containsKey('totalcompute'))
+            raw("cpu.totalcompute","=", map['totalcompute'].toString())
         this
     }
 
+    JobConstraintsAttr setUnique(Map map){
+        unique(map)
+    }
+
+    JobConstraintsAttr unique(Map map){
+        if( map.containsKey('hostname'))
+            raw("unique.hostname","=", map['hostname'].toString())
+        if( map.containsKey('ip-address'))
+            raw("unique.network.ip-address","=", map['ip-address'].toString())
+        this
+    }
+
+    JobConstraintsAttr setKernel(Map map){
+        kernel(map)
+    }
+
+    JobConstraintsAttr kernel(Map map){
+        if( map.containsKey('arch'))
+            raw("kernel.arch","=", map['arch'].toString())
+        if( map.containsKey('name'))
+            raw("kernel.name","=", map['name'].toString())
+        if( map.containsKey('version'))
+            raw("kernel.version","=", map['version'].toString())
+        this
+    }
+
+    JobConstraintsAttr raw(String attr, String operator, String value){
+        raws.add Triple.of("attr."+attr, operator, value)
+        this
+    }
 }

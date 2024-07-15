@@ -25,72 +25,22 @@ class ConstraintsBuilder {
     }
 
     protected static List<Constraint> nodeConstraints(JobConstraintsNode nodeSpec){
-        def ret = [] as List<Constraint>
-        if( nodeSpec.id ){
-            ret.add new Constraint()
-                    .ltarget('${node.unique.id}')
-                    .operand("=")
-                    .rtarget(nodeSpec.id)
-        }
-        if( nodeSpec.name ){
-            ret.add new Constraint()
-                    .ltarget('${node.unique.name}')
-                    .operand("=")
-                    .rtarget(nodeSpec.name)
-        }
-        if( nodeSpec.clientClass ){
-            ret.add new Constraint()
-                    .ltarget('${node.class}')
-                    .operand("=")
-                    .rtarget(nodeSpec.clientClass)
-        }
-        if( nodeSpec.dataCenter ){
-            ret.add new Constraint()
-                    .ltarget('${node.datacenter}')
-                    .operand("=")
-                    .rtarget(nodeSpec.dataCenter)
-        }
-        if( nodeSpec.region ){
-            ret.add new Constraint()
-                    .ltarget('${node.region}')
-                    .operand("=")
-                    .rtarget(nodeSpec.region)
-        }
-        if( nodeSpec.pool ){
-            ret.add new Constraint()
-                    .ltarget('${node.pool}')
-                    .operand("=")
-                    .rtarget(nodeSpec.pool)
-        }
+        def ret = nodeSpec.raws?.collect{ triple->
+            return new Constraint()
+                    .ltarget('${'+triple.left+'}')
+                    .operand(triple.middle)
+                    .rtarget(triple.right)
+        } as List<Constraint>
         ret
     }
 
     protected static List<Constraint> attrConstraints(JobConstraintsAttr nodeSpec) {
-        def ret = [] as List<Constraint>
-        if (nodeSpec.arch) {
-            ret.add new Constraint()
-                    .ltarget('${attr.cpu.arch}')
-                    .operand("=")
-                    .rtarget(nodeSpec.arch)
-        }
-        if (nodeSpec.numcores) {
-            ret.add new Constraint()
-                    .ltarget('${attr.cpu.numcores}')
-                    .operand("=")
-                    .rtarget("$nodeSpec.numcores")
-        }
-        if (nodeSpec.reservablecores) {
-            ret.add new Constraint()
-                    .ltarget('${attr.cpu.reservablecores}')
-                    .operand("=")
-                    .rtarget("$nodeSpec.reservablecores")
-        }
-        if (nodeSpec.totalcompute) {
-            ret.add new Constraint()
-                    .ltarget('${attr.cpu.totalcompute}')
-                    .operand("=")
-                    .rtarget("$nodeSpec.totalcompute")
-        }
+        def ret = nodeSpec.raws?.collect{ triple->
+            return new Constraint()
+                    .ltarget('${'+triple.left+'}')
+                    .operand(triple.middle)
+                    .rtarget(triple.right)
+        } as List<Constraint>
         ret
     }
 

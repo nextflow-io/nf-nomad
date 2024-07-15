@@ -250,4 +250,71 @@ class JobConstraintsSpec extends Specification{
         body.Job.TaskGroups[0].Tasks[0].Constraints[0].RTarget == '286'
         body.Job.TaskGroups[0].Tasks[0].Constraints[0].Operand == '='
     }
+
+    void "submit a task with a raw attr constraint"(){
+        given:
+        def config = new NomadConfig(
+                client:[
+                        address : "http://${mockWebServer.hostName}:${mockWebServer.port}"
+                ],
+        )
+        def service = new NomadService(config)
+
+        String id = "theId"
+        String name = "theName"
+        String image = "theImage"
+        List<String> args = ["theCommand", "theArgs"]
+        String workingDir = "/a/b/c"
+        Map<String, String>env = [test:"test"]
+
+        def contraints = {
+            attr {
+                raw 'platform.aws.instance-type', '=', 'm4.xlarge'
+            }
+        }
+
+        def mockTask = Mock(TaskRun){
+            getName() >> name
+            getContainer() >> image
+            getConfig() >> Mock(TaskConfig)
+            getWorkDirStr() >> workingDir
+            getContainer() >> "ubuntu"
+            getProcessor() >> Mock(TaskProcessor){
+                getExecutor() >> Mock(Executor){
+                    isFusionEnabled() >> false
+                }
+                getConfig() >> Mock(ProcessConfig){
+                    get("constraints") >> contraints
+                }
+            }
+            getWorkDir() >> Path.of(workingDir)
+            toTaskBean() >> Mock(TaskBean){
+                getWorkDir() >> Path.of(workingDir)
+                getScript() >> "theScript"
+                getShell() >> ["bash"]
+                getInputFiles() >> [:]
+            }
+        }
+
+        mockWebServer.enqueue(new MockResponse()
+                .setBody(JsonOutput.toJson(["EvalID":"test"]).toString())
+                .addHeader("Content-Type", "application/json"));
+        when:
+
+        def idJob = service.submitTask(id, mockTask, args, env)
+        def recordedRequest = mockWebServer.takeRequest();
+        def body = new JsonSlurper().parseText(recordedRequest.body.readUtf8())
+
+        then:
+        idJob
+
+        and:
+        recordedRequest.method == "POST"
+        recordedRequest.path == "/v1/jobs"
+
+        and:
+        body.Job.TaskGroups[0].Tasks[0].Constraints[0].LTarget == '${attr.platform.aws.instance-type}'
+        body.Job.TaskGroups[0].Tasks[0].Constraints[0].RTarget == 'm4.xlarge'
+        body.Job.TaskGroups[0].Tasks[0].Constraints[0].Operand == '='
+    }
 }
