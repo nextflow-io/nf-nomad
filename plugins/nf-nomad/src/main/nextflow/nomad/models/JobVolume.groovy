@@ -15,13 +15,13 @@
  * limitations under the License.
  */
 
-package nextflow.nomad.config
+package nextflow.nomad.models
 /**
  * Nomad Volume Spec
  *
  * @author Jorge Aguilera <jagedn@gmail.com>
  */
-class VolumeSpec {
+class JobVolume {
 
     final static public String VOLUME_DOCKER_TYPE = "docker"
     final static public String VOLUME_CSI_TYPE = "csi"
@@ -57,27 +57,27 @@ class VolumeSpec {
         return readOnly
     }
 
-    VolumeSpec type(String type){
+    JobVolume type(String type){
         this.type = type
         this
     }
 
-    VolumeSpec name(String name){
+    JobVolume name(String name){
         this.name = name
         this
     }
 
-    VolumeSpec workDir(boolean b){
+    JobVolume workDir(boolean b){
         this.workDir = b
         this
     }
 
-    VolumeSpec path(String path){
+    JobVolume path(String path){
         this.path = path
         this
     }
 
-    VolumeSpec readOnly(boolean readOnly){
+    JobVolume readOnly(boolean readOnly){
         this.readOnly = readOnly
         this
     }

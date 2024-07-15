@@ -15,13 +15,13 @@
  * limitations under the License.
  */
 
-package nextflow.nomad.config
+package nextflow.nomad.models
 /**
  * Nomad Job Affinity Spec
  *
  * @author Jorge Aguilera <jagedn@gmail.com>
  */
-class AffinitySpec{
+class JobAffinity {
 
     private String attribute
     private String operator
@@ -44,22 +44,22 @@ class AffinitySpec{
         return weight
     }
 
-    AffinitySpec attribute(String attribute){
+    JobAffinity attribute(String attribute){
         this.attribute=attribute
         this
     }
 
-    AffinitySpec operator(String operator){
+    JobAffinity operator(String operator){
         this.operator = operator
         this
     }
 
-    AffinitySpec value(String value){
+    JobAffinity value(String value){
         this.value = value
         this
     }
 
-    AffinitySpec weight(int weight){
+    JobAffinity weight(int weight){
         this.weight = weight
         this
     }

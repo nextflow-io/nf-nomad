@@ -15,10 +15,10 @@
  * limitations under the License.
  */
 
-package nextflow.nomad
+package nextflow.nomad.config
 
-import nextflow.nomad.config.NomadConfig
-import nextflow.nomad.config.VolumeSpec
+
+import nextflow.nomad.models.JobVolume
 import spock.lang.Specification
 import spock.lang.Unroll
 
@@ -140,7 +140,7 @@ class NomadConfigSpec extends Specification {
 
         then:
         config.jobOpts.volumeSpec
-        config.jobOpts.volumeSpec[0].type == VolumeSpec.VOLUME_DOCKER_TYPE
+        config.jobOpts.volumeSpec[0].type == JobVolume.VOLUME_DOCKER_TYPE
         config.jobOpts.volumeSpec[0].name == "test"
 
         when:
@@ -150,7 +150,7 @@ class NomadConfigSpec extends Specification {
 
         then:
         config2.jobOpts.volumeSpec
-        config2.jobOpts.volumeSpec[0].type == VolumeSpec.VOLUME_CSI_TYPE
+        config2.jobOpts.volumeSpec[0].type == JobVolume.VOLUME_CSI_TYPE
         config2.jobOpts.volumeSpec[0].name == "test"
 
         when:
@@ -160,7 +160,7 @@ class NomadConfigSpec extends Specification {
 
         then:
         config3.jobOpts.volumeSpec
-        config3.jobOpts.volumeSpec[0].type == VolumeSpec.VOLUME_HOST_TYPE
+        config3.jobOpts.volumeSpec[0].type == JobVolume.VOLUME_HOST_TYPE
         config3.jobOpts.volumeSpec[0].name == "test"
 
         when:
@@ -220,7 +220,7 @@ class NomadConfigSpec extends Specification {
 
         then:
         config.jobOpts.volumeSpec
-        config.jobOpts.volumeSpec[0].type == VolumeSpec.VOLUME_DOCKER_TYPE
+        config.jobOpts.volumeSpec[0].type == JobVolume.VOLUME_DOCKER_TYPE
         config.jobOpts.volumeSpec[0].name == "test"
         config.jobOpts.volumeSpec[0].workDir
 
@@ -249,9 +249,9 @@ class NomadConfigSpec extends Specification {
 
         then:
         config2.jobOpts.volumeSpec.size()==2
-        config2.jobOpts.volumeSpec[0].type == VolumeSpec.VOLUME_CSI_TYPE
+        config2.jobOpts.volumeSpec[0].type == JobVolume.VOLUME_CSI_TYPE
         config2.jobOpts.volumeSpec[0].name == "test"
-        config2.jobOpts.volumeSpec[1].type == VolumeSpec.VOLUME_DOCKER_TYPE
+        config2.jobOpts.volumeSpec[1].type == JobVolume.VOLUME_DOCKER_TYPE
         config2.jobOpts.volumeSpec[1].name == "test"
 
         config.jobOpts.volumeSpec[0].workDir
@@ -270,9 +270,9 @@ class NomadConfigSpec extends Specification {
 
         then:
         config3.jobOpts.volumeSpec.size()==3
-        config3.jobOpts.volumeSpec[0].type == VolumeSpec.VOLUME_CSI_TYPE
-        config3.jobOpts.volumeSpec[1].type == VolumeSpec.VOLUME_CSI_TYPE
-        config3.jobOpts.volumeSpec[2].type == VolumeSpec.VOLUME_DOCKER_TYPE
+        config3.jobOpts.volumeSpec[0].type == JobVolume.VOLUME_CSI_TYPE
+        config3.jobOpts.volumeSpec[1].type == JobVolume.VOLUME_CSI_TYPE
+        config3.jobOpts.volumeSpec[2].type == JobVolume.VOLUME_DOCKER_TYPE
 
         config3.jobOpts.volumeSpec[0].workDir
         config3.jobOpts.volumeSpec.findAll{ it.workDir}.size() == 1

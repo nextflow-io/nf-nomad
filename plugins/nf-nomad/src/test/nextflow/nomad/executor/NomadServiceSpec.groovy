@@ -622,4 +622,5 @@ class NomadServiceSpec extends Specification{
         1               | ['1']
         ({ 'a'*10 })    | ['aaaaaaaaaa']
     }
+
 }
