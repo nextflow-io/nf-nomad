@@ -41,7 +41,7 @@ The most important part of the configuration (`basic/nextflow.config`) are:
 
 ``` 
 plugins {
-    id 'nf-nomad@latest'
+    id "nf-nomad@${System.getenv("NOMAD_PLUGIN_VERSION") ?: "latest"}"
 }
 ```
 
@@ -85,8 +85,17 @@ you can test some pipelines from your terminal using the `--nfazure` argument
 
 - `./run-all.sh --skiplocal --nfazure` run only remote pipelines
 
+### Test published version
 
+In case you want to run the validation using a published version (for example, 0.1.2-edge3 release), you can run:
 
+```
+export NOMAD_PLUGIN_VERSION=0.1.2-edge3
+
+export NXF_PLUGINS_TEST_REPOSITORY="https://github.com/nextflow-io/nf-nomad/releases/download/0.1.2-edge3/nf-nomad-0.1.2-edge3-meta.json"
+
+./run-all.sh
+```
 
 ## Stop the cluster
 
@@ -95,4 +104,4 @@ cd validation
 sudo ./stop-nomad.sh
 ```
 
-This command try to clean and kill the nomad process unmounting temp folders created by the client
+This command tries to clean and kill the nomad process unmounting temp folders created by the client
