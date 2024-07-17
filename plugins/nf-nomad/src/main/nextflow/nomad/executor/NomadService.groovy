@@ -117,12 +117,10 @@ class NomadService implements Closeable {
         try {
             JobRegisterResponse jobRegisterResponse = jobsApi.registerJob(jobRegisterRequest, config.jobOpts().region, config.jobOpts().namespace, null, null)
             jobRegisterResponse.evalID
-            log.debug("[NOMAD] Submitted ${job.name}")
 
-        } catch (Throwable e) {
-            throw new ProcessSubmitException("[NOMAD] Failed to submit ${job.name} -- Cause: ${e.message ?: e}", e)
+        } catch (Exception e) {
+            log.debug ("[NOMAD] Failed to submit ${job.name} -- Cause: ${e.message ?: e}", e)
         }
-
     }
 
     TaskGroup createTaskGroup(TaskRun taskRun, List<String> args, Map<String, String> env) {
