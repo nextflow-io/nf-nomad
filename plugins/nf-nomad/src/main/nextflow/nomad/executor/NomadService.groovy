@@ -110,15 +110,16 @@ class NomadService implements Closeable {
             saveJsonPath.text = job.toString()
         }
         catch (Exception e) {
-            log.debug "WARN: unable to save request json -- cause: ${e.message ?: e}"
+            log.debug "[NOMAD] Unable to save request json -- cause: ${e.message ?: e}"
         }
 
 
         try {
             JobRegisterResponse jobRegisterResponse = jobsApi.registerJob(jobRegisterRequest, config.jobOpts().region, config.jobOpts().namespace, null, null)
             jobRegisterResponse.evalID
+            log.debug("[NOMAD] Submitted ${job.name}")
+
         } catch (Throwable e) {
-            log.debug("[NOMAD] Failed to submit ${job.name} -- Cause: ${e.message ?: e}", e)
             throw new ProcessSubmitException("[NOMAD] Failed to submit ${job.name} -- Cause: ${e.message ?: e}", e)
         }
 
