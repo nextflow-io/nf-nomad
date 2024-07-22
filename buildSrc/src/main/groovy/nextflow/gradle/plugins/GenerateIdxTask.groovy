@@ -34,6 +34,7 @@ abstract class GenerateIdxTask extends DefaultTask{
 
         def matcher = new SourcesMatcher(project)
         def extensionsClassName = matcher.pluginExtensions
+        extensionsClassName += matcher.providers
         def traceClassName = matcher.traceObservers
         def all = extensionsClassName+traceClassName
         output.text = all.join('\n')

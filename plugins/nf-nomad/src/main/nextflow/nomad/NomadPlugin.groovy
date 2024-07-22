@@ -21,6 +21,7 @@ import groovy.transform.CompileStatic
 import nextflow.nomad.executor.TaskDirectives
 import nextflow.plugin.BasePlugin
 import nextflow.script.ProcessConfig
+import nextflow.secret.SecretsLoader
 import org.pf4j.PluginWrapper
 
 /**
@@ -35,6 +36,7 @@ class NomadPlugin extends BasePlugin {
     NomadPlugin(PluginWrapper wrapper) {
         super(wrapper)
         addCustomDirectives()
+        SecretsLoader.instance.reset()
     }
 
     private static void addCustomDirectives() {

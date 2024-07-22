@@ -20,6 +20,7 @@ package nextflow.nomad.executor
 import groovy.transform.CompileStatic
 import groovy.util.logging.Slf4j
 import io.nomadproject.client.ApiClient
+import io.nomadproject.client.ApiException
 import io.nomadproject.client.api.JobsApi
 import io.nomadproject.client.model.*
 import nextflow.nomad.models.ConstraintsBuilder
@@ -110,6 +111,9 @@ class NomadService implements Closeable{
         try {
             JobRegisterResponse jobRegisterResponse = jobsApi.registerJob(jobRegisterRequest, config.jobOpts().region, config.jobOpts().namespace, null, null)
             jobRegisterResponse.evalID
+        } catch( ApiException apiException){
+            log.debug("[NOMAD] Failed to submit ${job.name} -- Cause: ${apiException.responseBody ?: apiException}", apiException)
+            throw new ProcessSubmitException("[NOMAD] Failed to submit ${job.name} -- Cause: ${apiException.responseBody ?: apiException}", apiException)
         } catch (Throwable e) {
             log.debug("[NOMAD] Failed to submit ${job.name} -- Cause: ${e.message ?: e}", e)
             throw new ProcessSubmitException("[NOMAD] Failed to submit ${job.name} -- Cause: ${e.message ?: e}", e)
@@ -186,7 +190,7 @@ class NomadService implements Closeable{
         affinity(task, taskDef)
         constraint(task, taskDef)
         constraints(task, taskDef)
-
+        secrets(task, taskDef)
         return taskDef
     }
 
@@ -276,7 +280,18 @@ class NomadService implements Closeable{
         taskDef
     }
 
-
+    protected Task secrets(TaskRun task, Task taskDef){
+        def secrets = task.processor?.config?.get(TaskDirectives.SECRETS)
+        if( secrets ){
+            Template template = new Template(envvars: true, destPath: "/secrets/nf-nomad")
+            String tmpl = secrets.collect{ String name->
+                "${name}={{ with nomadVar \"secrets/${name}\" }}{{ .${name} }}{{ end }}"
+            }.join('\n').stripIndent()
+            template.embeddedTmpl(tmpl)
+            taskDef.addTemplatesItem(template)
+        }
+        taskDef
+    }
 
     protected Job assignDatacenters(TaskRun task, Job job){
         def datacenters = task.processor?.config?.get(TaskDirectives.DATACENTERS)
