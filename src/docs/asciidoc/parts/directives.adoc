@@ -1,8 +1,0 @@
-== Directives
-
-You can tag your processes with following directives:
-
-- datacenters (a strings list or a closure returning a String)
-
-
-

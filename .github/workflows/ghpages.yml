@@ -31,7 +31,7 @@ jobs:
           distribution: 'temurin'
           architecture: x64
       - name: Generate
-        run: ./gradlew asciidoctor
+        run: ./gradlew antora
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v2
         with:

@@ -7,8 +7,9 @@ The plugin itself is similar in design and scope to other executor integrations 
 Hope you enjoy using the plugin and please participate in the development/feedback of the plugin in the `platform-nomad` channel on the Nextflow Slack instance. We would love to hear your feedback!
 
 
+=== Resources
 
-==== Some resources for familiarizing yourself with Nomad:
+Some resources for familiarizing yourself with Nomad:
 
 - https://developer.hashicorp.com/nomad/docs?product_intent=nomad[Hashicorp Documentation website for Nomad]
 

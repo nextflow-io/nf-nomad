@@ -64,9 +64,9 @@ workflow {
 }
 ----
 
-TIP:: You need to use an S3 bucket as working dir
+TIP: You need to use an S3 bucket as working dir
 
 Run the pipeline
 
-`$ nextflow run main.nf`
+`$ nextflow run main.nf -w s3://YOUR_BUCKET`
 
