@@ -1,5 +1,5 @@
 site:
-  title: Nextflow nf-nomad plugin
+  title: Nextflow Nomad executor
   start_page: main:ROOT:index.adoc
 content:
   sources:

@@ -1,5 +1,5 @@
 name: main
 version: final
-title: Nf-Nomad
+title: nf-nomad
 nav:
   - modules/ROOT/nav.adoc
