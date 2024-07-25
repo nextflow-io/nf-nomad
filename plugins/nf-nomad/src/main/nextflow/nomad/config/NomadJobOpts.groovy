@@ -40,6 +40,7 @@ class NomadJobOpts{
     List<String> datacenters
     String region
     String namespace
+    String secretsPath
     String dockerVolume
     JobVolume[] volumeSpec
     JobAffinity affinitySpec
@@ -76,6 +77,8 @@ class NomadJobOpts{
         this.affinitySpec = parseAffinity(nomadJobOpts)
         this.constraintSpec = parseConstraint(nomadJobOpts)
         this.constraintsSpec = parseConstraints(nomadJobOpts)
+
+        this.secretsPath = nomadJobOpts.secretsPath ?: sysEnv.get('NOMAD_SECRETS_PATH') ?: "secrets/nf-nomad"
     }
 
     JobVolume[] parseVolumes(Map nomadJobOpts){

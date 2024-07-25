@@ -22,6 +22,7 @@ import groovy.util.logging.Slf4j
 import io.nomadproject.client.ApiClient
 import io.nomadproject.client.ApiException
 import io.nomadproject.client.api.JobsApi
+import io.nomadproject.client.api.VariablesApi
 import io.nomadproject.client.model.*
 import nextflow.nomad.models.ConstraintsBuilder
 import nextflow.nomad.models.JobConstraints
@@ -44,8 +45,9 @@ import java.nio.file.Path
 class NomadService implements Closeable{
 
     NomadConfig config
-
+    ApiClient apiClient
     JobsApi jobsApi
+    VariablesApi variablesApi
 
     NomadService(NomadConfig config) {
         this.config = config
@@ -55,7 +57,7 @@ class NomadService implements Closeable{
         final READ_TIMEOUT_MILLISECONDS = 60000
         final WRITE_TIMEOUT_MILLISECONDS = 60000
 
-        ApiClient apiClient = new ApiClient( connectTimeout: CONNECTION_TIMEOUT_MILLISECONDS, readTimeout: READ_TIMEOUT_MILLISECONDS, writeTimeout: WRITE_TIMEOUT_MILLISECONDS)
+        apiClient = new ApiClient( connectTimeout: CONNECTION_TIMEOUT_MILLISECONDS, readTimeout: READ_TIMEOUT_MILLISECONDS, writeTimeout: WRITE_TIMEOUT_MILLISECONDS)
         apiClient.basePath = config.clientOpts().address
         log.debug "[NOMAD] Client Address: ${config.clientOpts().address}"
 
@@ -64,6 +66,7 @@ class NomadService implements Closeable{
             apiClient.apiKey = config.clientOpts().token
         }
         this.jobsApi = new JobsApi(apiClient)
+        this.variablesApi = new VariablesApi(apiClient)
     }
 
     protected Resources getResources(TaskRun task) {
@@ -284,8 +287,9 @@ class NomadService implements Closeable{
         def secrets = task.processor?.config?.get(TaskDirectives.SECRETS)
         if( secrets ){
             Template template = new Template(envvars: true, destPath: "/secrets/nf-nomad")
+            String secretPath = config.jobOpts().secretsPath
             String tmpl = secrets.collect{ String name->
-                "${name}={{ with nomadVar \"secrets/${name}\" }}{{ .${name} }}{{ end }}"
+                "${name}={{ with nomadVar \"$secretPath/${name}\" }}{{ .${name} }}{{ end }}"
             }.join('\n').stripIndent()
             template.embeddedTmpl(tmpl)
             taskDef.addTemplatesItem(template)
@@ -379,5 +383,50 @@ class NomadService implements Closeable{
             log.debug("[NOMAD] Failed to get job allocations ${jobId} -- Cause: ${e.message ?: e}", e)
             throw new ProcessSubmitException("[NOMAD] Failed to get alloactions ${jobId} -- Cause: ${e.message ?: e}", e)
         }
+    }
+
+    String getVariableValue(String key){
+        getVariableValue(config.jobOpts().secretsPath, key)
+    }
+
+    String getVariableValue(String path, String key){
+        var variable = variablesApi.getVariableQuery("$path/$key",
+                config.jobOpts().region,
+                config.jobOpts().namespace,
+                null, null, null, null, null, null, null)
+        variable?.items?.find{ it.key == key }?.value
+    }
+
+    void setVariableValue(String key, String value){
+        setVariableValue(config.jobOpts().secretsPath, key, value)
+    }
+
+    void setVariableValue(String path, String key, String value){
+        var content = Map.of(key,value)
+        var variable = new Variable(path: path, items: content)
+        variablesApi.postVariable("$path/$key", variable,
+                config.jobOpts().region,
+                config.jobOpts().namespace,
+                null, null, null)
+    }
+
+    List<String> getVariablesList(){
+        var listRequest = variablesApi.getVariablesListRequest(
+                config.jobOpts().region,
+                config.jobOpts().namespace,
+                null, null, null, null, null, null, null)
+        listRequest.collect{ it.path}
+    }
+
+    void deleteVariable(String key){
+        deleteVariable(config.jobOpts().secretsPath, key)
+    }
+
+    void deleteVariable(String path, String key){
+        var variable = new Variable( items: Map.of(key, ""))
+        variablesApi.deleteVariable("$path/$key", variable,
+                config.jobOpts().region,
+                config.jobOpts().namespace,
+                null, null, null)
     }
 }

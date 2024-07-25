@@ -18,6 +18,9 @@
 package nextflow.nomad
 
 import groovy.transform.CompileStatic
+import groovy.util.logging.Slf4j
+import nextflow.cli.PluginAbstractExec
+import nextflow.nomad.secrets.NomadSecretCmd
 import nextflow.nomad.executor.TaskDirectives
 import nextflow.plugin.BasePlugin
 import nextflow.script.ProcessConfig
@@ -31,7 +34,8 @@ import org.pf4j.PluginWrapper
  * @author : matthdsm <matthias.desmet@ugent.be>
  */
 @CompileStatic
-class NomadPlugin extends BasePlugin {
+@Slf4j
+class NomadPlugin extends BasePlugin implements PluginAbstractExec{
 
     NomadPlugin(PluginWrapper wrapper) {
         super(wrapper)
@@ -41,5 +45,24 @@ class NomadPlugin extends BasePlugin {
 
     private static void addCustomDirectives() {
         ProcessConfig.DIRECTIVES.addAll(TaskDirectives.ALL)
+    }
+
+    @Override
+    List<String> getCommands() {
+        return ['secrets']
+    }
+
+    @Override
+    int exec(String cmd, List<String> args) {
+        return switch (cmd){
+            case 'secrets'-> secrets(args.first(), args.drop(1))
+            default -> -1
+        }
+    }
+
+    int secrets(String action, List<String>args){
+        NomadSecretCmd nomadSecretCmd = new NomadSecretCmd()
+        nomadSecretCmd.runCommand( session.config , action, args)
+        return 0
     }
 }

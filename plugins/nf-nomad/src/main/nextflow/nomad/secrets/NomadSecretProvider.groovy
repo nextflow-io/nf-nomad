@@ -1,4 +1,4 @@
-package nextflow.nomad
+package nextflow.nomad.secrets
 
 import groovy.util.logging.Slf4j
 import nextflow.plugin.Priority
@@ -25,35 +25,35 @@ class NomadSecretProvider implements SecretsProvider, Closeable{
 
     @Override
     Secret getSecret(String name) {
-        log.error("NomadSecretProvider can't get secret, use nomad cli or disable it")
+        log.debug("NomadSecretProvider can't get secret, use nomad cli or nextflow plugin nf-nomad:secrets")
         null
     }
 
     @Override
     String getSecretsEnv(List<String> secretNames) {
-        log.error("NomadSecretProvider can't get secret, use nomad cli or disable it")
+        log.debug("NomadSecretProvider can't get secret, use nomad cli or nextflow plugin nf-nomad:secrets")
         null
     }
 
     @Override
     String getSecretsEnv() {
-        log.error("NomadSecretProvider can't get secret, use nomad cli or disable it")
+        log.debug("NomadSecretProvider can't get secret, use nomad cli or nextflow plugin nf-nomad:secrets")
         null
     }
 
     @Override
     void putSecret(String name, String value) {
-        throw new UnsupportedOperationException("NomadSecretProvider can't put secret, use nomad cli")
+        throw new UnsupportedOperationException("NomadSecretProvider can't put secret, use nomad cli or nextflow plugin nf-nomad:secrets")
     }
 
     @Override
     void removeSecret(String name) {
-        throw new UnsupportedOperationException("NomadSecretProvider can't remove secret, use nomad cli")
+        throw new UnsupportedOperationException("NomadSecretProvider can't remove secret, use nomad cli or nextflow plugin nf-nomad:secrets")
     }
 
     @Override
     Set<String> listSecretsNames() {
-        log.error("NomadSecretProvider can't get secret, use nomad cli or disable it")
+        log.debug("NomadSecretProvider can't get secret, use nomad cli or nextflow plugin nf-nomad:secrets")
         null
     }
 
