@@ -1,0 +1,25 @@
+== Configuration
+
+Most of the basic configuration is in a `nomad` closure in the `nextflow.config` file
+
+i.e.
+
+```
+nomad{
+    client{
+        address = "http://localhost:4646"
+    }
+    jobs{
+        deleteoncompletion = false
+    }
+}
+```
+
+=== Client configuration
+
+- address, a URL
+- token, if the cluster is protected you must to provide a token
+
+=== Jobs configuration
+
+- deleteOnCompletion, a boolean indicating if the job will be removed once completed

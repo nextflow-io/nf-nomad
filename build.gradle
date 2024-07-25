@@ -5,7 +5,7 @@ buildscript {
 }
 
 plugins {
-    id("org.asciidoctor.jvm.convert") version "3.3.2"
+    id 'org.antora' version '1.0.0'
 }
 
 repositories {
@@ -22,7 +22,18 @@ nextflowPlugin{
     ]
 }
 
-asciidoctor{
-    baseDir 'src/docs/asciidoc'
-    attributes revnumber : { project.version.toString() }
+node {
+    version = 'latest'
+}
+
+antora {
+    version = '3.0.3'
+    options = [
+            clean: true,
+            fetch: true,
+            stacktrace: true,
+            attributes: [product: 'Nf-Nomad Plugin']
+    ]
+    environment = [:]
+    packages = [:]
 }
