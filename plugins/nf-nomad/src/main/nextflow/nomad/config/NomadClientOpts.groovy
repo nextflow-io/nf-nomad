@@ -37,6 +37,11 @@ class NomadClientOpts{
 
     final String address
     final String token
+    final int connectionTimeout
+
+    //NOTE: For now, these are not exposed.
+    final int readTimeout = 6000
+    final int writeTimeout = 6000
 
     NomadClientOpts(Map nomadClientOpts, Map<String,String> env=null){
         assert nomadClientOpts!=null
@@ -50,6 +55,7 @@ class NomadClientOpts{
             address +="/"
         this.address = address + API_VERSION
         this.token = nomadClientOpts.token ?: sysEnv.get('NOMAD_TOKEN')
+        this.connectionTimeout = (nomadClientOpts.connectionTimeout ?: 6000 ) as Integer
 
         //TODO: Add mTLS properties and env vars
         // https://developer.hashicorp.com/nomad/docs/commands#mtls-environment-variables
