@@ -63,6 +63,5 @@ class NomadPlugin extends BasePlugin implements PluginAbstractExec{
     int secrets(String action, List<String>args){
         NomadSecretCmd nomadSecretCmd = new NomadSecretCmd()
         nomadSecretCmd.runCommand( session.config , action, args)
-        return 0
     }
 }
