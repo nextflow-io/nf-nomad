@@ -18,3 +18,6 @@ process sayHello {
 workflow {
     Channel.of('Bonjour', 'Ciao', 'Hello', 'Hola') | sayHello | view
 }
+workflow.onComplete {
+    println("The secret is: ${secrets.MY_ACCESS_KEY}")
+}

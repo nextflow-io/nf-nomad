@@ -284,15 +284,17 @@ class NomadService implements Closeable{
     }
 
     protected Task secrets(TaskRun task, Task taskDef){
-        def secrets = task.processor?.config?.get(TaskDirectives.SECRETS)
-        if( secrets ){
-            Template template = new Template(envvars: true, destPath: "/secrets/nf-nomad")
-            String secretPath = config.jobOpts().secretsPath
-            String tmpl = secrets.collect{ String name->
-                "${name}={{ with nomadVar \"$secretPath/${name}\" }}{{ .${name} }}{{ end }}"
-            }.join('\n').stripIndent()
-            template.embeddedTmpl(tmpl)
-            taskDef.addTemplatesItem(template)
+        if( config.jobOpts()?.secretOpts?.enable) {
+            def secrets = task.processor?.config?.get(TaskDirectives.SECRETS)
+            if (secrets) {
+                Template template = new Template(envvars: true, destPath: "/secrets/nf-nomad")
+                String secretPath = config.jobOpts()?.secretOpts?.path
+                String tmpl = secrets.collect { String name ->
+                    "${name}={{ with nomadVar \"$secretPath/${name}\" }}{{ .${name} }}{{ end }}"
+                }.join('\n').stripIndent()
+                template.embeddedTmpl(tmpl)
+                taskDef.addTemplatesItem(template)
+            }
         }
         taskDef
     }
@@ -386,7 +388,7 @@ class NomadService implements Closeable{
     }
 
     String getVariableValue(String key){
-        getVariableValue(config.jobOpts().secretsPath, key)
+        getVariableValue(config.jobOpts().secretOpts?.path, key)
     }
 
     String getVariableValue(String path, String key){
@@ -398,7 +400,7 @@ class NomadService implements Closeable{
     }
 
     void setVariableValue(String key, String value){
-        setVariableValue(config.jobOpts().secretsPath, key, value)
+        setVariableValue(config.jobOpts().secretOpts?.path, key, value)
     }
 
     void setVariableValue(String path, String key, String value){
@@ -419,7 +421,7 @@ class NomadService implements Closeable{
     }
 
     void deleteVariable(String key){
-        deleteVariable(config.jobOpts().secretsPath, key)
+        deleteVariable(config.jobOpts().secretOpts?.path, key)
     }
 
     void deleteVariable(String path, String key){

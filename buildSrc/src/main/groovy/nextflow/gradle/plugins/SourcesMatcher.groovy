@@ -22,7 +22,7 @@ class SourcesMatcher {
     }
 
     List<String> getProviders(){
-        return findSources(/class (\w+) implements (.+)Provider/)
+        return findSources(/implements SecretsProvider/)
     }
 
 

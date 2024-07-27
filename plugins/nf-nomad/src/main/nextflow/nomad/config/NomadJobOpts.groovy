@@ -40,13 +40,14 @@ class NomadJobOpts{
     List<String> datacenters
     String region
     String namespace
-    String secretsPath
     String dockerVolume
     JobVolume[] volumeSpec
     JobAffinity affinitySpec
     JobConstraint constraintSpec
 
     JobConstraints constraintsSpec
+
+    NomadSecretOpts secretOpts
 
     NomadJobOpts(Map nomadJobOpts, Map<String,String> env=null){
         assert nomadJobOpts!=null
@@ -77,8 +78,7 @@ class NomadJobOpts{
         this.affinitySpec = parseAffinity(nomadJobOpts)
         this.constraintSpec = parseConstraint(nomadJobOpts)
         this.constraintsSpec = parseConstraints(nomadJobOpts)
-
-        this.secretsPath = nomadJobOpts.secretsPath ?: sysEnv.get('NOMAD_SECRETS_PATH') ?: "secrets/nf-nomad"
+        this.secretOpts = parseSecrets(nomadJobOpts)
     }
 
     JobVolume[] parseVolumes(Map nomadJobOpts){
@@ -161,4 +161,14 @@ class NomadJobOpts{
             null
         }
     }
+
+    NomadSecretOpts parseSecrets(Map nomadJobOpts){
+        if (nomadJobOpts.secrets && nomadJobOpts.secrets instanceof Map) {
+            def secretOpts = new NomadSecretOpts(nomadJobOpts.secrets as Map)
+            secretOpts
+        }else{
+            null
+        }
+    }
+
 }
