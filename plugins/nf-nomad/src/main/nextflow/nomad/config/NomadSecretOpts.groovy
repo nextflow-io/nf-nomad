@@ -2,11 +2,11 @@ package nextflow.nomad.config
 
 class NomadSecretOpts {
 
-    final Boolean enable
+    final Boolean enabled
     final String path
 
     NomadSecretOpts(Map map){
-        this.enable = map.containsKey('enable') ? map.get('enable') as boolean : false
+        this.enabled = map.containsKey('enabled') ? map.get('enabled') as boolean : false
         this.path = map.path ?: "secrets/nf-nomad"
     }
 

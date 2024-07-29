@@ -25,7 +25,7 @@ class NomadSecretProvider extends LocalSecretsProvider implements SecretsProvide
         if( !config ){
             config = new NomadConfig(Global.config?.nomad as Map ?: Map.of())
         }
-        config?.jobOpts()?.secretOpts?.enable
+        config?.jobOpts()?.secretOpts?.enabled
     }
 
     @Override

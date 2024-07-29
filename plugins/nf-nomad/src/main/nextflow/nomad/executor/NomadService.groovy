@@ -284,7 +284,7 @@ class NomadService implements Closeable{
     }
 
     protected Task secrets(TaskRun task, Task taskDef){
-        if( config.jobOpts()?.secretOpts?.enable) {
+        if( config.jobOpts()?.secretOpts?.enabled) {
             def secrets = task.processor?.config?.get(TaskDirectives.SECRETS)
             if (secrets) {
                 Template template = new Template(envvars: true, destPath: "/secrets/nf-nomad")
