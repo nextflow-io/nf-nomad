@@ -10,6 +10,11 @@ import nextflow.secret.Secret
 import nextflow.secret.SecretImpl
 import nextflow.secret.SecretsProvider
 
+/**
+ * Custom Nextflow CLI commands for nf-nomad
+ *
+ * @author Jorge Aguilera <jagedn@gmail.com>
+ */
 @Slf4j
 @Priority(-100) // high priority
 class NomadSecretProvider extends LocalSecretsProvider implements SecretsProvider {

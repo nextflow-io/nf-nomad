@@ -31,7 +31,7 @@ import org.pf4j.PluginWrapper
  * Nextflow plugin for Nomad executor
  *
  * @author Abhinav Sharma <abhi18av@outlook.com>
- * @author : matthdsm <matthias.desmet@ugent.be>
+ * @author Jorge Aguilera <jagedn@gmail.com>
  */
 @CompileStatic
 @Slf4j
