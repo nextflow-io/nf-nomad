@@ -64,6 +64,7 @@ else
 # secured nomad cluster
 ../nomad agent -config server.conf -config client.conf -config server-custom.conf -config client-custom.conf &
 cd ..
+#./nomad namespace apply -description "local-nomadlab" nf-nomad
 ./wait-nomad.sh
 sleep 3
 NOMAD_TOKEN=$(nomad acl bootstrap | awk '/^Secret ID/ {print $4}')
