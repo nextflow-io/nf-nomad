@@ -21,6 +21,11 @@ class SourcesMatcher {
                 findSources(/class (\w+) extends Executor implements ExtensionPoint/)
     }
 
+    List<String> getProviders(){
+        return findSources(/implements SecretsProvider/)
+    }
+
+
     List<String> getTraceObservers(){
         return findSources(/class (\w+) implements TraceObserverFactory/)
     }

@@ -47,6 +47,8 @@ class NomadJobOpts{
 
     JobConstraints constraintsSpec
 
+    NomadSecretOpts secretOpts
+
     NomadJobOpts(Map nomadJobOpts, Map<String,String> env=null){
         assert nomadJobOpts!=null
 
@@ -76,6 +78,7 @@ class NomadJobOpts{
         this.affinitySpec = parseAffinity(nomadJobOpts)
         this.constraintSpec = parseConstraint(nomadJobOpts)
         this.constraintsSpec = parseConstraints(nomadJobOpts)
+        this.secretOpts = parseSecrets(nomadJobOpts)
     }
 
     JobVolume[] parseVolumes(Map nomadJobOpts){
@@ -158,4 +161,14 @@ class NomadJobOpts{
             null
         }
     }
+
+    NomadSecretOpts parseSecrets(Map nomadJobOpts){
+        if (nomadJobOpts.secrets && nomadJobOpts.secrets instanceof Map) {
+            def secretOpts = new NomadSecretOpts(nomadJobOpts.secrets as Map)
+            secretOpts
+        }else{
+            null
+        }
+    }
+
 }
