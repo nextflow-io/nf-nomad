@@ -1,0 +1,50 @@
+name: nf-azure CI
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Build nf-nomad
+    if: "!contains(github.event.head_commit.message, '[ci skip]')"
+    runs-on: nfazure
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        java_version: [19]
+
+    steps:
+      - name: Environment
+        run: env | sort
+
+      - name: Checkout
+        uses: actions/checkout@v1
+        with:
+          fetch-depth: 1
+          submodules: true
+
+      - name: Setup Java ${{ matrix.java_version }}
+        uses: actions/setup-java@v1
+        with:
+          java-version: ${{matrix.java_version}}
+          architecture: x64
+
+      - name: Compile
+        run: ./gradlew assemble
+
+      - name: Tests
+        run: ./gradlew check
+        env:
+          GRADLE_OPTS: '-Dorg.gradle.daemon=false'
+
+      - name: Install
+        run: ./gradlew clean unzipPlugin -x test -P version=$(git rev-parse --short "$GITHUB_SHA")
+        env:
+          GRADLE_OPTS: '-Dorg.gradle.daemon=false'
+
+      - name: Validate
+        run: |
+          sudo manager
+          cd validation
+          export NOMAD_PLUGIN_VERSION=$(git rev-parse --short "$GITHUB_SHA")
+          ./run-all.sh --skiplocal --nfgithub
