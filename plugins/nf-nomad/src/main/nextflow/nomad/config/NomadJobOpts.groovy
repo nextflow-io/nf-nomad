@@ -19,7 +19,6 @@ package nextflow.nomad.config
 
 import groovy.transform.CompileStatic
 import groovy.util.logging.Slf4j
-import groovyx.gpars.extra166y.Ops
 import nextflow.nomad.models.JobAffinity
 import nextflow.nomad.models.JobConstraint
 import nextflow.nomad.models.JobConstraints
