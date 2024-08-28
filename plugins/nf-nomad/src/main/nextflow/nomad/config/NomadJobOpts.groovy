@@ -57,7 +57,7 @@ class NomadJobOpts{
         sysEnv = env ?: new HashMap<String,String>(System.getenv())
 
         deleteOnCompletion = nomadJobOpts.containsKey("deleteOnCompletion") ?
-                nomadJobOpts.deleteOnCompletion : false
+                nomadJobOpts.deleteOnCompletion : true
         if( nomadJobOpts.containsKey("datacenters") ) {
             datacenters = ((nomadJobOpts.datacenters instanceof List<String> ?
                     nomadJobOpts.datacenters : nomadJobOpts.datacenters.toString().split(","))
