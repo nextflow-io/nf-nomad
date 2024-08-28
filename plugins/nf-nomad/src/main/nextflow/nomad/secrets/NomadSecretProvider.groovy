@@ -26,6 +26,16 @@ class NomadSecretProvider extends LocalSecretsProvider implements SecretsProvide
         return super.load()
     }
 
+    @Override
+    protected List<Secret> loadSecrets() {
+        Set<String> names = listSecretsNames()
+        List<Secret> ret = names.collect{ name->
+            String value = getSecret(name)
+            new SecretImpl(name, value)
+        }
+        ret
+    }
+
     protected boolean isEnabled(){
         if( !config ){
             config = new NomadConfig(Global.config?.nomad as Map ?: Map.of())

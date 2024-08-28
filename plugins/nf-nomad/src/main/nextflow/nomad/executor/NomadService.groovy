@@ -417,7 +417,8 @@ class NomadService implements Closeable{
                 config.jobOpts().region,
                 config.jobOpts().namespace,
                 null, null, null, null, null, null, null)
-        listRequest.collect{ it.path}
+        String path = (config.jobOpts().secretOpts?.path ?: '')+"/"
+        listRequest.collect{ it.path - path}
     }
 
     void deleteVariable(String key){
