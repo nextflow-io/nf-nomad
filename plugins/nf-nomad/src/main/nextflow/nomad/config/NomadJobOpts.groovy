@@ -19,6 +19,7 @@ package nextflow.nomad.config
 
 import groovy.transform.CompileStatic
 import groovy.util.logging.Slf4j
+import groovyx.gpars.extra166y.Ops
 import nextflow.nomad.models.JobAffinity
 import nextflow.nomad.models.JobConstraint
 import nextflow.nomad.models.JobConstraints
@@ -44,8 +45,10 @@ class NomadJobOpts{
     JobVolume[] volumeSpec
     JobAffinity affinitySpec
     JobConstraint constraintSpec
-
     JobConstraints constraintsSpec
+
+    Integer rescheduleAttempts
+    Integer restartAttempts
 
     NomadSecretOpts secretOpts
 
@@ -68,6 +71,10 @@ class NomadJobOpts{
 
         region = nomadJobOpts.region ?: sysEnv.get('NOMAD_REGION')
         namespace = nomadJobOpts.namespace ?: sysEnv.get('NOMAD_NAMESPACE')
+
+        //NOTE: Default to a single attempt per nomad job definition
+        rescheduleAttempts = nomadJobOpts.rescheduleAttempts as Integer ?: 1
+        restartAttempts = nomadJobOpts.restartAttempts as Integer ?: 1
 
         dockerVolume = nomadJobOpts.dockerVolume ?: null
         if( dockerVolume ){
