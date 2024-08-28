@@ -126,7 +126,7 @@ class NomadService implements Closeable{
 
     TaskGroup createTaskGroup(TaskRun taskRun, List<String> args, Map<String, String>env){
         //NOTE: Force a single-allocation with no-retries per nomad job definition
-        final TASK_RESCHEDULE_ATTEMPTS = 0
+        final TASK_RESCHEDULE_ATTEMPTS = 1
         final TASK_RESTART_ATTEMPTS = 0
 
         final ReschedulePolicy taskReschedulePolicy  = new ReschedulePolicy().attempts(TASK_RESCHEDULE_ATTEMPTS)
