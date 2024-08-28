@@ -46,6 +46,8 @@ if [ "$SKIPLOCAL" == 0 ]; then
     -profile test,docker --outdir $(pwd)/nomad_temp/scratchdir/bactopia/outdir \
     --datasets_cache $(pwd)/nomad_temp/scratchdir/bactopia/datasets
 
+  ./run-pipeline.sh -c secrets/nextflow.config secrets/main.nf
+
 else
   echo "skip local"
 fi

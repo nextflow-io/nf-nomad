@@ -1,25 +1,10 @@
 #!/bin/bash
 set -ue
 
-NOMAD_VERSION="1.8.1"
-NOMAD_PLATFORM=${NOMAD_PLATFORM:-linux_amd64}
-
-## Available platforms
-#- "linux_amd64"
-#- "linux_arm64"
-#- "darwin_amd64"
-#- "darwin_arm64"
-#- "windows_amd64"
+./install-nomad.sh
 
 SECURE=0
 [[ "$@" =~ '--secure' ]] && SECURE=1
-
-if [ ! -f ./nomad ]; then
-  curl -O "https://releases.hashicorp.com/nomad/${NOMAD_VERSION}/nomad_${NOMAD_VERSION}_${NOMAD_PLATFORM}.zip"
-  unzip nomad_${NOMAD_VERSION}_${NOMAD_PLATFORM}.zip
-  rm -f nomad_${NOMAD_VERSION}_${NOMAD_PLATFORM}.zip LICENSE.txt
-  chmod +x ./nomad
-fi
 
 mkdir -p nomad_temp
 cd nomad_temp
@@ -59,16 +44,19 @@ cp ../client.conf .
 
 if [ "$SECURE" == 0 ]; then
   # basic nomad cluter
-  ../nomad agent -config server.conf -config client.conf -config server-custom.conf -config client-custom.conf
+  ../nomad agent -config server.conf -config client.conf -config server-custom.conf -config client-custom.conf &
 else
-# secured nomad cluster
-../nomad agent -config server.conf -config client.conf -config server-custom.conf -config client-custom.conf &
-cd ..
-#./nomad namespace apply -description "local-nomadlab" nf-nomad
-./wait-nomad.sh
-sleep 3
-NOMAD_TOKEN=$(nomad acl bootstrap | awk '/^Secret ID/ {print $4}')
-export NOMAD_TOKEN
-echo New super token generated.
-echo export NOMAD_TOKEN=$NOMAD_TOKEN
+  # secured nomad cluster
+  ../nomad agent -config server.conf -config client.conf -config server-custom.conf -config client-custom.conf &
+  sleep 3
+  NOMAD_TOKEN=$(../nomad acl bootstrap | awk '/^Secret ID/ {print $4}')
+  export NOMAD_TOKEN
+  echo New super token generated.
+  echo export NOMAD_TOKEN=$NOMAD_TOKEN
 fi
+
+cd ..
+./wait-nomad.sh
+./nomad namespace apply -description "local-nomadlab" nf-nomad
+./nomad var put -namespace=nf-nomad secrets/nf-nomad/MY_ACCESS_KEY MY_ACCESS_KEY=TheAccessKey
+./nomad var put -namespace=nf-nomad secrets/nf-nomad/MY_SECRET_KEY MY_SECRET_KEY=TheSecretKey
