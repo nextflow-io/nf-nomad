@@ -38,7 +38,7 @@ jobs:
           GRADLE_OPTS: '-Dorg.gradle.daemon=false'
 
       - name: Install
-        run: ./gradlew clean unzipPlugin -x test -P version=$(git rev-parse --short "$GITHUB_SHA")
+        run: ./gradlew clean unzipPlugin -x test -P version=nfazure
         env:
           GRADLE_OPTS: '-Dorg.gradle.daemon=false'
 
@@ -46,5 +46,5 @@ jobs:
         run: |
           sudo manager
           cd validation
-          export NOMAD_PLUGIN_VERSION=$(git rev-parse --short "$GITHUB_SHA")
+          export NOMAD_PLUGIN_VERSION=nfazure
           ./run-all.sh --skiplocal --nfgithub
