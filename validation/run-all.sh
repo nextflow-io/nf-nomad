@@ -5,6 +5,7 @@ set -uex
 BUILD=0
 SKIPLOCAL=0
 NFAZURE=0
+NFGHACTION=0
 NFSUN=0
 NFSLEEP=0
 NFDEMO=0
@@ -13,6 +14,7 @@ NFDEMO=0
 [[ -f $HOME/.nextflow/plugins/nf-nomad-latest/ ]]  && BUILD=1
 [[ "$@" =~ '--skiplocal' ]] && SKIPLOCAL=1
 [[ "$@" =~ '--nfazure' ]] && NFAZURE=1
+[[ "$@" =~ '--nfgithub' ]] && NFGHACTION=1
 [[ "$@" =~ '--nfsun' ]] && NFSUN=1
 [[ "$@" =~ '--sleep' ]] && NFSLEEP=1
 [[ "$@" =~ '--demo' ]] && NFDEMO=1
@@ -67,6 +69,13 @@ if [ "$NFAZURE" == 1 ]; then
     'cd ~/integration-tests/az-nomadlab; NXF_ASSETS=/projects/assets nextflow run bactopia/bactopia -c nextflow.config -w /projects -profile test,docker --outdir /projects/bactopia/outdir --accession SRX4563634 --coverage 100 --genome_size 2800000 --datasets_cache /projects/bactopia/datasets'
 else
   echo "skip nfazure"
+fi
+
+if [ "$NFGHACTION" == 1 ]; then
+  cd ~/integration-tests/az-nomadlab; NXF_ASSETS=/projects/assets nextflow run hello -w /projects/ -c nextflow.config
+  cd ~/integration-tests/az-nomadlab; NXF_ASSETS=/projects/assets nextflow run bactopia/bactopia -c nextflow.config -w /projects -profile test,docker --outdir /projects/bactopia/outdir --accession SRX4563634 --coverage 100 --genome_size 2800000 --datasets_cache /projects/bactopia/datasets
+else
+  echo "skip ghaction"
 fi
 
 
