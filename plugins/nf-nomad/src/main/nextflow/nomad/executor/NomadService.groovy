@@ -27,7 +27,9 @@ import io.nomadproject.client.model.*
 import nextflow.nomad.models.ConstraintsBuilder
 import nextflow.nomad.models.JobConstraints
 import nextflow.nomad.config.NomadConfig
+import nextflow.nomad.models.JobSpreads
 import nextflow.nomad.models.JobVolume
+import nextflow.nomad.models.SpreadsBuilder
 import nextflow.processor.TaskRun
 import nextflow.util.MemoryUnit
 import nextflow.exception.ProcessSubmitException
@@ -99,6 +101,7 @@ class NomadService implements Closeable{
         job.taskGroups = [createTaskGroup(task, args, env)]
 
         assignDatacenters(task, job)
+        spreads(task, job)
 
         JobRegisterRequest jobRegisterRequest = new JobRegisterRequest()
         jobRegisterRequest.setJob(job)
@@ -311,6 +314,27 @@ class NomadService implements Closeable{
             return job
         }
         job
+    }
+
+    protected Job spreads(TaskRun task, Job jobDef){
+        def spreads = [] as List<Spread>
+        if( config.jobOpts().spreadsSpec ){
+            def list = SpreadsBuilder.spreadsSpecToList(config.jobOpts().spreadsSpec)
+            spreads.addAll(list)
+        }
+        if( task.processor?.config?.get(TaskDirectives.SPREAD) &&
+                task.processor?.config?.get(TaskDirectives.SPREAD) instanceof Map) {
+            Map map = task.processor?.config?.get(TaskDirectives.SPREAD) as Map
+            JobSpreads spreadSpec = new JobSpreads()
+            spreadSpec.spread(map)
+            def list = SpreadsBuilder.spreadsSpecToList(spreadSpec)
+            spreads.addAll(list)
+        }
+
+        spreads.each{
+            jobDef.addSpreadsItem(it)
+        }
+        jobDef
     }
 
     String getJobState(String jobId){
