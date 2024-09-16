@@ -623,4 +623,67 @@ class NomadServiceSpec extends Specification{
         ({ 'a'*10 })    | ['aaaaaaaaaa']
     }
 
+    void "submit a task with a spread"(){
+        given:
+        def config = new NomadConfig(
+                client:[
+                        address : "http://${mockWebServer.hostName}:${mockWebServer.port}"
+                ],
+                jobs:[
+                        spreads : {
+                            spread = [name:'test', weight:50, targets:['a':30]]
+                        }
+                ]
+        )
+        def service = new NomadService(config)
+
+        String id = "theId"
+        String name = "theName"
+        String image = "theImage"
+        List<String> args = ["theCommand", "theArgs"]
+        String workingDir = "/a/b/c"
+        Map<String, String>env = [test:"test"]
+
+        def mockTask = Mock(TaskRun){
+            getName() >> name
+            getContainer() >> image
+            getConfig() >> Mock(TaskConfig)
+            getWorkDirStr() >> workingDir
+            getContainer() >> "ubuntu"
+            getProcessor() >> Mock(TaskProcessor){
+                getExecutor() >> Mock(Executor){
+                    isFusionEnabled() >> false
+                }
+            }
+            getWorkDir() >> Path.of(workingDir)
+            toTaskBean() >> Mock(TaskBean){
+                getWorkDir() >> Path.of(workingDir)
+                getScript() >> "theScript"
+                getShell() >> ["bash"]
+                getInputFiles() >> [:]
+            }
+        }
+
+        mockWebServer.enqueue(new MockResponse()
+                .setBody(JsonOutput.toJson(["EvalID":"test"]).toString())
+                .addHeader("Content-Type", "application/json"));
+        when:
+
+        def idJob = service.submitTask(id, mockTask, args, env)
+        def recordedRequest = mockWebServer.takeRequest();
+        def body = new JsonSlurper().parseText(recordedRequest.body.readUtf8())
+
+        then:
+        idJob
+
+        and:
+        recordedRequest.method == "POST"
+        recordedRequest.path == "/v1/jobs"
+
+        and:
+        body.Job.Spreads[0].Attribute == 'test'
+        body.Job.Spreads[0].Weight == 50
+        body.Job.Spreads[0].SpreadTarget.first().Value == 'a'
+        body.Job.Spreads[0].SpreadTarget.first().Percent == 30
+    }
 }

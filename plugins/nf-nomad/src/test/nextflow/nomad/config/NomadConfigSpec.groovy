@@ -295,4 +295,36 @@ class NomadConfigSpec extends Specification {
         then:
         thrown(IllegalArgumentException)
     }
+
+    void "should instantiate a spread spec if specified"() {
+        when:
+        def config = new NomadConfig([
+                jobs: [spreads : {
+                    spread = [name:'test', weight:100]
+                }]
+        ])
+
+        then:
+        config.jobOpts.spreadsSpec
+        config.jobOpts.spreadsSpec.getRaws().size() == 1
+        config.jobOpts.spreadsSpec.getRaws().first().left == 'test'
+        config.jobOpts.spreadsSpec.getRaws().first().middle == 100
+        config.jobOpts.spreadsSpec.getRaws().first().right.size() == 0
+
+        when:
+        def config2 = new NomadConfig([
+                jobs: [spreads : {
+                    spread = [name:'test', weight:100, targets:[ a:50, b:100]]
+                }]
+        ])
+
+        then:
+        config2.jobOpts.spreadsSpec
+        config2.jobOpts.spreadsSpec.getRaws().size() == 1
+        config2.jobOpts.spreadsSpec.getRaws().first().left == 'test'
+        config2.jobOpts.spreadsSpec.getRaws().first().middle == 100
+        config2.jobOpts.spreadsSpec.getRaws().first().right.size() == 2
+        config2.jobOpts.spreadsSpec.getRaws().first().right.first().left == 'a'
+        config2.jobOpts.spreadsSpec.getRaws().first().right.first().right == 50
+    }
 }

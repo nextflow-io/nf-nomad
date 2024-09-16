@@ -22,6 +22,7 @@ import groovy.util.logging.Slf4j
 import nextflow.nomad.models.JobAffinity
 import nextflow.nomad.models.JobConstraint
 import nextflow.nomad.models.JobConstraints
+import nextflow.nomad.models.JobSpreads
 import nextflow.nomad.models.JobVolume
 
 
@@ -45,6 +46,7 @@ class NomadJobOpts{
     JobAffinity affinitySpec
     JobConstraint constraintSpec
     JobConstraints constraintsSpec
+    JobSpreads spreadsSpec
 
     Integer rescheduleAttempts
     Integer restartAttempts
@@ -85,6 +87,7 @@ class NomadJobOpts{
         this.constraintSpec = parseConstraint(nomadJobOpts)
         this.constraintsSpec = parseConstraints(nomadJobOpts)
         this.secretOpts = parseSecrets(nomadJobOpts)
+        this.spreadsSpec = parseSpreads(nomadJobOpts)
     }
 
     JobVolume[] parseVolumes(Map nomadJobOpts){
@@ -177,4 +180,15 @@ class NomadJobOpts{
         }
     }
 
+    JobSpreads parseSpreads(Map nomadJobOpts){
+        if( nomadJobOpts.spreads && nomadJobOpts.spreads instanceof Closure){
+            def spec = new JobSpreads()
+            def closure = (nomadJobOpts.spreads as Closure)
+            def clone = closure.rehydrate(spec, closure.owner, closure.thisObject)
+            clone.resolveStrategy = Closure.DELEGATE_FIRST
+            clone()
+            spec.validate()
+            spec
+        }
+    }
 }
