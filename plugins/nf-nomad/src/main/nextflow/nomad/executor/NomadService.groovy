@@ -24,6 +24,7 @@ import io.nomadproject.client.ApiException
 import io.nomadproject.client.api.JobsApi
 import io.nomadproject.client.api.VariablesApi
 import io.nomadproject.client.model.*
+import nextflow.nomad.builders.JobBuilder
 import nextflow.nomad.models.ConstraintsBuilder
 import nextflow.nomad.models.JobConstraints
 import nextflow.nomad.config.NomadConfig
@@ -90,15 +91,17 @@ class NomadService implements Closeable{
     void close() throws IOException {
     }
 
-    String submitTask(String id, TaskRun task, List<String> args, Map<String, String>env, Path saveJsonPath=null){
-        Job job = new Job();
-        job.ID = id
-        job.name = task.name
-        job.type = "batch"
-        job.datacenters = this.config.jobOpts().datacenters
-        job.namespace = this.config.jobOpts().namespace
 
-        job.taskGroups = [createTaskGroup(task, args, env)]
+
+    String submitTask(String id, TaskRun task, List<String> args, Map<String, String> env, Path saveJsonPath = null) {
+        Job job = new JobBuilder()
+                .id(id)
+                .name(task.name)
+                .type("batch")
+                .datacenters(this.config.jobOpts().datacenters)
+                .namespace(this.config.jobOpts().namespace)
+                .taskGroups([createTaskGroup(task, args, env)])
+                .build()
 
         assignDatacenters(task, job)
         spreads(task, job)
@@ -106,25 +109,22 @@ class NomadService implements Closeable{
         JobRegisterRequest jobRegisterRequest = new JobRegisterRequest()
         jobRegisterRequest.setJob(job)
 
-        if( saveJsonPath ) try {
+        if (saveJsonPath) try {
             saveJsonPath.text = job.toString()
-        }
-        catch( Exception e ) {
+        } catch (Exception e) {
             log.debug "WARN: unable to save request json -- cause: ${e.message ?: e}"
         }
 
-
         try {
             JobRegisterResponse jobRegisterResponse = jobsApi.registerJob(jobRegisterRequest, config.jobOpts().region, config.jobOpts().namespace, null, null)
-            jobRegisterResponse.evalID
-        } catch( ApiException apiException){
+            return jobRegisterResponse.evalID
+        } catch (ApiException apiException) {
             log.debug("[NOMAD] Failed to submit ${job.name} -- Cause: ${apiException.responseBody ?: apiException}", apiException)
             throw new ProcessSubmitException("[NOMAD] Failed to submit ${job.name} -- Cause: ${apiException.responseBody ?: apiException}", apiException)
         } catch (Throwable e) {
             log.debug("[NOMAD] Failed to submit ${job.name} -- Cause: ${e.message ?: e}", e)
             throw new ProcessSubmitException("[NOMAD] Failed to submit ${job.name} -- Cause: ${e.message ?: e}", e)
         }
-
     }
 
     TaskGroup createTaskGroup(TaskRun taskRun, List<String> args, Map<String, String>env){
