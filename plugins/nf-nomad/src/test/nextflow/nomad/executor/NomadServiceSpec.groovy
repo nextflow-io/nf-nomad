@@ -557,7 +557,7 @@ class NomadServiceSpec extends Specification{
         outputJson.text.indexOf(" Job {") != -1
     }
 
-    void "submit a task with a datasource directive"(){
+    void "submit a task with a datacenter directive"(){
         given:
         def config = new NomadConfig(
                 client:[
