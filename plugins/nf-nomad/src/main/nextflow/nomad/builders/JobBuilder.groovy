@@ -29,7 +29,6 @@ import io.nomadproject.client.model.Resources
 import io.nomadproject.client.model.Template
 import io.nomadproject.client.model.VolumeMount
 import io.nomadproject.client.model.VolumeRequest
-import nextflow.nomad.config.NomadConfig
 import nextflow.nomad.config.NomadJobOpts
 import nextflow.nomad.executor.TaskDirectives
 import nextflow.nomad.models.ConstraintsBuilder
@@ -54,22 +53,22 @@ import groovy.util.logging.Slf4j
 class JobBuilder {
     private Job job = new Job()
 
-    JobBuilder id(String id) {
+    JobBuilder withId(String id) {
         job.ID = id
         return this
     }
 
-    JobBuilder name(String name) {
+    JobBuilder withName(String name) {
         job.name = name
         return this
     }
 
-    JobBuilder type(String type) {
+    JobBuilder withType(String type) {
         job.type = type
         return this
     }
 
-    JobBuilder datacenters(List<String> datacenters) {
+    JobBuilder withDatacenters(List<String> datacenters) {
         job.datacenters = datacenters
         return this
     }
@@ -92,12 +91,12 @@ class JobBuilder {
         job
     }
 
-    JobBuilder namespace(String namespace) {
+    JobBuilder withNamespace(String namespace) {
         job.namespace = namespace
         return this
     }
 
-    JobBuilder taskGroups(List<TaskGroup> taskGroups) {
+    JobBuilder withTaskGroups(List<TaskGroup> taskGroups) {
         job.taskGroups = taskGroups
         return this
     }

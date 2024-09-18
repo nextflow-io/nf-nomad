@@ -25,14 +25,8 @@ import io.nomadproject.client.api.JobsApi
 import io.nomadproject.client.api.VariablesApi
 import io.nomadproject.client.model.*
 import nextflow.nomad.builders.JobBuilder
-import nextflow.nomad.models.ConstraintsBuilder
-import nextflow.nomad.models.JobConstraints
 import nextflow.nomad.config.NomadConfig
-import nextflow.nomad.models.JobSpreads
-import nextflow.nomad.models.JobVolume
-import nextflow.nomad.models.SpreadsBuilder
 import nextflow.processor.TaskRun
-import nextflow.util.MemoryUnit
 import nextflow.exception.ProcessSubmitException
 
 import java.nio.file.Path
@@ -81,12 +75,12 @@ class NomadService implements Closeable{
 
     String submitTask(String id, TaskRun task, List<String> args, Map<String, String> env, Path saveJsonPath = null) {
         Job job = new JobBuilder()
-                .id(id)
-                .name(task.name)
-                .type("batch")
-//                .datacenters(task, this.config.jobOpts().datacenters)
-                .namespace(this.config.jobOpts().namespace)
-                .taskGroups([JobBuilder.createTaskGroup(task, args, env, this.config.jobOpts())])
+                .withId(id)
+                .withName(task.name)
+                .withType("batch")
+//                .withDatacenters(task, this.config.jobOpts().datacenters)
+                .withNamespace(this.config.jobOpts().namespace)
+                .withTaskGroups([JobBuilder.createTaskGroup(task, args, env, this.config.jobOpts())])
                 .build()
 
         JobBuilder.assignDatacenters(task, job)
