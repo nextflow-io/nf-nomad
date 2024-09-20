@@ -45,14 +45,14 @@ class NomadService implements Closeable{
     ApiClient apiClient
     JobsApi jobsApi
     VariablesApi variablesApi
+    FailsafeExecutor safeExecutor
 
     NomadService(NomadConfig config) {
         this.config = config
 
-        //TODO: Accommodate these connection level options in clientOpts()
-        final CONNECTION_TIMEOUT_MILLISECONDS = 60000
-        final READ_TIMEOUT_MILLISECONDS = 60000
-        final WRITE_TIMEOUT_MILLISECONDS = 60000
+        final CONNECTION_TIMEOUT_MILLISECONDS = config.clientOpts().connectionTimeout
+        final READ_TIMEOUT_MILLISECONDS = config.clientOpts().readTimeout
+        final WRITE_TIMEOUT_MILLISECONDS = config.clientOpts().writeTimeout
 
         apiClient = new ApiClient( connectTimeout: CONNECTION_TIMEOUT_MILLISECONDS, readTimeout: READ_TIMEOUT_MILLISECONDS, writeTimeout: WRITE_TIMEOUT_MILLISECONDS)
         apiClient.basePath = config.clientOpts().address
@@ -64,6 +64,8 @@ class NomadService implements Closeable{
         }
         this.jobsApi = new JobsApi(apiClient)
         this.variablesApi = new VariablesApi(apiClient)
+
+        this.safeExecutor = new FailsafeExecutor(config.clientOpts().retryConfig)
     }
 
 
@@ -96,8 +98,12 @@ class NomadService implements Closeable{
         }
 
         try {
-            JobRegisterResponse jobRegisterResponse = jobsApi.registerJob(jobRegisterRequest, config.jobOpts().region, config.jobOpts().namespace, null, null)
-            return jobRegisterResponse.evalID
+            safeExecutor.apply {
+                JobRegisterResponse jobRegisterResponse = jobsApi.registerJob(jobRegisterRequest,
+                        config.jobOpts().region, config.jobOpts().namespace,
+                        null, null)
+                jobRegisterResponse.evalID
+            }
         } catch (ApiException apiException) {
             log.debug("[NOMAD] Failed to submit ${job.name} -- Cause: ${apiException.responseBody ?: apiException}", apiException)
             throw new ProcessSubmitException("[NOMAD] Failed to submit ${job.name} -- Cause: ${apiException.responseBody ?: apiException}", apiException)
@@ -110,7 +116,11 @@ class NomadService implements Closeable{
 
     String getJobState(String jobId){
         try {
-            List<AllocationListStub> allocations = jobsApi.getJobAllocations(jobId, config.jobOpts().region, config.jobOpts().namespace, null, null, null, null, null, null, null, null)
+            List<AllocationListStub> allocations = safeExecutor.apply {
+                jobsApi.getJobAllocations(jobId, config.jobOpts().region, config.jobOpts().namespace,
+                        null, null, null, null, null, null,
+                        null, null)
+            }
             AllocationListStub last = allocations?.sort {
                 it.modifyIndex
             }?.last()
@@ -127,7 +137,10 @@ class NomadService implements Closeable{
 
     boolean checkIfRunning(String jobId){
         try {
-            Job job = jobsApi.getJob(jobId, config.jobOpts().region, config.jobOpts().namespace, null, null, null, null, null, null, null)
+            Job job = safeExecutor.apply {
+                jobsApi.getJob(jobId, config.jobOpts().region, config.jobOpts().namespace,
+                        null, null, null, null, null, null, null)
+            }
             log.debug "[NOMAD] checkIfRunning jobID=$job.ID; status=$job.status"
             job.status == "running"
         }catch (Exception e){
@@ -138,7 +151,10 @@ class NomadService implements Closeable{
 
     boolean checkIfDead(String jobId){
         try{
-            Job job = jobsApi.getJob(jobId, config.jobOpts().region, config.jobOpts().namespace, null, null, null, null, null, null, null)
+            Job job = safeExecutor.apply {
+                jobsApi.getJob(jobId, config.jobOpts().region, config.jobOpts().namespace,
+                        null, null, null, null, null, null, null)
+            }
             log.debug "[NOMAD] checkIfDead jobID=$job.ID; status=$job.status"
             job.status == "dead"
         }catch (Exception e){
@@ -158,7 +174,10 @@ class NomadService implements Closeable{
     protected void purgeJob(String jobId, boolean purge){
         log.debug "[NOMAD] purgeJob with jobId=${jobId}"
         try {
-            jobsApi.deleteJob(jobId, config.jobOpts().region, config.jobOpts().namespace, null, null, purge, true)
+            safeExecutor.apply {
+                jobsApi.deleteJob(jobId, config.jobOpts().region, config.jobOpts().namespace,
+                        null, null, purge, true)
+            }
         }catch(Exception e){
             log.debug("[NOMAD] Failed to delete job ${jobId} -- Cause: ${e.message ?: e}", e)
         }
@@ -166,7 +185,11 @@ class NomadService implements Closeable{
 
     String getClientOfJob(String jobId) {
         try{
-            List<AllocationListStub> allocations = jobsApi.getJobAllocations(jobId, config.jobOpts().region, config.jobOpts().namespace, null, null, null, null, null, null, null, null)
+            List<AllocationListStub> allocations = safeExecutor.apply {
+                jobsApi.getJobAllocations(jobId, config.jobOpts().region, config.jobOpts().namespace,
+                        null, null, null, null, null, null,
+                        null, null)
+            }
             if( !allocations ){
                 return null
             }
@@ -183,10 +206,12 @@ class NomadService implements Closeable{
     }
 
     String getVariableValue(String path, String key){
-        var variable = variablesApi.getVariableQuery("$path/$key",
-                config.jobOpts().region,
-                config.jobOpts().namespace,
-                null, null, null, null, null, null, null)
+        var variable = safeExecutor.apply {
+            variablesApi.getVariableQuery("$path/$key",
+                    config.jobOpts().region,
+                    config.jobOpts().namespace,
+                    null, null, null, null, null, null, null)
+        }
         variable?.items?.find{ it.key == key }?.value
     }
 
@@ -197,17 +222,22 @@ class NomadService implements Closeable{
     void setVariableValue(String path, String key, String value){
         var content = Map.of(key,value)
         var variable = new Variable(path: path, items: content)
-        variablesApi.postVariable("$path/$key", variable,
-                config.jobOpts().region,
-                config.jobOpts().namespace,
-                null, null, null)
+        safeExecutor.apply {
+            variablesApi.postVariable("$path/$key", variable,
+                    config.jobOpts().region,
+                    config.jobOpts().namespace,
+                    null, null, null)
+        }
     }
 
     List<String> getVariablesList(){
-        var listRequest = variablesApi.getVariablesListRequest(
-                config.jobOpts().region,
-                config.jobOpts().namespace,
-                null, null, null, null, null, null, null)
+        var listRequest = safeExecutor.apply {
+            variablesApi.getVariablesListRequest(
+                    config.jobOpts().region,
+                    config.jobOpts().namespace,
+                    null, null, null, null,
+                    null, null, null)
+        }
         String path = (config.jobOpts().secretOpts?.path ?: '')+"/"
         listRequest.collect{ it.path - path}
     }
@@ -218,9 +248,11 @@ class NomadService implements Closeable{
 
     void deleteVariable(String path, String key){
         var variable = new Variable( items: Map.of(key, ""))
-        variablesApi.deleteVariable("$path/$key", variable,
-                config.jobOpts().region,
-                config.jobOpts().namespace,
-                null, null, null)
+        safeExecutor.apply {
+            variablesApi.deleteVariable("$path/$key", variable,
+                    config.jobOpts().region,
+                    config.jobOpts().namespace,
+                    null, null, null)
+        }
     }
 }

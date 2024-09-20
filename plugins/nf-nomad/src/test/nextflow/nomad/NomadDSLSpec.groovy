@@ -195,7 +195,11 @@ class NomadDSLSpec  extends Dsl2Spec{
                         [
                                 client:
                                         [
-                                                address : "http://${mockWebServer.hostName}:${mockWebServer.port}"
+                                                address : "http://${mockWebServer.hostName}:${mockWebServer.port}",
+                                                retryConfig:[
+                                                        maxAttempts: 1,
+                                                        delay: '1ms'
+                                                ]
                                         ]
                         ]
         ]).setScript(SCRIPT).execute()
