@@ -41,6 +41,14 @@ class FailsafeExecutor {
                 .build()
     }
 
+    /*
+    408 Request Timeout
+    429 Too Many Requests
+    500 Internal Server Error
+    502 Bad Gateway
+    503 Service Unavailable
+    504 Gateway Timeout
+     */
     final private static List<Integer> RETRY_CODES = List.of(408, 429, 500, 502, 503, 504)
 
     protected <T> T apply(CheckedSupplier<T> action) {
