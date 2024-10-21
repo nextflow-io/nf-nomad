@@ -65,7 +65,7 @@ class NomadServiceSpec extends Specification{
         mockWebServer.enqueue(new MockResponse()
                 .addHeader("Content-Type", "application/json"));
 
-        def state = service.getJobState("theId")
+        def state = service.getTaskState("theId")
         def recordedRequest = mockWebServer.takeRequest();
 
         then:
@@ -214,7 +214,7 @@ class NomadServiceSpec extends Specification{
                 """)
                 .addHeader("Content-Type", "application/json"));
 
-        state = service.getJobState("theId")
+        state = service.getTaskState("theId")
         recordedRequest = mockWebServer.takeRequest();
 
         then:
