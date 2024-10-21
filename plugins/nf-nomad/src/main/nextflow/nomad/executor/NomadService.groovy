@@ -114,52 +114,38 @@ class NomadService implements Closeable{
     }
 
 
-    String getJobState(String jobId){
+    TaskState getTaskState(String jobId){
         try {
             List<AllocationListStub> allocations = safeExecutor.apply {
                 jobsApi.getJobAllocations(jobId, config.jobOpts().region, config.jobOpts().namespace,
                         null, null, null, null, null, null,
                         null, null)
             }
-            AllocationListStub last = allocations?.sort {
+            AllocationListStub last = allocations ? allocations.sort {
                 it.modifyIndex
-            }?.last()
-            String currentState = last?.taskStates?.values()?.last()?.state
-            log.debug "Task $jobId , state=$currentState"
-            currentState ?: "Unknown"
+            }?.last() : null
+            TaskState currentState = last?.taskStates?.values()?.last()
+            log.debug "Task $jobId , state=${currentState.state}"
+            currentState
         }catch(Exception e){
             log.debug("[NOMAD] Failed to get jobState ${jobId} -- Cause: ${e.message ?: e}", e)
-            "dead"
+            new TaskState(state: "unknow")
         }
     }
 
 
 
-    boolean checkIfRunning(String jobId){
+    String getJobStatus(String jobId){
         try {
             Job job = safeExecutor.apply {
                 jobsApi.getJob(jobId, config.jobOpts().region, config.jobOpts().namespace,
                         null, null, null, null, null, null, null)
             }
             log.debug "[NOMAD] checkIfRunning jobID=$job.ID; status=$job.status"
-            job.status == "running"
+            job.status
         }catch (Exception e){
             log.debug("[NOMAD] Failed to get jobState ${jobId} -- Cause: ${e.message ?: e}", e)
-            false
-        }
-    }
-
-    boolean checkIfDead(String jobId){
-        try{
-            Job job = safeExecutor.apply {
-                jobsApi.getJob(jobId, config.jobOpts().region, config.jobOpts().namespace,
-                        null, null, null, null, null, null, null)
-            }
-            log.debug "[NOMAD] checkIfDead jobID=$job.ID; status=$job.status"
-            job.status == "dead"
-        }catch (Exception e){
-            log.debug("[NOMAD] Failed to get job ${jobId} -- Cause: ${e.message ?: e}", e)
-            true
+            "Unknow"
         }
     }
 
