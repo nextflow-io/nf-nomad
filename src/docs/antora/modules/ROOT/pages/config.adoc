@@ -8,18 +8,84 @@ i.e.
 nomad{
     client{
         address = "http://localhost:4646"
+        token = "YOUR_NOMAD_TOKEN"
+        connectionTimeout = 6000
+        readTimeout = 6000
+        writeTimeout = 6000
+        retryConfig = {
+            delay = 500
+            maxDelay = 90
+            maxAttempts = 10
+            jitter = 0.25
+        }
     }
+
     jobs{
+
+        namespace = 'nf-nomad'
         deleteoncompletion = false
+
+        volumes = [
+              { type "host" name "scratchdir" },
+              { type "csi" name "nextflow-fs-volume" },
+              { type "csi" name "nextflow-fs-volume" path "/var/data" readOnly true}
+            ]
+
+        constraints = {
+            node {
+                unique = [ name: 'nomad01' ]
+            }
+        }
+
+
+        spreads = {
+            spread = [ name:'node.datacenter', weight: 50 ]
+        }
+
+        secrets {
+            enabled = true
+        }
+
     }
 }
 ```
 
 === Client configuration
 
-- address, a URL
-- token, if the cluster is protected you must to provide a token
+- `address`: The URL for the nomad server node.
+- `token`: If the cluster is protected you must to provide a token.
+- `connectionTimeout`: The maximum time to wait before giving up on establishing a connection with the cluster (default `6000` ms).
+- `readTimeout`: The maximum time to wait before indicating inability to read from the connection (default `6000` ms).
+- `writeTimeout`: The maximum time to wait before indicating inability to write to the connection (default `6000` ms).
+- `retryConfig.delay`:  Delay when retrying failed API requests (default: 500ms).
+- `retryConfig.jitter`: Jitter value when retrying failed API requests (default: 0.25)
+- `retryConfig.maxAttempts`: Max attempts when retrying failed API requests (default: 10)
+- `retryConfig.maxDelay`: Max delay when retrying failed API requests (default: 90s)
+
 
 === Jobs configuration
 
-- deleteOnCompletion, a boolean indicating if the job will be removed once completed
+- `deleteOnCompletion`: A boolean indicating if the job will be removed once completed
+- `datacenters`: A list of datacenters for the job submission.
+- `region`: The region for job submission.
+- `namespace`: The namespace to be used for all Nextflow jobs.
+- `volumeSpec`: The volumes which should be accessible to the jobs.
+- `affinitiesSpec`: The affinities which should be attached to the job spec.
+- `constraintsSpec`: The constraints which should be attached to the job spec.
+- `spreadsSpec`: The spreads spec which should be used with all generated jobs.
+- `rescheduleAttempts`: Number of rescheduling (to a different node) attempts for the generated jobs.
+- `restartAttempts`: Number of restart (on the same node) attempts for the generated jobs.
+- `secretOpts`: The configuration for Nomad Secret Store.
+- `dockerVolume`, DEPRECATED
+- `affinitySpec`, DEPRECATED
+- `constraintSpec`, DEPRECATED
+
+
+
+=== Debug configuration
+- `debug`: Enabling this flag will dump the job definitions for troubleshooting.
+
+=== Secrets configuration
+
+- `enabled`: A boolean flag to indicate the usage of Nomad secrets store.
+- `path`: Path of the nomad secret to be used.
