@@ -78,7 +78,7 @@ class NomadTaskHandler extends TaskHandler implements FusionAwareTask {
         if(isSubmitted()) {
             def state = taskState0()
             // include `terminated` state to allow the handler status to progress
-            if( state && ( "running" == state.state || "terminated" == state.state)){
+            if( state && ( ["running","terminated"].contains(state.state))){
                 status = TaskStatus.RUNNING
                 determineClientNode()
                 return true
@@ -93,7 +93,7 @@ class NomadTaskHandler extends TaskHandler implements FusionAwareTask {
 
         def state = taskState0()
 
-        final isFinished = state && state.finishedAt != null
+        final isFinished = state && (state.finishedAt != null || state.state == "unknow")
 
         log.debug "[NOMAD] checkIfCompleted task.name=$task.name; state=${state?.state} completed=$isFinished"
 
