@@ -28,6 +28,7 @@ import nextflow.nomad.builders.JobBuilder
 import nextflow.nomad.config.NomadConfig
 import nextflow.processor.TaskRun
 import nextflow.exception.ProcessSubmitException
+import org.threeten.bp.OffsetDateTime
 
 import java.nio.file.Path
 
@@ -125,11 +126,11 @@ class NomadService implements Closeable{
                 it.modifyIndex
             }?.last() : null
             TaskState currentState = last?.taskStates?.values()?.last()
-            log.debug "Task $jobId , state=${currentState.state}"
-            currentState
+            log.debug "Task $jobId , state=${currentState?.state}"
+            currentState ?: new TaskState(state: "unknown", failed: true, finishedAt: OffsetDateTime.now())
         }catch(Exception e){
             log.debug("[NOMAD] Failed to get jobState ${jobId} -- Cause: ${e.message ?: e}", e)
-            new TaskState(state: "unknow")
+            new TaskState(state: "unknown", failed: true, finishedAt: OffsetDateTime.now())
         }
     }
 
@@ -145,7 +146,7 @@ class NomadService implements Closeable{
             job.status
         }catch (Exception e){
             log.debug("[NOMAD] Failed to get jobState ${jobId} -- Cause: ${e.message ?: e}", e)
-            "Unknow"
+            "unknown"
         }
     }
 
