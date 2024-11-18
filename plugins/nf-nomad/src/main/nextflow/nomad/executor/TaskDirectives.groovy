@@ -10,10 +10,13 @@ class TaskDirectives {
 
     public static final String SPREAD = "spread"
 
+    public static final String PRIORITY = "priority"
+
     public static final List<String> ALL = [
             DATACENTERS,
             CONSTRAINTS,
             SECRETS,
-            SPREAD
+            SPREAD,
+            PRIORITY
     ]
 }

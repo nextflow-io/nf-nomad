@@ -18,6 +18,7 @@ package nextflow.nomad.builders
 
 import nextflow.nomad.config.NomadConfig
 import nextflow.nomad.config.NomadJobOpts
+import nextflow.processor.TaskProcessor
 import nextflow.processor.TaskRun
 import okhttp3.mockwebserver.MockWebServer
 import spock.lang.Specification
@@ -98,5 +99,20 @@ class JobBuilderSpec extends Specification {
         taskGroup.tasks[0].env == env
     }
 
+    def "test priority in task"(){
+        given:
+        def taskRun = Mock(TaskRun)
+        taskRun.container >> "test-container"
+        taskRun.workDir >> new File("/test/workdir").toPath()
+        taskRun.getProcessor() >> Mock(TaskProcessor) {
+            getConfig() >> [priority: 666]
+        }
+
+        when:
+        def job = new JobBuilder().withPriority(taskRun).build()
+
+        then:
+        job.priority == 666
+    }
 
 }

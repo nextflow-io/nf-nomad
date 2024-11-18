@@ -73,22 +73,22 @@ class JobBuilder {
         return this
     }
 
-    static Job assignDatacenters(TaskRun task, Job job){
+    JobBuilder withDatacenters(TaskRun task){
         def datacenters = task.processor?.config?.get(TaskDirectives.DATACENTERS)
         if( datacenters ){
             if( datacenters instanceof List<String>) {
                 job.datacenters( datacenters as List<String>)
-                return job;
+                return this;
             }
             if( datacenters instanceof Closure) {
                 String str = datacenters.call().toString()
                 job.datacenters( [str])
-                return job;
+                return this;
             }
             job.datacenters( [datacenters.toString()] as List<String>)
-            return job
+            return this
         }
-        job
+        this
     }
 
     JobBuilder withNamespace(String namespace) {
@@ -291,7 +291,7 @@ class JobBuilder {
         taskDef
     }
 
-    static Job spreads(TaskRun task, Job jobDef, NomadJobOpts jobOpts){
+    JobBuilder withSpreads(TaskRun task, NomadJobOpts jobOpts){
         def spreads = [] as List<Spread>
         if( jobOpts.spreadsSpec ){
             def list = SpreadsBuilder.spreadsSpecToList(jobOpts.spreadsSpec)
@@ -307,10 +307,20 @@ class JobBuilder {
         }
 
         spreads.each{
-            jobDef.addSpreadsItem(it)
+            job.addSpreadsItem(it)
         }
-        jobDef
+        this
     }
 
+    JobBuilder withPriority(int priority){
+        job.priority = priority
+        this
+    }
 
+    JobBuilder withPriority(TaskRun task){
+        if( task.processor?.config?.containsKey(TaskDirectives.PRIORITY) ){
+            withPriority( task.processor?.config?.get(TaskDirectives.PRIORITY) as int)
+        }
+        this
+    }
 }
