@@ -19,6 +19,7 @@ package nextflow.nomad.executor
 
 import groovy.transform.CompileStatic
 import groovy.util.logging.Slf4j
+import io.nomadproject.client.model.TaskState
 import nextflow.exception.ProcessSubmitException
 import nextflow.exception.ProcessUnrecoverableException
 import nextflow.executor.BashWrapperBuilder
@@ -31,6 +32,7 @@ import nextflow.processor.TaskStatus
 import nextflow.trace.TraceRecord
 import nextflow.util.Escape
 import nextflow.SysEnv
+import org.threeten.bp.OffsetDateTime
 
 import java.nio.file.Path
 
@@ -51,7 +53,7 @@ class NomadTaskHandler extends TaskHandler implements FusionAwareTask {
 
     private String clientName = null
 
-    private String state
+    private TaskState state
 
     private long timestamp
 
@@ -72,41 +74,46 @@ class NomadTaskHandler extends TaskHandler implements FusionAwareTask {
 
     @Override
     boolean checkIfRunning() {
-        if(isActive()) {
-            determineClientNode()
+        if( !jobName ) throw new IllegalStateException("Missing Nomad Job name -- cannot check if running")
+        if(isSubmitted()) {
+            def state = taskState0()
+            // include `terminated` state to allow the handler status to progress
+            if( state && ( ["running","terminated"].contains(state.state))){
+                status = TaskStatus.RUNNING
+                determineClientNode()
+                return true
+            }
         }
-        nomadService.checkIfRunning(this.jobName)
+        return false
     }
 
     @Override
     boolean checkIfCompleted() {
-        if (!nomadService.checkIfDead(this.jobName)) {
-            return false
-        }
+        if( !jobName ) throw new IllegalStateException("Missing Nomad Job name -- cannot check if running")
 
-        state = taskState0(this.jobName)
+        def state = taskState0()
 
-        final isFinished = [
-                "complete",
-                "failed",
-                "dead",
-                "lost"].contains(state)
+        final isFinished = state && (state.finishedAt != null || state.state == "unknow")
 
-        log.debug "[NOMAD] checkIfCompleted task.name=$task.name; state=$state completed=$isFinished"
+        log.debug "[NOMAD] checkIfCompleted task.name=$task.name; state=${state?.state} completed=$isFinished"
 
         if (isFinished) {
             // finalize the task
             task.exitStatus = readExitFile()
             task.stdout = outputFile
             task.stderr = errorFile
-            this.status = TaskStatus.COMPLETED
-            if (state == "failed" || state == "lost" || state == "unknown")
+            status = TaskStatus.COMPLETED
+            if ( !state || state.failed ) {
                 task.error = new ProcessUnrecoverableException()
+                task.aborted = true
+            }
 
             if (shouldDelete()) {
                 nomadService.jobPurge(this.jobName)
             }
 
+            updateTimestamps(state?.startedAt, state?.finishedAt)
+            determineClientNode()
             return true
         }
 
@@ -180,13 +187,13 @@ class NomadTaskHandler extends TaskHandler implements FusionAwareTask {
         return ret
     }
 
-    protected String taskState0(String taskName) {
+    protected TaskState taskState0() {
         final now = System.currentTimeMillis()
         final delta = now - timestamp;
         if (!status || delta >= 1_000) {
 
-            def newState = nomadService.getJobState(jobName)
-            log.debug "[NOMAD] Check jobState: jobName=$jobName currentState=$state newState=$newState"
+            def newState = nomadService.getTaskState(jobName)
+            log.debug "[NOMAD] Check jobState: jobName=$jobName currentState=${state?.state} newState=${newState?.state}"
 
             if (newState) {
                 state = newState
@@ -229,4 +236,19 @@ class NomadTaskHandler extends TaskHandler implements FusionAwareTask {
         return result
     }
 
+    void updateTimestamps(OffsetDateTime start, OffsetDateTime end){
+        try {
+            startTimeMillis = start.toInstant().toEpochMilli()
+            completeTimeMillis = end.toInstant().toEpochMilli()
+        } catch( Exception e ) {
+            // Only update if startTimeMillis hasn't already been set.
+            // If startTimeMillis _has_ been set, then both startTimeMillis
+            // and completeTimeMillis will have been set with the normal
+            // TaskHandler mechanism, so there's no need to reset them here.
+            if (!startTimeMillis) {
+                startTimeMillis = System.currentTimeMillis()
+                completeTimeMillis = System.currentTimeMillis()
+            }
+        }
+    }
 }

@@ -43,13 +43,15 @@ if [ "$SKIPLOCAL" == 0 ]; then
     -r dev -profile test,docker \
     --outdir $(pwd)/nomad_temp/scratchdir/out
 
-  ./run-pipeline.sh -c basic/nextflow.config bactopia/bactopia \
-    --accession SRX4563634 --coverage 100 --genome_size 2800000 \
-    -profile test,docker --outdir $(pwd)/nomad_temp/scratchdir/bactopia/outdir \
-    --datasets_cache $(pwd)/nomad_temp/scratchdir/bactopia/datasets
+# Batctopia is failing with current version of nextflow due some bug in --max_cpus but cant find a fix
+#  ./run-pipeline.sh -c basic/nextflow.config bactopia/bactopia \
+#    --accession SRX4563634 --coverage 100 --genome_size median --max_cpus 2 \
+#    -profile test,docker --outdir $(pwd)/nomad_temp/scratchdir/bactopia/outdir \
+#    --datasets_cache $(pwd)/nomad_temp/scratchdir/bactopia/datasets
 
   ./run-pipeline.sh -c secrets/nextflow.config secrets/main.nf
 
+  ./run-pipeline.sh -c tower/nextflow.config tower/main.nf
 else
   echo "skip local"
 fi

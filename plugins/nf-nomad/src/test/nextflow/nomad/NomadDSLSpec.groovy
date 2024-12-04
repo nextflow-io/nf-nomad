@@ -110,7 +110,7 @@ class NomadDSLSpec  extends Dsl2Spec{
                         if( recordedRequest.path.endsWith("/allocations")) {
                             summary = true
                             return new MockResponse().setResponseCode(200)
-                                    .setBody('{"Summary": {"test":{"Complete":1}}}').addHeader("Content-Type", "application/json")
+                                    .setBody(this.getClass().getResourceAsStream("/allocations.json").text).addHeader("Content-Type", "application/json")
                         }else {
                             return new MockResponse().setResponseCode(200)
                                     .setBody('{"Status": "dead"}').addHeader("Content-Type", "application/json")
