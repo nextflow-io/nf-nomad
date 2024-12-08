@@ -16,3 +16,4 @@ oracle-nomad-cluster
 .settings
 /validation/nomad_temp/**
 /validation/nomad
+**/*.tsv
