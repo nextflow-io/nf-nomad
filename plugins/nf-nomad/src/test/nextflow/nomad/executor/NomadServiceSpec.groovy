@@ -149,7 +149,7 @@ class NomadServiceSpec extends Specification{
         body.Job.Name == name
         body.Job.Type == "batch"
         body.Job.TaskGroups.size() == 1
-        body.Job.TaskGroups[0].Name == "group"
+        body.Job.TaskGroups[0].Name == "nf-taskgroup"
         body.Job.TaskGroups[0].Tasks.size() == 1
         body.Job.TaskGroups[0].Tasks[0].Name == "nf-task"
         body.Job.TaskGroups[0].Tasks[0].Resources.Cores == 1
@@ -224,7 +224,7 @@ class NomadServiceSpec extends Specification{
         body.Job.Name == name
         body.Job.Type == "batch"
         body.Job.TaskGroups.size() == 1
-        body.Job.TaskGroups[0].Name == "group"
+        body.Job.TaskGroups[0].Name == "nf-taskgroup"
         body.Job.TaskGroups[0].Tasks.size() == 1
         body.Job.TaskGroups[0].Tasks[0].Name == "nf-task"
         body.Job.TaskGroups[0].Tasks[0].Resources.Cores == 1

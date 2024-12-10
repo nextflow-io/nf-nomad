@@ -72,14 +72,41 @@ class NomadTaskHandler extends TaskHandler implements FusionAwareTask {
         this.exitFile = task.workDir.resolve(TaskRun.CMD_EXIT)
     }
 
+
+//-------------------------------------------------
+//
+// NOTE: From https://github.com/hashicorp/nomad/blob/6a41dc7b2f1fdbbc5a20ed267b4ad25fc2a14489/api/jobs.go#L1263-L1287
+//
+//-------------------------------------------------
+//        type JobChildrenSummary struct {
+//            Pending int64
+//            Running int64
+//            Dead    int64
+//        }
+//-------------------------------------------------
+//        type TaskGroupSummary struct {
+//            Queued   int
+//            Complete int
+//            Failed   int
+//            Running  int
+//            Starting int
+//            Lost     int
+//            Unknown  int
+//        }
+//-------------------------------------------------
+
+
     @Override
     boolean checkIfRunning() {
-        if( !jobName ) throw new IllegalStateException("Missing Nomad Job name -- cannot check if running")
+        if( !jobName ) throw new IllegalStateException("[NOMAD] Missing Nomad Job name -- cannot check if running")
         if(isSubmitted()) {
             def state = taskState0()
+
+            log.debug "[NOMAD] checkIfRunning task=$task.name; state=${state?.state}"
+
             // include `terminated` state to allow the handler status to progress
-            if( state && ( ["running","terminated"].contains(state.state))){
-                status = TaskStatus.RUNNING
+            if( state && ( ["running","pending","unknown"].contains(state.state))){
+                this.status = TaskStatus.RUNNING
                 determineClientNode()
                 return true
             }
@@ -89,15 +116,14 @@ class NomadTaskHandler extends TaskHandler implements FusionAwareTask {
 
     @Override
     boolean checkIfCompleted() {
-        if( !jobName ) throw new IllegalStateException("Missing Nomad Job name -- cannot check if running")
+        if( !jobName ) throw new IllegalStateException("[NOMAD] Missing Nomad Job name -- cannot check if running")
+        def isFinished = false
 
         def state = taskState0()
 
-        final isFinished = state && (state.finishedAt != null || state.state == "unknow")
+        log.debug "[NOMAD] checkIfCompleted task=$task.name; state=${state?.state}"
 
-        log.debug "[NOMAD] checkIfCompleted task.name=$task.name; state=${state?.state} completed=$isFinished"
-
-        if (isFinished) {
+        if( state && ( ["dead","complete"].contains(state.state))){
             // finalize the task
             task.exitStatus = readExitFile()
             task.stdout = outputFile
@@ -193,7 +219,7 @@ class NomadTaskHandler extends TaskHandler implements FusionAwareTask {
         if (!status || delta >= 1_000) {
 
             def newState = nomadService.getTaskState(jobName)
-            log.debug "[NOMAD] Check jobState: jobName=$jobName currentState=${state?.state} newState=${newState?.state}"
+            log.debug "[NOMAD] taskState0 jobName=$jobName currentState=${state?.state} newState=${newState?.state}"
 
             if (newState) {
                 state = newState

@@ -89,7 +89,7 @@ class JobBuilderSpec extends Specification {
         def taskGroup = JobBuilder.createTaskGroup(taskRun, args, env, jobOpts)
 
         then:
-        taskGroup.name == "group"
+        taskGroup.name == "nf-taskgroup"
         taskGroup.tasks.size() == 1
         taskGroup.tasks[0].name == "nf-task"
         taskGroup.tasks[0].config.image == "test-container"
