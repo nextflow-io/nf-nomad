@@ -102,6 +102,7 @@ class NomadDSLSpec  extends Dsl2Spec{
         given:
         boolean submitted = false
         boolean summary = false
+        int requestCounter = 0
         mockWebServer.dispatcher = new Dispatcher() {
             @Override
             MockResponse dispatch(@NotNull RecordedRequest recordedRequest) throws InterruptedException {
@@ -109,8 +110,9 @@ class NomadDSLSpec  extends Dsl2Spec{
                     case "get":
                         if( recordedRequest.path.endsWith("/allocations")) {
                             summary = true
+                            def resource = !requestCounter++ ? "/allocations.json" : "/completed.json"
                             return new MockResponse().setResponseCode(200)
-                                    .setBody(this.getClass().getResourceAsStream("/allocations.json").text).addHeader("Content-Type", "application/json")
+                                    .setBody(this.getClass().getResourceAsStream(resource).text).addHeader("Content-Type", "application/json")
                         }else {
                             return new MockResponse().setResponseCode(200)
                                     .setBody('{"Status": "dead"}').addHeader("Content-Type", "application/json")
