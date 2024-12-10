@@ -126,7 +126,7 @@ class JobBuilder {
 
         def task = createTask(taskRun, args, env, jobOpts)
         def taskGroup = new TaskGroup(
-                name: "group",
+                name: "nf-taskgroup",
                 tasks: [ task ],
                 reschedulePolicy: taskReschedulePolicy,
                 restartPolicy: taskRestartPolicy

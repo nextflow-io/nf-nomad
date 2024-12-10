@@ -126,10 +126,10 @@ class NomadService implements Closeable{
                 it.modifyIndex
             }?.last() : null
             TaskState currentState = last?.taskStates?.values()?.last()
-            log.debug "Task $jobId , state=${currentState?.state}"
+            log.debug "[NOMAD] getTaskStatus $jobId , state=${currentState?.state}"
             currentState ?: new TaskState(state: "unknown", failed: true, finishedAt: OffsetDateTime.now())
         }catch(Exception e){
-            log.debug("[NOMAD] Failed to get jobState ${jobId} -- Cause: ${e.message ?: e}", e)
+            log.debug("[NOMAD] getTaskStatus Failed to get jobState ${jobId} -- Cause: ${e.message ?: e}", e)
             new TaskState(state: "unknown", failed: true, finishedAt: OffsetDateTime.now())
         }
     }
@@ -142,10 +142,10 @@ class NomadService implements Closeable{
                 jobsApi.getJob(jobId, config.jobOpts().region, config.jobOpts().namespace,
                         null, null, null, null, null, null, null)
             }
-            log.debug "[NOMAD] checkIfRunning jobID=$job.ID; status=$job.status"
+            log.debug "[NOMAD] getJobStatus jobID=$job.ID; status=$job.status"
             job.status
         }catch (Exception e){
-            log.debug("[NOMAD] Failed to get jobState ${jobId} -- Cause: ${e.message ?: e}", e)
+            log.debug("[NOMAD] getJobStatus Failed to get jobState ${jobId} -- Cause: ${e.message ?: e}", e)
             "unknown"
         }
     }

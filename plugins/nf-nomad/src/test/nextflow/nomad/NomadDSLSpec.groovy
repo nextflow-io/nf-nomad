@@ -125,7 +125,7 @@ class NomadDSLSpec  extends Dsl2Spec{
         }
 
         when:
-        def SCRIPT = '''     
+        def SCRIPT = '''
             process sayHello{
                 container 'ubuntu:22.0.4'
                 input:
@@ -136,10 +136,10 @@ class NomadDSLSpec  extends Dsl2Spec{
                     """
                     echo '$x world!\'
                     """
-            }       
+            }
             workflow {
                 channel.of('hi!') | sayHello | view
-            } 
+            }
             '''
         and:
         def result = new MockScriptRunner([
