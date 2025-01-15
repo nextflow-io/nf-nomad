@@ -29,9 +29,9 @@ import nextflow.processor.TaskRun
 import nextflow.script.ProcessConfig
 import okhttp3.mockwebserver.MockResponse
 import okhttp3.mockwebserver.MockWebServer
+import spock.lang.Requires
 import spock.lang.Specification
 
-import java.nio.file.Files
 import java.nio.file.Path
 
 /**
@@ -41,7 +41,9 @@ import java.nio.file.Path
  *
  * @author : Jorge Aguilera <jagedn@gmail.com>
  */
-class JobConstraintsSpec extends Specification{
+
+@Requires({ System.getenv('NF_NOMAD_TEST_ENV') == 'mock' })
+class MockJobConstraintsSpec extends Specification{
 
     MockWebServer mockWebServer
 
