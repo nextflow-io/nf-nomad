@@ -111,7 +111,7 @@ class JobBuilder {
 
         final taskCfg = task.getConfig()
         final taskCores =  !taskCfg.get("cpus") ? DEFAULT_CPUS :  taskCfg.get("cpus") as Integer
-        final taskMemory = !taskCfg.get("memory") ?  new MemoryUnit(DEFAULT_MEMORY) : new MemoryUnit( taskCfg.get("memory") as String )
+        final taskMemory = new MemoryUnit( taskCfg.get("memory")?.toString() ?:  DEFAULT_MEMORY)
 
         final res = new Resources()
                 .cores(taskCores)
