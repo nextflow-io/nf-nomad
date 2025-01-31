@@ -33,7 +33,7 @@ jobs:
       - name: Generate
         run: ./gradlew antora
       - name: Upload artifact
-        uses: actions/upload-pages-artifact@v2
+        uses: actions/upload-pages-artifact@v3.0.1
         with:
           path: ./build/site
 
