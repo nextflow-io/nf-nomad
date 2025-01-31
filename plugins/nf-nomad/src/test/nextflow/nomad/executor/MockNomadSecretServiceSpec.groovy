@@ -16,21 +16,12 @@
  */
 package nextflow.nomad.executor
 
-import groovy.json.JsonOutput
-import groovy.json.JsonSlurper
-import nextflow.executor.Executor
+
 import nextflow.nomad.config.NomadConfig
-import nextflow.processor.TaskBean
-import nextflow.processor.TaskConfig
-import nextflow.processor.TaskProcessor
-import nextflow.processor.TaskRun
-import nextflow.script.ProcessConfig
 import okhttp3.mockwebserver.MockResponse
 import okhttp3.mockwebserver.MockWebServer
+import spock.lang.Requires
 import spock.lang.Specification
-
-import java.nio.file.Files
-import java.nio.file.Path
 
 /**
  * Unit test for Nomad Service for Secrets requests
@@ -39,7 +30,9 @@ import java.nio.file.Path
  *
  * @author : Jorge Aguilera <jagedn@gmail.com>
  */
-class NomadSecretServiceSpec extends Specification{
+
+@Requires({ System.getenv('NF_NOMAD_TEST_ENV') == 'mock' })
+class MockNomadSecretServiceSpec extends Specification{
 
     MockWebServer mockWebServer
 
@@ -90,6 +83,7 @@ class NomadSecretServiceSpec extends Specification{
         recordedRequest2.path == "/v1/var/another%2FMySecret"
     }
 
+    @Requires({ System.getenv('NF_NOMAD_TEST_ENV') == 'mock' })
     void "should set a variable"(){
         given:
         def config = new NomadConfig(

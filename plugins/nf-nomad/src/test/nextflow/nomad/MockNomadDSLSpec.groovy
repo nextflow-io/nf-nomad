@@ -28,6 +28,7 @@ import okhttp3.mockwebserver.MockWebServer
 import okhttp3.mockwebserver.RecordedRequest
 import org.jetbrains.annotations.NotNull
 import org.pf4j.PluginDescriptorFinder
+import spock.lang.Requires
 import spock.lang.Shared
 import spock.lang.Timeout
 import test.Dsl2Spec
@@ -43,7 +44,8 @@ import java.util.jar.Manifest
  * @author : Jorge Aguilera <jagedn@gmail.com>
  */
 @Timeout(60)
-class NomadDSLSpec  extends Dsl2Spec{
+@Requires({ System.getenv('NF_NOMAD_TEST_ENV') == 'mock' })
+class MockNomadDSLSpec  extends Dsl2Spec{
     @Shared String pluginsMode
 
     MockWebServer mockWebServer
@@ -102,6 +104,7 @@ class NomadDSLSpec  extends Dsl2Spec{
         given:
         boolean submitted = false
         boolean summary = false
+        int requestCounter = 0
         mockWebServer.dispatcher = new Dispatcher() {
             @Override
             MockResponse dispatch(@NotNull RecordedRequest recordedRequest) throws InterruptedException {
@@ -109,8 +112,9 @@ class NomadDSLSpec  extends Dsl2Spec{
                     case "get":
                         if( recordedRequest.path.endsWith("/allocations")) {
                             summary = true
+                            def resource = !requestCounter++ ? "/allocations.json" : "/completed.json"
                             return new MockResponse().setResponseCode(200)
-                                    .setBody('{"Summary": {"test":{"Complete":1}}}').addHeader("Content-Type", "application/json")
+                                    .setBody(this.getClass().getResourceAsStream(resource).text).addHeader("Content-Type", "application/json")
                         }else {
                             return new MockResponse().setResponseCode(200)
                                     .setBody('{"Status": "dead"}').addHeader("Content-Type", "application/json")
@@ -125,7 +129,7 @@ class NomadDSLSpec  extends Dsl2Spec{
         }
 
         when:
-        def SCRIPT = '''     
+        def SCRIPT = '''
             process sayHello{
                 container 'ubuntu:22.0.4'
                 input:
@@ -136,10 +140,10 @@ class NomadDSLSpec  extends Dsl2Spec{
                     """
                     echo '$x world!\'
                     """
-            }       
+            }
             workflow {
                 channel.of('hi!') | sayHello | view
-            } 
+            }
             '''
         and:
         def result = new MockScriptRunner([
@@ -195,7 +199,11 @@ class NomadDSLSpec  extends Dsl2Spec{
                         [
                                 client:
                                         [
-                                                address : "http://${mockWebServer.hostName}:${mockWebServer.port}"
+                                                address : "http://${mockWebServer.hostName}:${mockWebServer.port}",
+                                                retryConfig:[
+                                                        maxAttempts: 1,
+                                                        delay: '1ms'
+                                                ]
                                         ]
                         ]
         ]).setScript(SCRIPT).execute()
