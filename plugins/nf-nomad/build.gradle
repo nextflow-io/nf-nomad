@@ -52,7 +52,7 @@ sourceSets {
 }
 
 ext {
-    nextflowVersion = '24.04.2'
+    nextflowVersion = '24.10.4'
 }
 
 
@@ -71,11 +71,11 @@ dependencies {
 
 
     // test configuration
-    testImplementation "org.apache.groovy:groovy:4.0.21"
-    testImplementation "org.apache.groovy:groovy-nio:4.0.21"
+    testImplementation "org.apache.groovy:groovy:4.0.23"
+    testImplementation "org.apache.groovy:groovy-nio:4.0.23"
     testImplementation "io.nextflow:nextflow:$nextflowVersion"
     testImplementation "io.nextflow:nf-commons:$nextflowVersion"
-    testImplementation ("org.apache.groovy:groovy-test:4.0.21") { exclude group: 'org.apache.groovy' }
+    testImplementation ("org.apache.groovy:groovy-test:4.0.23") { exclude group: 'org.apache.groovy' }
     testImplementation ("cglib:cglib-nodep:3.3.0")
     testImplementation ("org.objenesis:objenesis:3.1")
     testImplementation ("org.spockframework:spock-core:2.3-groovy-4.0") { exclude group: 'org.apache.groovy'; exclude group: 'net.bytebuddy' }
@@ -108,7 +108,7 @@ jar {
                 'Plugin-Version': archiveVersion,
                 'Plugin-Class': "nextflow.nomad.NomadPlugin",
                 'Plugin-Provider': 'nextflow',
-                'Plugin-Requires': '>=24.04.0',
+                'Plugin-Requires': '>=24.10.4',
         )
     }
 }
