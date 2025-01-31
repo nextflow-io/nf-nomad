@@ -102,10 +102,10 @@ class NomadTaskHandler extends TaskHandler implements FusionAwareTask {
         if(isSubmitted()) {
             def state = taskState0()
 
-            log.debug "[NOMAD] checkIfRunning task=$task.name; state=${state?.state}"
+            log.debug "[NOMAD] checkIfRunning task=$task.name ; state=${state?.state}"
 
-            // include `terminated` state to allow the handler status to progress
-            if( state && ( ["running","pending","unknown"].contains(state.state))){
+            // if a state exists, include an array of states to determine task status
+            if( state?.state && ( ["running","pending","unknown"].contains(state.state))){
                 this.status = TaskStatus.RUNNING
                 determineClientNode()
                 return true
@@ -121,9 +121,10 @@ class NomadTaskHandler extends TaskHandler implements FusionAwareTask {
 
         def state = taskState0()
 
-        log.debug "[NOMAD] checkIfCompleted task=$task.name; state=${state?.state}"
+        log.debug "[NOMAD] checkIfCompleted task=$task.name ; state=${state?.state}"
 
-        if( state && ( ["dead","complete"].contains(state.state))){
+        // if a state exists, include an array of states to determine task status
+        if( state?.state && ( ["dead"].contains(state.state))){
             // finalize the task
             task.exitStatus = readExitFile()
             task.stdout = outputFile
@@ -157,9 +158,8 @@ class NomadTaskHandler extends TaskHandler implements FusionAwareTask {
     }
 
     String submitTask() {
-        log.debug "[NOMAD] Submitting task ${task.name} - work-dir=${task.workDirStr}"
         if (!task.container)
-            throw new ProcessSubmitException("Missing container image for process `$task.processor.name`")
+            throw new ProcessSubmitException("[NOMAD] Missing container image for process `$task.processor.name`")
 
         def builder = createBashWrapper(task)
         builder.build()
@@ -172,7 +172,7 @@ class NomadTaskHandler extends TaskHandler implements FusionAwareTask {
         nomadService.submitTask(this.jobName, task, taskLauncher, taskEnv, debugPath())
 
         // submit the task execution
-        log.debug "[NOMAD] Submitted task ${task.name} with taskId=${this.jobName}"
+        log.debug "[NOMAD] submitTask task=${task.name} ; taskId=${this.jobName} ; work-dir=${task.workDirStr}"
         // update the status
         this.status = TaskStatus.SUBMITTED
     }
@@ -219,7 +219,7 @@ class NomadTaskHandler extends TaskHandler implements FusionAwareTask {
         if (!status || delta >= 1_000) {
 
             def newState = nomadService.getTaskState(jobName)
-            log.debug "[NOMAD] taskState0 jobName=$jobName currentState=${state?.state} newState=${newState?.state}"
+            log.debug "[NOMAD] taskState0 task=$jobName ; currentState=${state?.state} ; newState=${newState?.state}"
 
             if (newState) {
                 state = newState
@@ -244,12 +244,11 @@ class NomadTaskHandler extends TaskHandler implements FusionAwareTask {
     }
 
 
-
     private void determineClientNode(){
         try {
             if ( !clientName )
                 clientName = nomadService.getClientOfJob( jobName )
-            log.debug "[NOMAD] determineClientNode: jobName:$jobName; clientName:$clientName"
+            log.debug "[NOMAD] determineClientNode: jobName:$jobName ; clientName:$clientName"
         } catch ( Exception e ){
             log.debug ("[NOMAD] Unable to get the client name of job $jobName -- awaiting for a client to be assigned.")
         }

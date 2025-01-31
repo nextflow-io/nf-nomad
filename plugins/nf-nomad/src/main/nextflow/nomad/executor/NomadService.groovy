@@ -136,20 +136,6 @@ class NomadService implements Closeable{
 
 
 
-    String getJobStatus(String jobId){
-        try {
-            Job job = safeExecutor.apply {
-                jobsApi.getJob(jobId, config.jobOpts().region, config.jobOpts().namespace,
-                        null, null, null, null, null, null, null)
-            }
-            log.debug "[NOMAD] getJobStatus jobID=$job.ID; status=$job.status"
-            job.status
-        }catch (Exception e){
-            log.debug("[NOMAD] getJobStatus Failed to get jobState ${jobId} -- Cause: ${e.message ?: e}", e)
-            "unknown"
-        }
-    }
-
     void kill(String jobId) {
         purgeJob(jobId, false)
     }

@@ -28,6 +28,7 @@ import okhttp3.mockwebserver.MockWebServer
 import okhttp3.mockwebserver.RecordedRequest
 import org.jetbrains.annotations.NotNull
 import org.pf4j.PluginDescriptorFinder
+import spock.lang.Requires
 import spock.lang.Shared
 import spock.lang.Timeout
 import test.Dsl2Spec
@@ -43,7 +44,8 @@ import java.util.jar.Manifest
  * @author : Jorge Aguilera <jagedn@gmail.com>
  */
 @Timeout(60)
-class NomadDSLSpec  extends Dsl2Spec{
+@Requires({ System.getenv('NF_NOMAD_TEST_ENV') == 'mock' })
+class MockNomadDSLSpec  extends Dsl2Spec{
     @Shared String pluginsMode
 
     MockWebServer mockWebServer

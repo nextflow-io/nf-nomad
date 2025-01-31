@@ -107,11 +107,11 @@ class JobBuilder {
 
     static protected Resources getResources(TaskRun task) {
         final DEFAULT_CPUS = 1
-        final DEFAULT_MEMORY = "500.MB"
+        final DEFAULT_MEMORY = "1.GB"
 
         final taskCfg = task.getConfig()
         final taskCores =  !taskCfg.get("cpus") ? DEFAULT_CPUS :  taskCfg.get("cpus") as Integer
-        final taskMemory = taskCfg.get("memory") ? new MemoryUnit( taskCfg.get("memory") as String ) : new MemoryUnit(DEFAULT_MEMORY)
+        final taskMemory = new MemoryUnit( taskCfg.get("memory")?.toString() ?:  DEFAULT_MEMORY)
 
         final res = new Resources()
                 .cores(taskCores)
