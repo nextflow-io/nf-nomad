@@ -39,9 +39,10 @@ if [ "$SKIPLOCAL" == 0 ]; then
 
   ./run-pipeline.sh -c constraints/node-nextflow.config constraints/main.nf -profile localnomad --RUN_IN_NODE $HOSTNAME
 
-  ./run-pipeline.sh -c basic/nextflow.config nf-core/demo \
-    -r dev -profile test,docker \
-    --outdir $(pwd)/nomad_temp/scratchdir/out
+# nf-core is failing with current version of nextflow due some allocation
+#  ./run-pipeline.sh -c basic/nextflow.config nf-core/demo \
+#    -r dev -profile test,docker \
+#    --outdir $(pwd)/nomad_temp/scratchdir/out
 
 # Batctopia is failing with current version of nextflow due some bug in --max_cpus but cant find a fix
 #  ./run-pipeline.sh -c basic/nextflow.config bactopia/bactopia \
