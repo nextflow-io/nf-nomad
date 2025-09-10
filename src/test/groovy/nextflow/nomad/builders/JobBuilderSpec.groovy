@@ -16,10 +16,9 @@
  */
 package nextflow.nomad.builders
 
-import nextflow.nomad.config.NomadConfig
+
 import nextflow.nomad.config.NomadJobOpts
 import nextflow.processor.TaskRun
-import okhttp3.mockwebserver.MockWebServer
 import spock.lang.Specification
 
 /**

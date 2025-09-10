@@ -16,5 +16,3 @@
  */
 
 rootProject.name = 'nf-nomad'
-include 'plugins'
-include('plugins:nf-nomad')
