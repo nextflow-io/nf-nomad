@@ -11,7 +11,7 @@ NFSLEEP=0
 NFDEMO=0
 
 [[ "$@" =~ '--build' ]] && BUILD=1
-[[ -f $HOME/.nextflow/plugins/nf-nomad-latest/ ]]  && BUILD=1
+[[ -f $HOME/.nextflow/plugins/nf-nomad-99.99.99/ ]]  && BUILD=1
 [[ "$@" =~ '--skiplocal' ]] && SKIPLOCAL=1
 [[ "$@" =~ '--nfazure' ]] && NFAZURE=1
 [[ "$@" =~ '--nfgithub' ]] && NFGHACTION=1
@@ -21,7 +21,7 @@ NFDEMO=0
 
 if [ "$BUILD" == 1 ]; then
   pushd ..
-  ./gradlew unzipPlugin -x test -P version=latest
+  ./gradlew installPlugin -x test -P version=99.99.99
   popd +0  || exit
 else
   echo "skip build"
@@ -57,8 +57,8 @@ else
 fi
 
 if [ "$NFAZURE" == 1 ]; then
-  ssh manager@nfazure 'rm -rf ~/.nextflow/plugins/nf-nomad-latest'
-  rsync -Pr ~/.nextflow/plugins/nf-nomad-latest manager@nfazure:~/.nextflow/plugins/
+  ssh manager@nfazure 'rm -rf ~/.nextflow/plugins/nf-nomad-99.99.99'
+  rsync -Pr ~/.nextflow/plugins/nf-nomad-99.99.99 manager@nfazure:~/.nextflow/plugins/
   rsync -Pr az-nomadlab manager@nfazure:~/integration-tests/
 
   ssh manager@nfazure \

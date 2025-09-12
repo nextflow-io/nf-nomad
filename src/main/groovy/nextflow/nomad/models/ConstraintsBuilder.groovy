@@ -1,9 +1,6 @@
 package nextflow.nomad.models
 
 import io.nomadproject.client.model.Constraint
-import nextflow.nomad.models.JobConstraintsAttr
-import nextflow.nomad.models.JobConstraintsNode
-import nextflow.nomad.models.JobConstraints
 
 class ConstraintsBuilder {
 

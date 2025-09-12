@@ -12,6 +12,7 @@ jobs:
   build:
     name: Build
     runs-on: ubuntu-latest
+    if: ${{ github.actor == 'jagedn' || github.actor == 'abhi18av' }}
     timeout-minutes: 90
     strategy:
       fail-fast: false
@@ -55,7 +56,7 @@ jobs:
           architecture: x64
 
       - name: build artifacts
-        run: ./gradlew clean jsonPlugin -x test -P version=${GITHUB_REF#refs/tags/}
+        run: ./gradlew clean installPlugin -x test -P version=${GITHUB_REF#refs/tags/}
 
       - name: Upload artifact and release
         uses: softprops/action-gh-release@v2
@@ -64,4 +65,7 @@ jobs:
           prerelease: false
           body_path: CHANGELOG.md
           files: |
-            ./plugins/nf-nomad/build/plugin/*
+            ./build/distributions/*
+
+      - name: publish release
+        run: ./gradlew releasePlugin -x test -P version=${GITHUB_REF#refs/tags/}

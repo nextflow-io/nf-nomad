@@ -4,10 +4,6 @@ import groovy.util.logging.Slf4j
 import nextflow.exception.AbortOperationException
 import nextflow.nomad.config.NomadConfig
 import nextflow.nomad.executor.NomadService
-import nextflow.plugin.Priority
-import nextflow.secret.Secret
-import nextflow.secret.SecretImpl
-import nextflow.secret.SecretsProvider
 
 @Slf4j
 class NomadSecretCmd {

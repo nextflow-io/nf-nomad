@@ -1,10 +1,10 @@
 # Validation tests
 
-Before to run the validation tests you must to "recompile" the plugin using `latest` version:
+Before to run the validation tests you must to "recompile" the plugin using `99.99.99` version:
 
-`./gradlew clean unzipPlugin -P version=latest`
+`./gradlew clean installPlugin -P version=99.99.99`
 
-this command will build and install current code of the plugin with the version name `latest` used by this validation
+this command will build and install current code of the plugin with the version name `99.99.99` used by this validation
 tests
 
 ## Start a local "cluster"
@@ -41,7 +41,7 @@ The most important part of the configuration (`basic/nextflow.config`) are:
 
 ``` 
 plugins {
-    id "nf-nomad@${System.getenv("NOMAD_PLUGIN_VERSION") ?: "latest"}"
+    id "nf-nomad@${System.getenv("NOMAD_PLUGIN_VERSION") ?: "99.99.99"}"
 }
 ```
 
