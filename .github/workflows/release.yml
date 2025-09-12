@@ -68,4 +68,6 @@ jobs:
             ./build/distributions/*
 
       - name: publish release
+        env:
+          NPR_API_KEY: ${{ secrets.NPR_API_KEY }}
         run: ./gradlew releasePlugin -x test -P version=${GITHUB_REF#refs/tags/}
