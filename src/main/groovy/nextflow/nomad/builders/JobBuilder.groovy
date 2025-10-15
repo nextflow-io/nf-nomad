@@ -203,7 +203,7 @@ class JobBuilder {
         if( jobOpts.volumeSpec){
             taskDef.volumeMounts = []
             jobOpts.volumeSpec.eachWithIndex { volumeSpec, idx ->
-                String destinationDir = volumeSpec.workDir ?
+                String destinationDir = volumeSpec.workDir && !volumeSpec.path ?
                         workingDir.split(File.separator).dropRight(2).join(File.separator) : volumeSpec.path
                 taskDef.volumeMounts.add new VolumeMount(
                         destination: destinationDir,

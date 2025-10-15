@@ -1,0 +1,23 @@
+nextflow_workflow {
+
+    name "Test Basic"
+    script "tests/basic/main.nf"
+    workflow "MAIN"
+
+    test("Should run without failures") {
+
+        when {
+            params {
+            }
+            workflow {
+            }
+        }
+
+        then {
+            assert workflow.success
+            assert snapshot(workflow.out).match()
+        }
+
+    }
+
+}
