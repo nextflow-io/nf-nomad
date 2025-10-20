@@ -9,7 +9,9 @@ process sayHello {
     stdout
     script:
     """
-    echo '$x world!'
+    echo '$x world!' > /var/data1/hello
+    cp /var/data1/hello /var/data2/hello2
+    echo '$x'
     """
 }
 

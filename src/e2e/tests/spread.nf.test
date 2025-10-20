@@ -1,9 +1,9 @@
 nextflow_workflow {
 
     name "Test Spread"
-    script "tests/spread/main.nf"
+    script "workflows/hello.nf"
+    config "tests/nextflow.config"
     workflow "MAIN"
-    config "tests/spread/nextflow.config"
 
     test("Should run without failures") {
 

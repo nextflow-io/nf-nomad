@@ -1,9 +1,9 @@
 nextflow_workflow {
 
-    name "Test Wrong Spread"
-    script "tests/spread/main.nf"
+    name "Test Constraints"
+    script "workflows/hello.nf"
+    config "tests/constraints.config"
     workflow "MAIN"
-    config "tests/spread/wrong-spread-nextflow.config"
 
     test("Should run without failures") {
 
@@ -15,7 +15,8 @@ nextflow_workflow {
         }
 
         then {
-            assert workflow.success == false
+            assert workflow.success
+            assert snapshot(workflow.out).match()
         }
 
     }

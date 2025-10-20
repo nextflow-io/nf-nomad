@@ -84,6 +84,17 @@ To run and test the plugin in a development environment, configure a local Nextf
     ./launch.sh run main.nf -plugins nf-nomad
     ```
 
+## End 2 End test (nf-test)
+
+Project uses `nf-test` to run end to end integration tests running "real" pipelines against a local nomad
+
+- compile and install a 99.99.99 version (`./gradlew clean installPlugin -Pversion=99.99.99)
+- open a terminal at `src/e2e/nomad` and execute `sudo ./start-nomad.sh` (this command will create a nomad server+client in the /tmp/nomad folder)
+- follow terminal instructions to get the NOMAD_TOKEN (`source /mtp/nomad/nomad_temp/.env`)
+- run all tests (`nf-test test`)
+
+
+
 ## Package, upload and publish
 
 The project should be hosted in a GitHub repository whose name should match the name of the plugin, that is the name of the directory in the `plugins` folder (e.g. `nf-nomad`).
