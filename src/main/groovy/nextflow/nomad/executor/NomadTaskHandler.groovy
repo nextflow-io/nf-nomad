@@ -149,7 +149,13 @@ class NomadTaskHandler extends TaskHandler implements FusionAwareTask {
 
     @Override
     void kill() {
+        super.kill()
         nomadService.kill(this.jobName)
+    }
+
+    @Override
+    void killTask(){
+        kill()
     }
 
     @Override
