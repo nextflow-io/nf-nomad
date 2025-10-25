@@ -1,0 +1,24 @@
+nextflow_workflow {
+
+    name "Test Spread"
+    script "workflows/hello.nf"
+    config "tests/nextflow.config"
+    workflow "MAIN"
+
+    test("Should run without failures") {
+
+        when {
+            params {
+            }
+            workflow {
+            }
+        }
+
+        then {
+            assert workflow.success
+            assert snapshot(workflow.out).match()
+        }
+
+    }
+
+}

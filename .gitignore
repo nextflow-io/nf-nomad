@@ -17,3 +17,4 @@ oracle-nomad-cluster
 /validation/nomad_temp/**
 /validation/nomad
 **/*.tsv
+/src/e2e/.nf-test.log
