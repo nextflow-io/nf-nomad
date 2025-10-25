@@ -38,6 +38,9 @@ class NomadSecretProvider extends LocalSecretsProvider implements SecretsProvide
 
     protected boolean isEnabled(){
         if( !config ){
+            if( !Global.config ){
+                return false
+            }
             config = new NomadConfig(Global.config?.nomad as Map ?: Map.of())
         }
         config?.jobOpts()?.secretOpts?.enabled

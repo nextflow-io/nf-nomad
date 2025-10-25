@@ -40,7 +40,7 @@ import org.pf4j.ExtensionPoint
 class NomadExecutor extends Executor implements ExtensionPoint {
 
     private NomadService service
-    private NomadConfig config
+    private NomadConfig nomadConfig
 
     @Override
     protected void register() {
@@ -49,13 +49,13 @@ class NomadExecutor extends Executor implements ExtensionPoint {
     }
 
     protected void initNomadService(){
-        this.config = new NomadConfig((session.config.nomad ?: Collections.emptyMap()) as Map)
-        this.service = new NomadService(this.config)
+        this.nomadConfig = new NomadConfig((session.config.nomad ?: Collections.emptyMap()) as Map)
+        this.service = new NomadService(this.nomadConfig)
     }
 
     @Override
     protected TaskMonitor createTaskMonitor() {
-        TaskPollingMonitor.create(session, name, 100, Duration.of('5 sec'))
+        TaskPollingMonitor.create(session, config, name, Duration.of('5 sec'))
     }
 
     @Override
@@ -63,7 +63,7 @@ class NomadExecutor extends Executor implements ExtensionPoint {
         assert task
         assert task.workDir
         log.trace "[NOMAD] launching process > ${task.name} -- work folder: ${task.workDirStr}"
-        return new NomadTaskHandler(task, this.config, service)
+        return new NomadTaskHandler(task, this.nomadConfig, service)
     }
 
     @Override

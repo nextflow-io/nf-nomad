@@ -23,8 +23,7 @@ import nextflow.cli.PluginAbstractExec
 import nextflow.nomad.secrets.NomadSecretCmd
 import nextflow.nomad.executor.TaskDirectives
 import nextflow.plugin.BasePlugin
-import nextflow.script.ProcessConfig
-import nextflow.secret.SecretsLoader
+import nextflow.script.dsl.ProcessBuilder
 import org.pf4j.PluginWrapper
 
 /**
@@ -40,11 +39,10 @@ class NomadPlugin extends BasePlugin implements PluginAbstractExec{
     NomadPlugin(PluginWrapper wrapper) {
         super(wrapper)
         addCustomDirectives()
-        SecretsLoader.instance.reset()
     }
 
     private static void addCustomDirectives() {
-        ProcessConfig.DIRECTIVES.addAll(TaskDirectives.ALL)
+        ProcessBuilder.DIRECTIVES.addAll(TaskDirectives.ALL)
     }
 
     @Override
