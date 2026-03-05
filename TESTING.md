@@ -1,0 +1,144 @@
+# Testing Guide — nf-nomad
+
+## Overview
+
+Tests are organised into three categories, controlled by the `NF_NOMAD_TEST_ENV`
+environment variable (or the Gradle property `-PtestEnv`):
+
+| Category        | `testEnv` value | What runs                                      |
+|-----------------|----------------|-------------------------------------------------|
+| **Unit**        | _(empty)_      | Pure unit tests — always run, no network needed |
+| **Mock**        | `mock`         | Unit tests **+** MockWebServer-based specs      |
+| **Integration** | `local`        | Unit tests **+** live tests against local Nomad |
+| **Integration** | `oci`          | Unit tests **+** live tests against OCI cluster |
+
+## Test Spec Files
+
+### Unit tests (always run, no annotation gate)
+
+These test internal logic without any Nomad cluster or mock server:
+
+- `config/NomadConfigSpec.groovy` — NomadConfig parsing and defaults
+- `config/NomadJobOptsSpec.groovy` — Job options (volumes, affinities, constraints, spreads)
+- `config/NomadJobConstraintsSpec.groovy` — Constraint DSL parsing
+- `builders/JobBuilderSpec.groovy` — Job/TaskGroup/Task builder logic
+- `executor/NomadTaskHandlerSpec.groovy` — Task handler submit logic
+
+### Mock tests (`@Requires NF_NOMAD_TEST_ENV == 'mock'`)
+
+These use OkHttp `MockWebServer` to validate HTTP requests without a real cluster:
+
+- `executor/MockNomadServiceSpec.groovy` — Service request/response validation
+- `executor/MockNomadSecretServiceSpec.groovy` — Secrets (variables) API requests
+- `models/MockJobConstraintsSpec.groovy` — Constraint serialisation in job payloads
+- `MockNomadDSLSpec.groovy` — End-to-end DSL / plugin integration with mock server
+
+### Integration tests (`@Requires NF_NOMAD_TEST_ENV in ['oci', 'local']`)
+
+These run against a **live** Nomad cluster:
+
+- `executor/NomadServiceIntegrationSpec.groovy` — Connectivity, job submit, state polling, purge
+
+Some methods inside this spec have additional per-cluster gates:
+
+- `@Requires NF_NOMAD_TEST_ENV == 'oci'` — OCI-specific checks (e.g. token auth)
+- `@Requires NF_NOMAD_TEST_ENV == 'local'` — Local-specific checks (e.g. localhost address)
+
+## How It Works
+
+### Environment variable: `NF_NOMAD_TEST_ENV`
+
+Spock's `@Requires` annotation reads this variable at class/method load time to
+decide which specs to run. The value is set in one of two ways:
+
+1. **Gradle property** (preferred): `./gradlew test -PtestEnv=mock`
+2. **Shell env var**: `NF_NOMAD_TEST_ENV=mock ./gradlew test`
+
+The Gradle property takes precedence. See `build.gradle` for the resolution logic.
+
+### Cluster connection variables
+
+When `testEnv` is `oci` or `local`, the following env vars are forwarded from
+your shell into the test JVM:
+
+- `NOMAD_ADDR` — Nomad HTTP API address (defaults to `http://localhost:4646` for `local`)
+- `NOMAD_TOKEN` — ACL token (required for `oci`, not needed for `local` dev agent)
+- `NOMAD_DC` — Datacenter name (optional)
+
+When `testEnv` is empty or `mock`, safe dummy values are injected instead
+(`NOMAD_ADDR=http://test-nf-nomad`, `NOMAD_DC=dc-test`).
+
+## Quick Start
+
+### Run unit tests only (default)
+
+```shell
+make test
+# or: ./gradlew test
+```
+
+### Run unit + mock tests
+
+```shell
+make test-mock
+# or: ./gradlew test -PtestEnv=mock
+```
+
+### Run integration tests against local Nomad
+
+Ensure the local cluster is running
+(see `../../infrastructure/03_automation/035_terraform/local-nomad-minio/`):
+
+```shell
+# Fish
+set -gx NOMAD_ADDR http://localhost:4646
+
+make test-local
+# or: ./gradlew test -PtestEnv=local
+```
+
+### Run integration tests against OCI Nomad
+
+Source the generated env from the OCI terraform module first:
+
+```shell
+# Fish
+source ../../infrastructure/03_automation/035_terraform/oci-vm-nomad/generated/env.fish
+
+# Bash/Zsh
+source ../../infrastructure/03_automation/035_terraform/oci-vm-nomad/generated/env.sh
+
+make test-oci
+# or: ./gradlew test -PtestEnv=oci
+```
+
+### Run a single spec
+
+```shell
+make test class=nextflow.nomad.executor.NomadServiceIntegrationSpec
+# with testEnv:
+./gradlew test -PtestEnv=local --tests nextflow.nomad.executor.NomadServiceIntegrationSpec
+```
+
+## Target Clusters
+
+### local-nomad-minio
+
+- **Location**: `../../infrastructure/03_automation/035_terraform/local-nomad-minio/`
+- **Nomad address**: `http://localhost:4646`
+- **Auth**: None (dev agent)
+- Nomad runs natively on macOS; MinIO runs in Docker
+
+### oci-vm-nomad
+
+- **Location**: `../../infrastructure/03_automation/035_terraform/oci-vm-nomad/`
+- **Nomad address**: Public IP of OCI server on port 4646
+- **Auth**: ACL bootstrap token (set via `NOMAD_TOKEN`)
+- Remote cluster on Oracle Cloud with MinIO on the server node
+
+## Adding New Tests
+
+- **Unit test**: No annotation needed — just extend `Specification`.
+- **Mock test**: Add `@Requires({ System.getenv('NF_NOMAD_TEST_ENV') == 'mock' })` at class level.
+- **Integration test**: Add `@Requires({ System.getenv('NF_NOMAD_TEST_ENV') in ['oci', 'local'] })`
+  at class level. Use per-method `@Requires` for cluster-specific assertions.
