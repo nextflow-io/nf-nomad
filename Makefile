@@ -44,6 +44,21 @@ else
 	./gradlew ${mm}test --tests ${class}
 endif
 
+#
+# Integration test targets — source the cluster env first, then run:
+#   make test-mock   (unit + mock tests with MockWebServer)
+#   make test-local  (unit + integration against local-nomad-minio)
+#   make test-oci    (unit + integration against oci-vm-nomad)
+#
+test-mock:
+	./gradlew ${mm}test -PtestEnv=mock
+
+test-local:
+	./gradlew ${mm}test -PtestEnv=local
+
+test-oci:
+	./gradlew ${mm}test -PtestEnv=oci
+
 
 
 #

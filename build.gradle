@@ -9,11 +9,26 @@ dependencies {
     testImplementation 'com.squareup.okhttp3:mockwebserver:4.9.3'
 }
 
+// Resolve test environment: -PtestEnv=mock|oci|local  (falls back to NF_NOMAD_TEST_ENV env var)
+def testEnv = project.hasProperty('testEnv') ? project.property('testEnv') : System.getenv('NF_NOMAD_TEST_ENV') ?: ''
+
 test {
     useJUnitPlatform()
     jvmArgs '--add-opens=java.base/java.lang=ALL-UNNAMED'
-    environment 'NOMAD_ADDR', 'http://test-nf-nomad'
-    environment 'NOMAD_DC', 'dc-test'
+
+    // Always propagate the resolved test-environment selector
+    environment 'NF_NOMAD_TEST_ENV', testEnv
+
+    if (testEnv in ['oci', 'local']) {
+        // Forward real cluster env vars into the test JVM
+        environment 'NOMAD_ADDR',  System.getenv('NOMAD_ADDR')  ?: (testEnv == 'local' ? 'http://localhost:4646' : '')
+        environment 'NOMAD_TOKEN', System.getenv('NOMAD_TOKEN') ?: ''
+        environment 'NOMAD_DC',    System.getenv('NOMAD_DC')    ?: ''
+    } else {
+        // Unit / mock tests: safe dummy values
+        environment 'NOMAD_ADDR', 'http://test-nf-nomad'
+        environment 'NOMAD_DC',   'dc-test'
+    }
 }
 
 node {
