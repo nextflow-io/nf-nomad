@@ -81,7 +81,7 @@ class NomadService implements Closeable{
                 .withId(id)
                 .withName(task.name)
                 .withType("batch")
-//                .withDatacenters(task, this.config.jobOpts().datacenters)
+                .withDatacenters(this.config.jobOpts().datacenters)
                 .withNamespace(this.config.jobOpts().namespace)
                 .withTaskGroups([JobBuilder.createTaskGroup(task, args, env, this.config.jobOpts())])
                 .build()

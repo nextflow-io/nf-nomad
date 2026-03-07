@@ -56,6 +56,19 @@ decide which specs to run. The value is set in one of two ways:
 
 The Gradle property takes precedence. See `build.gradle` for the resolution logic.
 
+### Gradle property overrides
+
+You can override Nomad-related test environment values directly when invoking Gradle:
+
+- `-PnomadAddr=...` → sets `NOMAD_ADDR`
+- `-PnomadToken=...` → sets `NOMAD_TOKEN`
+- `-PnomadDc=...` → sets `NOMAD_DC`
+- `-PnomadRegion=...` → sets `NOMAD_REGION`
+- `-PnomadNamespace=...` → sets `NOMAD_NAMESPACE`
+- `-PnxfDebug=...` → sets `NXF_DEBUG`
+
+These overrides work with `local`, `oci`, `mock`, and default unit test runs.
+
 ### Cluster connection variables
 
 When `testEnv` is `oci` or `local`, the following env vars are forwarded from
@@ -97,6 +110,18 @@ make test-local
 # or: ./gradlew test -PtestEnv=local
 ```
 
+To target a non-default local endpoint, override it explicitly:
+
+```shell
+./gradlew test -PtestEnv=local -PnomadAddr=http://<host>:4646
+```
+
+You can combine other overrides in the same command, for example:
+
+```shell
+./gradlew test -PtestEnv=local -PnomadAddr=http://localhost:4646 -PnomadDc=dc1 -PnxfDebug=1
+```
+
 ### Run integration tests against OCI Nomad
 
 Source the generated env from the OCI terraform module first:
@@ -110,6 +135,12 @@ source ../../infrastructure/03_automation/035_terraform/oci-vm-nomad/generated/e
 
 make test-oci
 # or: ./gradlew test -PtestEnv=oci
+```
+
+Example with explicit overrides:
+
+```shell
+./gradlew test -PtestEnv=oci -PnomadAddr=http://<oci-host>:4646 -PnomadToken=<token> -PnomadNamespace=nf-nomad
 ```
 
 ### Run a single spec

@@ -45,12 +45,12 @@ class NomadConfigSpec extends Specification {
         expect:
         new NomadConfig([
                 client:[address: ADDRESS]
-        ]).clientOpts.address == EXPECTED
+        ], ENV).clientOpts.address == EXPECTED
 
         where:
-        ADDRESS                                  |  EXPECTED
-        null                                     | "http://test-nf-nomad/v1" // see build.gradle
-        "http://nomad"                           | "http://nomad/v1"
+        ADDRESS                                  | ENV                                     | EXPECTED
+        null                                     | [NOMAD_ADDR: "http://test-nf-nomad"]   | "http://test-nf-nomad/v1"
+        "http://nomad"                           | [:]                                     | "http://nomad/v1"
     }
 
     void "should use address if provided"() {
@@ -87,7 +87,7 @@ class NomadConfigSpec extends Specification {
         given:
         def config = new NomadConfig([
                 jobs: [:]
-        ])
+        ], [NOMAD_DC: 'dc-test'])
 
         expect:
         config.jobOpts.datacenters == List.of('dc-test')

@@ -56,6 +56,35 @@ Run the following command in the project root directory (ie. where the file `set
 ./gradlew check
 ```
 
+## Test environment selection
+
+The Gradle test task supports selecting the target environment with `-PtestEnv`:
+
+- `./gradlew test` → unit tests only
+- `./gradlew test -PtestEnv=mock` → unit + mock tests
+- `./gradlew test -PtestEnv=local` → unit + local Nomad integration tests
+- `./gradlew test -PtestEnv=oci` → unit + OCI Nomad integration tests
+
+For local integration tests, the default Nomad address is `http://localhost:4646`.
+If you need a different endpoint, override explicitly:
+
+```bash
+./gradlew test -PtestEnv=local -PnomadAddr=http://<host>:4646
+```
+
+## Runtime security default
+
+Nomad Docker jobs are **not privileged by default**.
+To opt in, set:
+
+```groovy
+nomad {
+  jobs {
+    privileged = true
+  }
+}
+```
+
 ## Testing and debugging
 
 To run and test the plugin in a development environment, configure a local Nextflow build with the following steps:

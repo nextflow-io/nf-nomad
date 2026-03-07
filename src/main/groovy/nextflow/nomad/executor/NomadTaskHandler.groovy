@@ -105,7 +105,7 @@ class NomadTaskHandler extends TaskHandler implements FusionAwareTask {
             log.debug "[NOMAD] checkIfRunning task=$task.name ; state=${state?.state}"
 
             // if a state exists, include an array of states to determine task status
-            if( state?.state && ( ["running","pending","unknown"].contains(state.state))){
+            if( state?.state && ( ["running","pending","starting"].contains(state.state))){
                 this.status = TaskStatus.RUNNING
                 determineClientNode()
                 return true
@@ -124,7 +124,7 @@ class NomadTaskHandler extends TaskHandler implements FusionAwareTask {
         log.debug "[NOMAD] checkIfCompleted task=$task.name ; state=${state?.state}"
 
         // if a state exists, include an array of states to determine task status
-        if( state?.state && ( ["dead"].contains(state.state))){
+        if( state?.state && ( ["dead","complete","failed","lost"].contains(state.state))){
             // finalize the task
             task.exitStatus = readExitFile()
             task.stdout = outputFile

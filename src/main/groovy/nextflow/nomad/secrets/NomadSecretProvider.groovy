@@ -29,9 +29,8 @@ class NomadSecretProvider extends LocalSecretsProvider implements SecretsProvide
     @Override
     protected List<Secret> loadSecrets() {
         Set<String> names = listSecretsNames()
-        List<Secret> ret = names.collect{ name->
-            String value = getSecret(name)
-            new SecretImpl(name, value)
+        List<Secret> ret = names.collect { name ->
+            getSecret(name)
         }
         ret
     }
@@ -74,16 +73,22 @@ class NomadSecretProvider extends LocalSecretsProvider implements SecretsProvide
 
     @Override
     void putSecret(String name, String value) {
-        if( !this.enabled ) {
-            super.putSecret(name, value)
+        if( this.enabled ) {
+            NomadService service = new NomadService(config)
+            service.setVariableValue(name, value)
+            return
         }
+        super.putSecret(name, value)
     }
 
     @Override
     void removeSecret(String name) {
-        if( !this.enabled ) {
-            super.removeSecret(name)
+        if( this.enabled ) {
+            NomadService service = new NomadService(config)
+            service.deleteVariable(name)
+            return
         }
+        super.removeSecret(name)
     }
 
     @Override

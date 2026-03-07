@@ -45,7 +45,10 @@ class NomadClientOpts{
     NomadClientOpts(Map nomadClientOpts, Map<String,String> env=null){
         assert nomadClientOpts!=null
 
-        def sysEnv = env ?: new HashMap<String,String>(System.getenv())
+        def sysEnv = new HashMap<String,String>(System.getenv())
+        if( env ) {
+            sysEnv.putAll(env)
+        }
 
         def address = (nomadClientOpts.address?.toString() ?: sysEnv.get('NOMAD_ADDR'))
         assert address != null, "Nomad Address is required"

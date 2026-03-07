@@ -50,23 +50,31 @@ class NomadJobOpts{
 
     Integer rescheduleAttempts
     Integer restartAttempts
+    Boolean privileged
 
     NomadSecretOpts secretOpts
 
     NomadJobOpts(Map nomadJobOpts, Map<String,String> env=null){
         assert nomadJobOpts!=null
 
-        sysEnv = env ?: new HashMap<String,String>(System.getenv())
+        sysEnv = new HashMap<String,String>(System.getenv())
+        if( env ) {
+            sysEnv.putAll(env)
+        }
 
         deleteOnCompletion = nomadJobOpts.containsKey("deleteOnCompletion") ?
                 nomadJobOpts.deleteOnCompletion : true
         if( nomadJobOpts.containsKey("datacenters") ) {
             datacenters = ((nomadJobOpts.datacenters instanceof List<String> ?
                     nomadJobOpts.datacenters : nomadJobOpts.datacenters.toString().split(","))
-                    as List<String>).findAll{it.size()}.unique()
+                    as List<String>).collect { it?.toString()?.trim() }.findAll { it?.size() }.unique()
         }else{
-            if( sysEnv.containsKey('NOMAD_DC')) {
-                datacenters = sysEnv.get('NOMAD_DC').split(",") as List<String>
+            def envDatacenters = sysEnv.get('NOMAD_DC')
+            if( envDatacenters?.toString()?.trim() ) {
+                datacenters = (envDatacenters.toString().split(",") as List<String>)
+                        .collect { it?.toString()?.trim() }
+                        .findAll { it?.size() }
+                        .unique()
             }
         }
 
@@ -76,6 +84,9 @@ class NomadJobOpts{
         //NOTE: Default to a single attempt per nomad job definition
         rescheduleAttempts = nomadJobOpts.rescheduleAttempts as Integer ?: 1
         restartAttempts = nomadJobOpts.restartAttempts as Integer ?: 1
+        privileged = nomadJobOpts.containsKey("privileged")
+                ? Boolean.valueOf(nomadJobOpts.privileged.toString())
+                : true
 
         dockerVolume = nomadJobOpts.dockerVolume ?: null
         if( dockerVolume ){
