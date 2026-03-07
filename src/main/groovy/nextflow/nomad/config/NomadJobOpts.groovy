@@ -24,7 +24,6 @@ import nextflow.nomad.models.JobConstraint
 import nextflow.nomad.models.JobConstraints
 import nextflow.nomad.models.JobSpreads
 import nextflow.nomad.models.JobVolume
-import nextflow.util.Duration
 
 
 /**
@@ -52,8 +51,6 @@ class NomadJobOpts{
     Integer rescheduleAttempts
     Integer restartAttempts
     Boolean privileged
-    Boolean failOnPlacementFailure
-    Duration placementFailureTimeout
 
     NomadSecretOpts secretOpts
 
@@ -81,8 +78,8 @@ class NomadJobOpts{
             }
         }
 
-        region = sanitizeOptionalString(nomadJobOpts.region) ?: sanitizeOptionalString(sysEnv.get('NOMAD_REGION'))
-        namespace = sanitizeOptionalString(nomadJobOpts.namespace) ?: sanitizeOptionalString(sysEnv.get('NOMAD_NAMESPACE'))
+        region = nomadJobOpts.region ?: sysEnv.get('NOMAD_REGION')
+        namespace = nomadJobOpts.namespace ?: sysEnv.get('NOMAD_NAMESPACE')
 
         //NOTE: Default to a single attempt per nomad job definition
         rescheduleAttempts = nomadJobOpts.rescheduleAttempts as Integer ?: 1
@@ -90,23 +87,6 @@ class NomadJobOpts{
         privileged = nomadJobOpts.containsKey("privileged")
                 ? Boolean.valueOf(nomadJobOpts.privileged.toString())
                 : true
-
-        // Placement failure handling
-        failOnPlacementFailure = nomadJobOpts.containsKey("failOnPlacementFailure") ?
-                Boolean.valueOf(nomadJobOpts.failOnPlacementFailure.toString()) :
-                Boolean.valueOf(sysEnv.get('NOMAD_FAIL_ON_PLACEMENT_FAILURE') ?: 'false')
-
-        // Placement failure timeout (default: 60 seconds)
-        // Supports Nextflow Duration format: "20s", "2m", "1h", "2d"
-        // Or long milliseconds: 60000
-        def timeoutValue = nomadJobOpts.get('placementFailureTimeout') ?: sysEnv.get('NF_NOMAD_PLACEMENT_FAILURE_TIMEOUT')
-        if (timeoutValue) {
-            placementFailureTimeout = timeoutValue instanceof Duration ?
-                (timeoutValue as Duration) :
-                Duration.of(timeoutValue.toString())
-        } else {
-            placementFailureTimeout = Duration.of('60s')
-        }
 
         dockerVolume = nomadJobOpts.dockerVolume ?: null
         if( dockerVolume ){
@@ -221,10 +201,5 @@ class NomadJobOpts{
             spec.validate()
             spec
         }
-    }
-
-    private static String sanitizeOptionalString(Object value) {
-        final str = value?.toString()?.trim()
-        str ? str : null
     }
 }

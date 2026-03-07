@@ -35,8 +35,8 @@ nomad{
     }
     jobs{
         deleteOnCompletion = false
-        // privileged defaults to true. Set to false to disable privileged Docker tasks
-        // privileged = false
+        // privileged defaults to true
+        // set privileged = false to disable privileged Docker tasks
     }
 }
 
