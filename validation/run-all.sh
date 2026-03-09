@@ -9,6 +9,7 @@ NFGHACTION=0
 NFSUN=0
 NFSLEEP=0
 NFDEMO=0
+NFRNASEQ=0
 
 [[ "$@" =~ '--build' ]] && BUILD=1
 [[ -f $HOME/.nextflow/plugins/nf-nomad-99.99.99/ ]]  && BUILD=1
@@ -18,6 +19,7 @@ NFDEMO=0
 [[ "$@" =~ '--nfsun' ]] && NFSUN=1
 [[ "$@" =~ '--sleep' ]] && NFSLEEP=1
 [[ "$@" =~ '--demo' ]] && NFDEMO=1
+[[ "$@" =~ '--rnaseq' ]] && NFRNASEQ=1
 
 if [ "$BUILD" == 1 ]; then
   pushd ..
@@ -54,6 +56,12 @@ if [ "$SKIPLOCAL" == 0 ]; then
   ./run-pipeline.sh -c tower/nextflow.config tower/main.nf
 else
   echo "skip local"
+fi
+
+if [ "$NFRNASEQ" == 1 ]; then
+  ./run-rnaseq-nf.sh
+else
+  echo "skip rnaseq-nf"
 fi
 
 if [ "$NFAZURE" == 1 ]; then
