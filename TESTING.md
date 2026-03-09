@@ -151,6 +151,19 @@ make test class=nextflow.nomad.executor.NomadServiceIntegrationSpec
 ./gradlew test -PtestEnv=local --tests nextflow.nomad.executor.NomadServiceIntegrationSpec
 ```
 
+### Run real rnaseq pipeline validation (manual)
+
+Use this to exercise the plugin with a pinned external pipeline (`nextflow-io/rnaseq-nf`):
+
+```shell
+cd validation
+./run-rnaseq-nf.sh
+```
+
+The script stores run artifacts (`trace`, `report`, `timeline`, `nextflow.log`) under
+`validation/nomad_temp/scratchdir/real-pipelines/rnaseq-nf/` and fails if key process
+or output assertions are not satisfied.
+
 ## Target Clusters
 
 ### local-nomad-minio
