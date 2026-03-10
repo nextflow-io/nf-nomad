@@ -24,7 +24,7 @@ nomad{
 
         namespace = 'nf-nomad'
         deleteOnCompletion = false
-        privileged = false
+        privileged = true
 
         volumes = [
               { type "host" name "scratchdir" },
@@ -68,7 +68,7 @@ nomad{
 - `datacenters`: A list of datacenters for the job submission.
 - `region`: The region for job submission.
 - `namespace`: The namespace to be used for all Nextflow jobs.
-- `privileged`: Run Docker tasks in privileged mode (default `false`; enable only when required by your workload).
+- `privileged`: Run Docker tasks in privileged mode (default `true`).
 - `volumeSpec`: The volumes which should be accessible to the jobs.
 - `affinitiesSpec`: The affinities which should be attached to the job spec.
 - `constraintsSpec`: The constraints which should be attached to the job spec.

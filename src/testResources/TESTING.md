@@ -12,6 +12,18 @@ environment variable (or the Gradle property `-PtestEnv`):
 | **Integration** | `local`        | Unit tests **+** live tests against local Nomad |
 | **Integration** | `oci`          | Unit tests **+** live tests against OCI cluster |
 
+## Additional Test Suites
+
+
+### Local Integration Tests (Implemented)
+Extensive integration tests for local Docker-based setup:
+
+- **Documentation:** `LOCAL_INTEGRATION_TESTS.md` - Comprehensive guide
+- **Quick Reference:** `QUICK_START_LOCAL_TESTS.md` - Quick start
+- **Run with:** `make test-local`
+- **Coverage:** 33 tests for Docker, Minio, and Nomad scheduling
+- **Duration:** 15-20 minutes
+
 ## Test Spec Files
 
 ### Unit tests (always run, no annotation gate)
