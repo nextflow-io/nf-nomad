@@ -12,17 +12,47 @@ environment variable (or the Gradle property `-PtestEnv`):
 | **Integration** | `local`        | Unit tests **+** live tests against local Nomad |
 | **Integration** | `oci`          | Unit tests **+** live tests against OCI cluster |
 
-## Additional Test Suites
+## Local Integration Tests (Implemented)
 
+Extensive integration tests for local Docker-based Minio and Nomad setup (triggered via `make test-local`):
 
-### Local Integration Tests (Implemented)
-Extensive integration tests for local Docker-based setup:
+**Test Coverage:** 33 comprehensive tests across three specifications
+- **Docker/Container Tests:** 13 tests for job lifecycle, environment vars, resource constraints
+- **Minio/Storage Tests:** 10 tests for file I/O, persistence, data passing
+- **Nomad Scheduling Tests:** 10 tests for resource allocation, metadata, state transitions
 
-- **Documentation:** `LOCAL_INTEGRATION_TESTS.md` - Comprehensive guide
-- **Quick Reference:** `QUICK_START_LOCAL_TESTS.md` - Quick start
-- **Run with:** `make test-local`
-- **Coverage:** 33 tests for Docker, Minio, and Nomad scheduling
-- **Duration:** 15-20 minutes
+**Estimated Duration:** 15-20 minutes
+
+### Local Integration Test Specs
+
+#### LocalDockerIntegrationSpec (13 tests)
+Tests Docker container execution and job lifecycle management:
+- Container execution with various images (Ubuntu, Alpine, Python)
+- Job state transitions (pending → running → complete)
+- Environment variable handling
+- Resource constraints (memory and CPU)
+- Job operations (kill, purge, concurrent submissions)
+- Client node allocation retrieval
+
+#### LocalMinioIntegrationSpec (10 tests)
+Tests file I/O operations and storage backend integration:
+- Volume mount configuration and input/output file handling
+- Chained job execution (producer-consumer pattern)
+- Large file handling (10MB test files)
+- Parallel file operations
+- File compression and decompression
+- Data persistence across task boundaries
+- Disk space monitoring
+- Job allocation and cleanup verification
+
+#### LocalNomadSchedulingIntegrationSpec (10 tests)
+Tests advanced Nomad scheduling features and resource allocation:
+- Minimal and moderate resource requirements
+- Batch job submission
+- Job priority levels and metadata handling
+- Job state transitions and restart scenarios
+- Datacenter-specific configuration
+- Resource allocation tracking
 
 ## Test Spec Files
 
