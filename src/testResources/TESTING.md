@@ -12,47 +12,17 @@ environment variable (or the Gradle property `-PtestEnv`):
 | **Integration** | `local`        | Unit tests **+** live tests against local Nomad |
 | **Integration** | `oci`          | Unit tests **+** live tests against OCI cluster |
 
-## Local Integration Tests (Implemented)
+## Additional Test Suites
 
-Extensive integration tests for local Docker-based Minio and Nomad setup (triggered via `make test-local`):
 
-**Test Coverage:** 33 comprehensive tests across three specifications
-- **Docker/Container Tests:** 13 tests for job lifecycle, environment vars, resource constraints
-- **Minio/Storage Tests:** 10 tests for file I/O, persistence, data passing
-- **Nomad Scheduling Tests:** 10 tests for resource allocation, metadata, state transitions
+### Local Integration Tests (Implemented)
+Extensive integration tests for local Docker-based setup:
 
-**Estimated Duration:** 15-20 minutes
-
-### Local Integration Test Specs
-
-#### LocalDockerIntegrationSpec (13 tests)
-Tests Docker container execution and job lifecycle management:
-- Container execution with various images (Ubuntu, Alpine, Python)
-- Job state transitions (pending → running → complete)
-- Environment variable handling
-- Resource constraints (memory and CPU)
-- Job operations (kill, purge, concurrent submissions)
-- Client node allocation retrieval
-
-#### LocalMinioIntegrationSpec (10 tests)
-Tests file I/O operations and storage backend integration:
-- Volume mount configuration and input/output file handling
-- Chained job execution (producer-consumer pattern)
-- Large file handling (10MB test files)
-- Parallel file operations
-- File compression and decompression
-- Data persistence across task boundaries
-- Disk space monitoring
-- Job allocation and cleanup verification
-
-#### LocalNomadSchedulingIntegrationSpec (10 tests)
-Tests advanced Nomad scheduling features and resource allocation:
-- Minimal and moderate resource requirements
-- Batch job submission
-- Job priority levels and metadata handling
-- Job state transitions and restart scenarios
-- Datacenter-specific configuration
-- Resource allocation tracking
+- **Documentation:** `LOCAL_INTEGRATION_TESTS.md` - Comprehensive guide
+- **Quick Reference:** `QUICK_START_LOCAL_TESTS.md` - Quick start
+- **Run with:** `make test-local`
+- **Coverage:** 33 tests for Docker, Minio, and Nomad scheduling
+- **Duration:** 15-20 minutes
 
 ## Test Spec Files
 
@@ -107,7 +77,7 @@ You can override Nomad-related test environment values directly when invoking Gr
 - `-PnomadDc=...` → sets `NOMAD_DC`
 - `-PnomadRegion=...` → sets `NOMAD_REGION`
 - `-PnomadNamespace=...` → sets `NOMAD_NAMESPACE`
-- `-PnfNomadDebug=...` → sets `NF_NOMAD_DEBUG`
+- `-PnxfDebug=...` → sets `NXF_DEBUG`
 
 These overrides work with `local`, `oci`, `mock`, and default unit test runs.
 
@@ -161,7 +131,7 @@ To target a non-default local endpoint, override it explicitly:
 You can combine other overrides in the same command, for example:
 
 ```shell
-./gradlew test -PtestEnv=local -PnomadAddr=http://localhost:4646 -PnomadDc=dc1 -PnfNomadDebug=1
+./gradlew test -PtestEnv=local -PnomadAddr=http://localhost:4646 -PnomadDc=dc1 -PnxfDebug=1
 ```
 
 ### Run integration tests against OCI Nomad
