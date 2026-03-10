@@ -45,7 +45,7 @@ install-local: clean compile
 install-dev: clean compile
 	@echo "Installing nf-nomad development version (99.99.99) to ~/.nextflow/plugins..."
 	@mkdir -p ${HOME}/.nextflow/plugins
-	./gradlew clean installPlugin -Pversion=99.99.99
+	./gradlew clean installPlugin -Pversion=99.99.99 --rerun-tasks
 	@echo "✓ Development version installed to ${HOME}/.nextflow/plugins"
 
 #
