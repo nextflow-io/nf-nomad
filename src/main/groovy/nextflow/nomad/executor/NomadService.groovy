@@ -247,4 +247,60 @@ class NomadService implements Closeable{
                     null, null, null)
         }
     }
+
+    /**
+     * Check if a job has failed to be placed on any node due to resource constraints
+     * Returns true if the allocation has no node assignment and is still in a waiting state
+     *
+     * @param jobId The job ID
+     * @param submissionTime The time the job was submitted (in milliseconds)
+     * @return true if placement failure is detected, false otherwise
+     */
+    boolean isPlacementFailure(String jobId, long submissionTime) {
+        if (!config.jobOpts().failOnPlacementFailure) {
+            return false
+        }
+
+        try {
+            List<AllocationListStub> allocations = safeExecutor.apply {
+                jobsApi.getJobAllocations(jobId, config.jobOpts().region, config.jobOpts().namespace,
+                        null, null, null, null, null, null,
+                        null, null)
+            }
+
+            AllocationListStub lastAllocation = allocations ? allocations.sort {
+                it.modifyIndex
+            }?.last() : null
+
+            if (!lastAllocation) {
+                return false
+            }
+
+            // Check if allocation has no node assignment (indicates placement failure)
+            boolean hasNoNode = !lastAllocation.nodeName || lastAllocation.nodeName.isEmpty()
+
+            // Check if allocation is in a waiting state (pending, queued, etc.)
+            boolean isWaiting = lastAllocation.clientStatus &&
+                    ['pending', 'queued', 'allocating'].contains(lastAllocation.clientStatus.toLowerCase())
+
+            // Check if timeout has been exceeded
+            long elapsedTime = System.currentTimeMillis() - submissionTime
+            boolean timeoutExceeded = elapsedTime >= config.jobOpts().placementFailureTimeout.millis
+
+            log.debug "[NOMAD] Placement check for $jobId: hasNoNode=$hasNoNode, isWaiting=$isWaiting, " +
+                    "timeoutExceeded=$timeoutExceeded, elapsedTime=${elapsedTime}ms, " +
+                    "timeout=${config.jobOpts().placementFailureTimeout.millis}ms"
+
+            if (hasNoNode && isWaiting && timeoutExceeded) {
+                log.warn "[NOMAD] Job $jobId appears to have failed placement (no node assignment after " +
+                        "${elapsedTime}ms). This may indicate insufficient resources on available nodes."
+                return true
+            }
+
+            return false
+        } catch (Exception e) {
+            log.debug "[NOMAD] Error checking placement failure for $jobId: ${e.message ?: e}", e
+            return false
+        }
+    }
 }

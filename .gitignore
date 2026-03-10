@@ -19,3 +19,4 @@ oracle-nomad-cluster
 **/*.tsv
 /src/e2e/.nf-test.log
 /.CLAUDE.md
+/results

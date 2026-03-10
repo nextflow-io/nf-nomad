@@ -57,6 +57,8 @@ class NomadTaskHandler extends TaskHandler implements FusionAwareTask {
 
     private long timestamp
 
+    private long submissionTime = 0L
+
     private final Path outputFile
 
     private final Path errorFile
@@ -123,6 +125,18 @@ class NomadTaskHandler extends TaskHandler implements FusionAwareTask {
 
         log.debug "[NOMAD] checkIfCompleted task=$task.name ; state=${state?.state}"
 
+        // Check for placement failure if configured
+        if (nomadService.isPlacementFailure(jobName, submissionTime)) {
+            task.exitStatus = 1
+            task.stdout = outputFile
+            task.stderr = errorFile
+            status = TaskStatus.COMPLETED
+            task.error = new ProcessUnrecoverableException("[NOMAD] Job placement failed - no suitable nodes with available resources")
+            task.aborted = true
+            determineClientNode()
+            return true
+        }
+
         // if a state exists, include an array of states to determine task status
         if( state?.state && ( ["dead","complete","failed","lost"].contains(state.state))){
             // finalize the task
@@ -176,6 +190,9 @@ class NomadTaskHandler extends TaskHandler implements FusionAwareTask {
         final taskLauncher = getSubmitCommand(task)
         final taskEnv = getEnv(task)
         nomadService.submitTask(this.jobName, task, taskLauncher, taskEnv, debugPath())
+
+        // Record submission time for placement failure detection
+        this.submissionTime = System.currentTimeMillis()
 
         // submit the task execution
         log.debug "[NOMAD] submitTask task=${task.name} ; taskId=${this.jobName} ; work-dir=${task.workDirStr}"
