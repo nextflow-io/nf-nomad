@@ -78,8 +78,8 @@ class NomadJobOpts{
             }
         }
 
-        region = nomadJobOpts.region ?: sysEnv.get('NOMAD_REGION')
-        namespace = nomadJobOpts.namespace ?: sysEnv.get('NOMAD_NAMESPACE')
+        region = sanitizeOptionalString(nomadJobOpts.region) ?: sanitizeOptionalString(sysEnv.get('NOMAD_REGION'))
+        namespace = sanitizeOptionalString(nomadJobOpts.namespace) ?: sanitizeOptionalString(sysEnv.get('NOMAD_NAMESPACE'))
 
         //NOTE: Default to a single attempt per nomad job definition
         rescheduleAttempts = nomadJobOpts.rescheduleAttempts as Integer ?: 1
@@ -201,5 +201,10 @@ class NomadJobOpts{
             spec.validate()
             spec
         }
+    }
+
+    private static String sanitizeOptionalString(Object value) {
+        final str = value?.toString()?.trim()
+        str ? str : null
     }
 }

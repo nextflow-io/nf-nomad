@@ -132,6 +132,28 @@ class NomadConfigSpec extends Specification {
         config.jobOpts.namespace == "namespace"
     }
 
+    void "should derive region and namespace from environment variables"() {
+        given:
+        def config = new NomadConfig([
+                jobs: [:]
+        ], [NOMAD_REGION: 'test-region', NOMAD_NAMESPACE: 'test-namespace'])
+
+        expect:
+        config.jobOpts.region == 'test-region'
+        config.jobOpts.namespace == 'test-namespace'
+    }
+
+    void "should ignore blank region and namespace environment variables"() {
+        given:
+        def config = new NomadConfig([
+                jobs: [:]
+        ], [NOMAD_REGION: '', NOMAD_NAMESPACE: '   '])
+
+        expect:
+        config.jobOpts.region == null
+        config.jobOpts.namespace == null
+    }
+
     void "should instantiate a volume spec if specified"() {
         when:
         def config = new NomadConfig([
