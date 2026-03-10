@@ -99,7 +99,7 @@ class NomadJobOpts{
         // Placement failure timeout (default: 60 seconds)
         // Supports Nextflow Duration format: "20s", "2m", "1h", "2d"
         // Or long milliseconds: 60000
-        def timeoutValue = nomadJobOpts.get('placementFailureTimeout') ?: sysEnv.get('NOMAD_PLACEMENT_FAILURE_TIMEOUT')
+        def timeoutValue = nomadJobOpts.get('placementFailureTimeout') ?: sysEnv.get('NF_NOMAD_PLACEMENT_FAILURE_TIMEOUT')
         if (timeoutValue) {
             placementFailureTimeout = timeoutValue instanceof Duration ?
                 (timeoutValue as Duration) :

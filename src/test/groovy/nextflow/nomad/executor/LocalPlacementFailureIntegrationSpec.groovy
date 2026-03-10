@@ -252,7 +252,7 @@ class LocalPlacementFailureIntegrationSpec extends Specification {
 
     void "placement failure timeout respects environment variable override"() {
         given:
-        def env = ['NOMAD_PLACEMENT_FAILURE_TIMEOUT': '30s']
+        def env = ['NF_NOMAD_PLACEMENT_FAILURE_TIMEOUT': '30s']
 
         when:
         def opts = new NomadJobOpts([failOnPlacementFailure: true], env)
