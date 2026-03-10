@@ -137,18 +137,6 @@ class NomadTaskHandler extends TaskHandler implements FusionAwareTask {
             return true
         }
 
-        // Check for placement failure if configured
-        if (nomadService.isPlacementFailure(jobName, submissionTime)) {
-            task.exitStatus = 1
-            task.stdout = outputFile
-            task.stderr = errorFile
-            status = TaskStatus.COMPLETED
-            task.error = new ProcessUnrecoverableException("[NOMAD] Job placement failed - no suitable nodes with available resources")
-            task.aborted = true
-            determineClientNode()
-            return true
-        }
-
         // if a state exists, include an array of states to determine task status
         if( state?.state && ( ["dead","complete","failed","lost"].contains(state.state))){
             // finalize the task

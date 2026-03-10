@@ -23,7 +23,7 @@ def nomadToken = project.hasProperty('nomadToken') ? project.property('nomadToke
 def nomadDc = project.hasProperty('nomadDc') ? project.property('nomadDc').toString() : null
 def nomadRegion = project.hasProperty('nomadRegion') ? project.property('nomadRegion').toString() : null
 def nomadNamespace = project.hasProperty('nomadNamespace') ? project.property('nomadNamespace').toString() : null
-def nxfDebug = project.hasProperty('nxfDebug') ? project.property('nxfDebug').toString() : null
+def nfNomadDebug = project.hasProperty('nfNomadDebug') ? project.property('nfNomadDebug').toString() : null
 
 test {
     useJUnitPlatform()
@@ -53,9 +53,9 @@ test {
     environment 'NOMAD_REGION', nomadRegion ?: System.getenv('NOMAD_REGION') ?: ''
     environment 'NOMAD_NAMESPACE', nomadNamespace ?: System.getenv('NOMAD_NAMESPACE') ?: ''
 
-    // Optional override for debugging behavior in task launch env
-    if (nxfDebug != null) {
-        environment 'NXF_DEBUG', nxfDebug
+    // Optional override for Nomad-specific debug behavior
+    if (nfNomadDebug != null) {
+        environment 'NF_NOMAD_DEBUG', nfNomadDebug
     }
 }
 

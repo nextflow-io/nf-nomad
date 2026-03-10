@@ -107,7 +107,7 @@ You can override Nomad-related test environment values directly when invoking Gr
 - `-PnomadDc=...` → sets `NOMAD_DC`
 - `-PnomadRegion=...` → sets `NOMAD_REGION`
 - `-PnomadNamespace=...` → sets `NOMAD_NAMESPACE`
-- `-PnxfDebug=...` → sets `NXF_DEBUG`
+- `-PnfNomadDebug=...` → sets `NF_NOMAD_DEBUG`
 
 These overrides work with `local`, `oci`, `mock`, and default unit test runs.
 
@@ -161,7 +161,7 @@ To target a non-default local endpoint, override it explicitly:
 You can combine other overrides in the same command, for example:
 
 ```shell
-./gradlew test -PtestEnv=local -PnomadAddr=http://localhost:4646 -PnomadDc=dc1 -PnxfDebug=1
+./gradlew test -PtestEnv=local -PnomadAddr=http://localhost:4646 -PnomadDc=dc1 -PnfNomadDebug=1
 ```
 
 ### Run integration tests against OCI Nomad
