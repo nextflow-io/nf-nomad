@@ -179,13 +179,32 @@ class NomadService implements Closeable{
     }
 
     String getVariableValue(String path, String key){
-        var variable = safeExecutor.apply {
-            variablesApi.getVariableQuery("$path/$key",
-                    config.jobOpts().region,
-                    config.jobOpts().namespace,
-                    null, null, null, null, null, null, null)
+        try {
+            var variable = safeExecutor.apply {
+                variablesApi.getVariableQuery("$path/$key",
+                        config.jobOpts().region,
+                        config.jobOpts().namespace,
+                        null, null, null, null, null, null, null)
+            }
+            return variable?.items?.find{ it.key == key }?.value
+        } catch (Exception e) {
+            final apiException = findApiException(e)
+            if( apiException?.code == 404 ) {
+                return null
+            }
+            throw e
         }
-        variable?.items?.find{ it.key == key }?.value
+    }
+
+    private static ApiException findApiException(Throwable error) {
+        Throwable current = error
+        while( current ) {
+            if( current instanceof ApiException ) {
+                return (ApiException)current
+            }
+            current = current.cause
+        }
+        return null
     }
 
     void setVariableValue(String key, String value){
