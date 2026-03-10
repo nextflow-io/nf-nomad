@@ -174,7 +174,7 @@ class NomadJobOptsSpec extends Specification {
 
     def "test placementFailureTimeout from environment variable"() {
         given:
-        def env = ['NF_NOMAD_PLACEMENT_FAILURE_TIMEOUT': '30s']
+        def env = ['NOMAD_PLACEMENT_FAILURE_TIMEOUT': '30s']
         def nomadJobOpts = new NomadJobOpts([:], env)
 
         expect:

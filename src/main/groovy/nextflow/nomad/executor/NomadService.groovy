@@ -26,7 +26,6 @@ import io.nomadproject.client.api.VariablesApi
 import io.nomadproject.client.model.*
 import nextflow.nomad.builders.JobBuilder
 import nextflow.nomad.config.NomadConfig
-import nextflow.nomad.util.NomadLogging
 import nextflow.processor.TaskRun
 import nextflow.exception.ProcessSubmitException
 import org.threeten.bp.OffsetDateTime
@@ -58,16 +57,10 @@ class NomadService implements Closeable{
 
         apiClient = new ApiClient( connectTimeout: CONNECTION_TIMEOUT_MILLISECONDS, readTimeout: READ_TIMEOUT_MILLISECONDS, writeTimeout: WRITE_TIMEOUT_MILLISECONDS)
         apiClient.basePath = config.clientOpts().address
-        NomadLogging.logConfiguration(log, "Client", [
-            address: config.clientOpts().address,
-            connectionTimeout: config.clientOpts().connectionTimeout,
-            readTimeout: config.clientOpts().readTimeout
-        ])
+        log.debug "[NOMAD] Client Address: ${config.clientOpts().address}"
 
         if( config.clientOpts().token ){
-            NomadLogging.logConfiguration(log, "Authentication", [
-                token: config.clientOpts().token?.take(5) + '..'
-            ])
+            log.debug "[NOMAD] Client Token: ${config.clientOpts().token?.take(5)}.."
             apiClient.apiKey = config.clientOpts().token
         }
         this.jobsApi = new JobsApi(apiClient)
@@ -84,8 +77,6 @@ class NomadService implements Closeable{
 
 
     String submitTask(String id, TaskRun task, List<String> args, Map<String, String> env, Path saveJsonPath = null) {
-        long startTime = System.currentTimeMillis()
-
         Job job = new JobBuilder()
                 .withId(id)
                 .withName(task.name)
@@ -108,24 +99,17 @@ class NomadService implements Closeable{
         }
 
         try {
-            String evalId = safeExecutor.apply {
+            safeExecutor.apply {
                 JobRegisterResponse jobRegisterResponse = jobsApi.registerJob(jobRegisterRequest,
                         config.jobOpts().region, config.jobOpts().namespace,
                         null, null)
                 jobRegisterResponse.evalID
             }
-
-            long elapsed = System.currentTimeMillis() - startTime
-            NomadLogging.logTiming(log, "Job submission for $id", elapsed)
-            NomadLogging.logJobState(log, id, "submitted", [name: task.name])
-
-            return evalId
         } catch (ApiException apiException) {
-            NomadLogging.logError(log, "submitTask", id, apiException,
-                    [taskName: task.name, statusCode: apiException.code])
+            log.debug("[NOMAD] Failed to submit ${job.name} -- Cause: ${apiException.responseBody ?: apiException}", apiException)
             throw new ProcessSubmitException("[NOMAD] Failed to submit ${job.name} -- Cause: ${apiException.responseBody ?: apiException}", apiException)
         } catch (Throwable e) {
-            NomadLogging.logError(log, "submitTask", id, e, [taskName: task.name])
+            log.debug("[NOMAD] Failed to submit ${job.name} -- Cause: ${e.message ?: e}", e)
             throw new ProcessSubmitException("[NOMAD] Failed to submit ${job.name} -- Cause: ${e.message ?: e}", e)
         }
     }
@@ -142,10 +126,10 @@ class NomadService implements Closeable{
                 it.modifyIndex
             }?.last() : null
             TaskState currentState = last?.taskStates?.values()?.last()
-            NomadLogging.logJobState(log, jobId, currentState?.state)
+            log.debug "[NOMAD] getTaskStatus $jobId , state=${currentState?.state}"
             currentState ?: new TaskState(state: "unknown", failed: true, finishedAt: OffsetDateTime.now())
         }catch(Exception e){
-            NomadLogging.logError(log, "getTaskState", jobId, e)
+            log.debug("[NOMAD] getTaskStatus Failed to get jobState ${jobId} -- Cause: ${e.message ?: e}", e)
             new TaskState(state: "unknown", failed: true, finishedAt: OffsetDateTime.now())
         }
     }
@@ -161,16 +145,14 @@ class NomadService implements Closeable{
     }
 
     protected void purgeJob(String jobId, boolean purge){
-        if (NomadLogging.isDebugEnabled()) {
-            log.info "[NOMAD] purgeJob with jobId=${jobId}"
-        }
+        log.debug "[NOMAD] purgeJob with jobId=${jobId}"
         try {
             safeExecutor.apply {
                 jobsApi.deleteJob(jobId, config.jobOpts().region, config.jobOpts().namespace,
                         null, null, purge, true)
             }
         }catch(Exception e){
-            NomadLogging.logError(log, "purgeJob", jobId, e)
+            log.debug("[NOMAD] Failed to delete job ${jobId} -- Cause: ${e.message ?: e}", e)
         }
     }
 
@@ -185,15 +167,9 @@ class NomadService implements Closeable{
                 return null
             }
             AllocationListStub jobAllocation = allocations.first()
-            NomadLogging.logAllocationDetails(log, jobId, [
-                nodeName: jobAllocation.nodeName,
-                clientStatus: jobAllocation.clientStatus,
-                desiredStatus: jobAllocation.desiredStatus,
-                modifyIndex: jobAllocation.modifyIndex
-            ])
             return jobAllocation.nodeName
         }catch (Exception e){
-            NomadLogging.logError(log, "getClientOfJob", jobId, e)
+            log.debug("[NOMAD] Failed to get job allocations ${jobId} -- Cause: ${e.message ?: e}", e)
             throw new ProcessSubmitException("[NOMAD] Failed to get alloactions ${jobId} -- Cause: ${e.message ?: e}", e)
         }
     }
@@ -291,25 +267,12 @@ class NomadService implements Closeable{
                         null, null, null, null, null, null,
                         null, null)
             }
-            // Check if timeout has been exceeded
-            long elapsedTime = System.currentTimeMillis() - submissionTime
-            long timeout = config.jobOpts().placementFailureTimeout.millis
-            boolean timeoutExceeded = elapsedTime >= timeout
 
             AllocationListStub lastAllocation = allocations ? allocations.sort {
                 it.modifyIndex
             }?.last() : null
 
             if (!lastAllocation) {
-                if (NomadLogging.isTraceEnabled()) {
-                    log.info "[NOMAD-TRACE] Placement check for $jobId: hasNoAllocation=true, " +
-                            "timeoutExceeded=$timeoutExceeded, elapsedTime=${elapsedTime}ms, timeout=${timeout}ms"
-                }
-                if (timeoutExceeded) {
-                    log.warn "[NOMAD] Job $jobId appears to have failed placement (no allocations after " +
-                            "${elapsedTime}ms). This may indicate insufficient resources on available nodes."
-                    return true
-                }
                 return false
             }
 
@@ -320,11 +283,13 @@ class NomadService implements Closeable{
             boolean isWaiting = lastAllocation.clientStatus &&
                     ['pending', 'queued', 'allocating'].contains(lastAllocation.clientStatus.toLowerCase())
 
-            if (NomadLogging.isTraceEnabled()) {
-                log.info "[NOMAD-TRACE] Placement check for $jobId: hasNoNode=$hasNoNode, isWaiting=$isWaiting, " +
-                        "timeoutExceeded=$timeoutExceeded, elapsedTime=${elapsedTime}ms, " +
-                        "timeout=${timeout}ms"
-            }
+            // Check if timeout has been exceeded
+            long elapsedTime = System.currentTimeMillis() - submissionTime
+            boolean timeoutExceeded = elapsedTime >= config.jobOpts().placementFailureTimeout.millis
+
+            log.debug "[NOMAD] Placement check for $jobId: hasNoNode=$hasNoNode, isWaiting=$isWaiting, " +
+                    "timeoutExceeded=$timeoutExceeded, elapsedTime=${elapsedTime}ms, " +
+                    "timeout=${config.jobOpts().placementFailureTimeout.millis}ms"
 
             if (hasNoNode && isWaiting && timeoutExceeded) {
                 log.warn "[NOMAD] Job $jobId appears to have failed placement (no node assignment after " +
@@ -334,7 +299,7 @@ class NomadService implements Closeable{
 
             return false
         } catch (Exception e) {
-            NomadLogging.logError(log, "isPlacementFailure", jobId, e)
+            log.debug "[NOMAD] Error checking placement failure for $jobId: ${e.message ?: e}", e
             return false
         }
     }
