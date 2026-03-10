@@ -80,7 +80,7 @@ nomad{
 - `rescheduleAttempts`: Number of rescheduling (to a different node) attempts for the generated jobs.
 - `restartAttempts`: Number of restart (on the same node) attempts for the generated jobs.
 - `failOnPlacementFailure`: A boolean flag to automatically fail jobs that cannot be placed on any node due to insufficient resources (default `false`). When enabled, jobs that remain unscheduled (have no node assignment) beyond the `placementFailureTimeout` threshold will be marked as failed instead of indefinitely waiting.
-- `placementFailureTimeout`: The time to wait before considering a job as failed due to placement failure (default `60s`). Supports Nextflow duration format: `20s`, `2m`, `5m`, `1h`, `2d`, etc. Can also be set via the `NOMAD_PLACEMENT_FAILURE_TIMEOUT` environment variable.
+- `placementFailureTimeout`: The time to wait before considering a job as failed due to placement failure (default `60s`). Supports Nextflow duration format: `20s`, `2m`, `5m`, `1h`, `2d`, etc. Can also be set via the `NF_NOMAD_PLACEMENT_FAILURE_TIMEOUT` environment variable.
 - `secretOpts`: The configuration for Nomad Secret Store.
 - `dockerVolume`, DEPRECATED
 - `affinitySpec`, DEPRECATED
