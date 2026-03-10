@@ -141,11 +141,15 @@ class LocalPlacementFailureIntegrationSpec extends Specification {
         given:
         def jobId = "placement-test-excessive-${System.nanoTime()}"
         submittedJobIds.add(jobId)
+        def excessiveTaskConfig = Mock(TaskConfig) {
+            get('cpus') >> 10_000
+            get('memory') >> '10 TB'
+        }
 
         def mockTask = Mock(TaskRun) {
             getName()      >> "excessive-resources"
             getContainer() >> "ubuntu:latest"
-            getConfig()    >> Mock(TaskConfig)
+            getConfig()    >> excessiveTaskConfig
             getWorkDirStr() >> testWorkDir.toString()
             getWorkDir()   >> testWorkDir
             getProcessor() >> Mock(TaskProcessor) {
@@ -173,7 +177,7 @@ class LocalPlacementFailureIntegrationSpec extends Specification {
         then:
         evalId != null
         evalId.size() > 0
-        log.info("[TEST] Job submitted successfully with ID: $evalId")
+        log.info("[TEST] Job submitted successfully with ID: $evalId (cpus=10000, memory=10 TB)")
     }
 
     void "placement failure is not triggered immediately"() {
@@ -193,20 +197,15 @@ class LocalPlacementFailureIntegrationSpec extends Specification {
     void "placement failure is triggered after timeout exceeded"() {
         given:
         def jobId = submittedJobIds.last()
-        def submissionTime = System.currentTimeMillis() - 6_000L  // Simulate 6 seconds ago
+        def submissionTime = System.currentTimeMillis() - 12_000L  // Simulate submission older than timeout
 
         when:
-        sleep(1_000)  // Give Nomad time to record the allocation
+        sleep(1_000)  // Give Nomad time to record scheduling state/allocation status
         def hasFailure = serviceWithFailure.isPlacementFailure(jobId, submissionTime)
 
         then:
-        // This will be true if the job truly couldn't be placed
-        // In a local test environment, the job might actually be placed, so we check the logic
-        if (!hasFailure) {
-            log.info("[TEST] Job was placed on a node (not a placement failure)")
-        } else {
-            log.info("[TEST] Confirmed: placement failure detected after timeout exceeded")
-        }
+        hasFailure
+        log.info("[TEST] Confirmed: placement failure detected after timeout exceeded")
     }
 
     void "normally scheduled jobs are not marked as placement failures"() {
