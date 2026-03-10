@@ -291,12 +291,25 @@ class NomadService implements Closeable{
                         null, null, null, null, null, null,
                         null, null)
             }
+            // Check if timeout has been exceeded
+            long elapsedTime = System.currentTimeMillis() - submissionTime
+            long timeout = config.jobOpts().placementFailureTimeout.millis
+            boolean timeoutExceeded = elapsedTime >= timeout
 
             AllocationListStub lastAllocation = allocations ? allocations.sort {
                 it.modifyIndex
             }?.last() : null
 
             if (!lastAllocation) {
+                if (NomadLogging.isTraceEnabled()) {
+                    log.info "[NOMAD-TRACE] Placement check for $jobId: hasNoAllocation=true, " +
+                            "timeoutExceeded=$timeoutExceeded, elapsedTime=${elapsedTime}ms, timeout=${timeout}ms"
+                }
+                if (timeoutExceeded) {
+                    log.warn "[NOMAD] Job $jobId appears to have failed placement (no allocations after " +
+                            "${elapsedTime}ms). This may indicate insufficient resources on available nodes."
+                    return true
+                }
                 return false
             }
 
@@ -307,14 +320,10 @@ class NomadService implements Closeable{
             boolean isWaiting = lastAllocation.clientStatus &&
                     ['pending', 'queued', 'allocating'].contains(lastAllocation.clientStatus.toLowerCase())
 
-            // Check if timeout has been exceeded
-            long elapsedTime = System.currentTimeMillis() - submissionTime
-            boolean timeoutExceeded = elapsedTime >= config.jobOpts().placementFailureTimeout.millis
-
             if (NomadLogging.isTraceEnabled()) {
                 log.info "[NOMAD-TRACE] Placement check for $jobId: hasNoNode=$hasNoNode, isWaiting=$isWaiting, " +
                         "timeoutExceeded=$timeoutExceeded, elapsedTime=${elapsedTime}ms, " +
-                        "timeout=${config.jobOpts().placementFailureTimeout.millis}ms"
+                        "timeout=${timeout}ms"
             }
 
             if (hasNoNode && isWaiting && timeoutExceeded) {
