@@ -43,6 +43,10 @@ class NomadJobOpts{
     String region
     String namespace
     String dockerVolume
+    Map<String, String> meta
+    Duration shutdownDelay
+    Map<String, Object> restartPolicy
+    Map<String, Object> reschedulePolicy
     JobVolume[] volumeSpec
     JobAffinity affinitySpec
     JobConstraint constraintSpec
@@ -83,6 +87,12 @@ class NomadJobOpts{
 
         region = sanitizeOptionalString(nomadJobOpts.region) ?: sanitizeOptionalString(sysEnv.get('NOMAD_REGION'))
         namespace = sanitizeOptionalString(nomadJobOpts.namespace) ?: sanitizeOptionalString(sysEnv.get('NOMAD_NAMESPACE'))
+        meta = parseStringMap(nomadJobOpts.meta)
+        shutdownDelay = parseOptionalDuration(nomadJobOpts.shutdownDelay)
+
+        Map<String, Object> failures = nomadJobOpts.failures instanceof Map ? (nomadJobOpts.failures as Map<String, Object>) : Collections.emptyMap()
+        restartPolicy = failures.restart instanceof Map ? (failures.restart as Map<String, Object>) : Collections.emptyMap()
+        reschedulePolicy = failures.reschedule instanceof Map ? (failures.reschedule as Map<String, Object>) : Collections.emptyMap()
 
         //NOTE: Default to a single attempt per nomad job definition
         rescheduleAttempts = nomadJobOpts.rescheduleAttempts as Integer ?: 1
@@ -226,5 +236,22 @@ class NomadJobOpts{
     private static String sanitizeOptionalString(Object value) {
         final str = value?.toString()?.trim()
         str ? str : null
+    }
+
+    private static Map<String, String> parseStringMap(Object value) {
+        if( !(value instanceof Map) ) {
+            return Collections.emptyMap()
+        }
+        return ((Map)value).collectEntries { k, v -> [(k?.toString()): v?.toString()] } as Map<String, String>
+    }
+
+    private static Duration parseOptionalDuration(Object value) {
+        if( value == null ) {
+            return null
+        }
+        if( value instanceof Duration ) {
+            return (Duration)value
+        }
+        return Duration.of(value.toString())
     }
 }

@@ -94,16 +94,25 @@ process {
   withName: sayHello {
     nomadOptions = [
       datacenters: ['dc1', 'dc2'],
+      namespace: 'bio',
       constraints: { node { unique = [name: params.RUN_IN_NODE] } },
+      meta: [owner: 'team-x', step: 'align'],
+      shutdownDelay: '15s',
+      failures: [
+        restart: [attempts: 1, delay: '5s', mode: 'fail'],
+        reschedule: [attempts: 2, delay: '10s']
+      ],
       secrets: ['MY_ACCESS_KEY', 'MY_SECRET_KEY'],
       spread: [name: 'node.datacenter', weight: 50, targets: ['us-east1': 70, 'us-east2': 30]],
-      priority: 'high'
+      priority: 'high',
+      resources: [memoryMax: '64 GB', device: [[name: 'nvidia/gpu', count: 1]]]
     ]
   }
 }
 ```
 
 If both `nomadOptions.<key>` and a legacy directive are present for the same process, `nomadOptions.<key>` wins for that key.
+If `nomadOptions.resources.memoryMax` is not set, it defaults to the task `memory` value.
 
 ## Testing and debugging
 

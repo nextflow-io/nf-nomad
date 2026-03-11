@@ -98,8 +98,129 @@ class JobBuilderNomadOptionsSpec extends Specification {
         jobDef.spreads[0].spreadTarget.first().value == 'gpu'
         jobDef.spreads[0].spreadTarget.first().percent == 100
     }
+    void "getResources should default memoryMax to task memory"() {
+        given:
+        def task = taskWithConfig([:], [cpus: 2, memory: '2 GB'])
 
-    private TaskRun taskWithConfig(Map<String, Object> configValues) {
+        when:
+        def resources = JobBuilder.getResources(task)
+
+        then:
+        resources.getMemoryMB() == 2048
+        resources.getMemoryMaxMB() == 2048
+    }
+
+    void "getResources should ignore nomadOptions resources cores and keep task cpus"() {
+        given:
+        def task = taskWithConfig([
+                (TaskDirectives.NOMAD_OPTIONS): [resources: [cores: 6]]
+        ], [cpus: 2, memory: '2 GB'])
+
+        when:
+        def resources = JobBuilder.getResources(task)
+
+        then:
+        resources.getCores() == 2
+    }
+
+    void "getResources should apply nomadOptions resources device list"() {
+        given:
+        def task = taskWithConfig([
+                (TaskDirectives.NOMAD_OPTIONS): [resources: [device: [[name: 'nvidia/gpu', count: 2]]]]
+        ], [memory: '2 GB'])
+
+        when:
+        def resources = JobBuilder.getResources(task)
+
+        then:
+        resources.getDevices().size() == 1
+        resources.getDevices().first().getName() == 'nvidia/gpu'
+        resources.getDevices().first().getCount() == 2
+    }
+
+    void "resolveRestartPolicy should merge global and process options with process precedence"() {
+        given:
+        def task = taskWithConfig([
+                (TaskDirectives.NOMAD_OPTIONS): [failures: [restart: [attempts: 1, delay: '5s', mode: 'fail']]]
+        ])
+        def jobOpts = Stub(NomadJobOpts) {
+            getRestartAttempts() >> 3
+            getRestartPolicy() >> [attempts: 3, interval: '1m']
+        }
+
+        when:
+        def policy = JobBuilder.resolveRestartPolicy(task, jobOpts)
+
+        then:
+        policy.getAttempts() == 1
+        policy.getDelay() == 5000
+        policy.getInterval() == 60000
+        policy.getMode() == 'fail'
+    }
+
+    void "resolveReschedulePolicy should merge global and process options with process precedence"() {
+        given:
+        def task = taskWithConfig([
+                (TaskDirectives.NOMAD_OPTIONS): [failures: [reschedule: [attempts: 2, delay: '20s', unlimited: true]]]
+        ])
+        def jobOpts = Stub(NomadJobOpts) {
+            getRescheduleAttempts() >> 4
+            getReschedulePolicy() >> [attempts: 4, interval: '1m', maxDelay: '2m']
+        }
+
+        when:
+        def policy = JobBuilder.resolveReschedulePolicy(task, jobOpts)
+
+        then:
+        policy.getAttempts() == 2
+        policy.getDelay() == 20000
+        policy.getInterval() == 60000
+        policy.getMaxDelay() == 120000
+        policy.getUnlimited() == true
+    }
+
+    void "resolveShutdownDelayMillis should prefer process nomadOptions over global setting"() {
+        given:
+        def task = taskWithConfig([
+                (TaskDirectives.NOMAD_OPTIONS): [shutdownDelay: '15s']
+        ])
+        def jobOpts = Stub(NomadJobOpts) {
+            getShutdownDelay() >> nextflow.util.Duration.of('30s')
+        }
+
+        expect:
+        JobBuilder.resolveShutdownDelayMillis(task, jobOpts) == 15000
+    }
+
+    void "getResources should use nomadOptions resources memoryMax when provided"() {
+        given:
+        def task = taskWithConfig([
+                (TaskDirectives.NOMAD_OPTIONS): [resources: [memoryMax: '3 GB']]
+        ], [cpus: 2, memory: '2 GB'])
+
+        when:
+        def resources = JobBuilder.getResources(task)
+
+        then:
+        resources.getMemoryMB() == 2048
+        resources.getMemoryMaxMB() == 3072
+    }
+
+    void "getResources should fallback to task memory when nomadOptions resources memoryMax is invalid"() {
+        given:
+        def task = taskWithConfig([
+                (TaskDirectives.NOMAD_OPTIONS): [resources: [memoryMax: 'invalid']]
+        ], [cpus: 2, memory: '2 GB'])
+
+        when:
+        def resources = JobBuilder.getResources(task)
+
+        then:
+        resources.getMemoryMB() == 2048
+        resources.getMemoryMaxMB() == 2048
+    }
+
+    private TaskRun taskWithConfig(Map<String, Object> configValues, Map<String, Object> taskConfigValues = [:]) {
         def processConfig = Mock(ProcessConfig)
         processConfig.get(_ as String) >> { String key -> configValues.get(key) }
 
@@ -108,6 +229,7 @@ class JobBuilderNomadOptionsSpec extends Specification {
 
         return Mock(TaskRun) {
             getProcessor() >> processor
+            getConfig() >> taskConfigValues
         }
     }
 }

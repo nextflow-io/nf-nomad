@@ -16,7 +16,15 @@ class NomadTaskOptionsResolverSpec extends Specification {
                         datacenters: ['dc-new'],
                         constraints: nomadOptionsConstraints,
                         secrets    : ['NEW_ONE', 'NEW_TWO'],
-                        spread     : [name: 'node.class', weight: 10]
+                        spread     : [name: 'node.class', weight: 10],
+                        resources  : [memoryMax: '4 GB'],
+                        namespace  : 'process-ns',
+                        meta       : [owner: 'team-b'],
+                        failures   : [
+                                restart   : [attempts: 2],
+                                reschedule: [attempts: 3]
+                        ],
+                        shutdownDelay: '15s'
                 ],
                 (TaskDirectives.DATACENTERS)  : ['dc-legacy'],
                 (TaskDirectives.CONSTRAINTS)  : legacyConstraints,
@@ -31,6 +39,12 @@ class NomadTaskOptionsResolverSpec extends Specification {
         NomadTaskOptionsResolver.secrets(task) == ['NEW_ONE', 'NEW_TWO']
         NomadTaskOptionsResolver.spread(task) == [name: 'node.class', weight: 10]
         NomadTaskOptionsResolver.priority(task) == 'low'
+        NomadTaskOptionsResolver.resources(task) == [memoryMax: '4 GB']
+        NomadTaskOptionsResolver.namespace(task) == 'process-ns'
+        NomadTaskOptionsResolver.meta(task) == [owner: 'team-b']
+        NomadTaskOptionsResolver.restart(task) == [attempts: 2]
+        NomadTaskOptionsResolver.reschedule(task) == [attempts: 3]
+        NomadTaskOptionsResolver.shutdownDelay(task) == '15s'
     }
 
     void "should prefer nomadOptions priority over legacy priority"() {
@@ -72,6 +86,32 @@ class NomadTaskOptionsResolverSpec extends Specification {
 
         expect:
         NomadTaskOptionsResolver.datacenters(task) == ['dc-legacy']
+        NomadTaskOptionsResolver.resources(task).isEmpty()
+    }
+
+    void "should ignore non-map nomadOptions resources value"() {
+        given:
+        def task = taskWithConfig([
+                (TaskDirectives.NOMAD_OPTIONS): [resources: 'invalid']
+        ])
+
+        expect:
+        NomadTaskOptionsResolver.resources(task).isEmpty()
+    }
+
+    void "should ignore invalid map-based values for meta and failures"() {
+        given:
+        def task = taskWithConfig([
+                (TaskDirectives.NOMAD_OPTIONS): [
+                        meta    : 'invalid',
+                        failures: [restart: 'invalid', reschedule: 1]
+                ]
+        ])
+
+        expect:
+        NomadTaskOptionsResolver.meta(task).isEmpty()
+        NomadTaskOptionsResolver.restart(task).isEmpty()
+        NomadTaskOptionsResolver.reschedule(task).isEmpty()
     }
 
     private TaskRun taskWithConfig(Map<String, Object> configValues) {

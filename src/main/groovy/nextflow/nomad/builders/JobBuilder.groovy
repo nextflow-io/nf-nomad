@@ -26,6 +26,7 @@ import io.nomadproject.client.model.Task
 import io.nomadproject.client.model.ReschedulePolicy
 import io.nomadproject.client.model.RestartPolicy
 import io.nomadproject.client.model.Resources
+import io.nomadproject.client.model.RequestedDevice
 import io.nomadproject.client.model.Template
 import io.nomadproject.client.model.VolumeMount
 import io.nomadproject.client.model.VolumeRequest
@@ -38,6 +39,7 @@ import nextflow.nomad.models.JobSpreads
 import nextflow.nomad.models.JobVolume
 import nextflow.nomad.models.SpreadsBuilder
 import nextflow.processor.TaskRun
+import nextflow.util.Duration
 import nextflow.util.MemoryUnit
 
 
@@ -112,18 +114,54 @@ class JobBuilder {
 
         final taskCfg = task.getConfig()
         final taskCores =  !taskCfg.get("cpus") ? DEFAULT_CPUS :  taskCfg.get("cpus") as Integer
+        final resourceOptions = NomadTaskOptionsResolver.resources(task)
         final taskMemory = new MemoryUnit( taskCfg.get("memory")?.toString() ?:  DEFAULT_MEMORY)
+        final taskMemoryMb = taskMemory.toMega() as Integer
 
         final res = new Resources()
                 .cores(taskCores)
-                .memoryMB(taskMemory.toMega() as Integer)
+                .memoryMB(taskMemoryMb)
+                .memoryMaxMB(resolveMemoryMaxMb(task, taskMemoryMb))
+        final devices = resolveRequestedDevices(resourceOptions.get("device"))
+        if( devices ) {
+            res.devices(devices)
+        }
 
         return res
     }
 
+    static protected Integer resolveMemoryMaxMb(TaskRun task, Integer defaultMemoryMb) {
+        Map resources = NomadTaskOptionsResolver.resources(task)
+        if( !resources || !resources.containsKey("memoryMax") ) {
+            return defaultMemoryMb
+        }
+
+        Integer parsed = parseMemoryToMega(resources.get("memoryMax"))
+        if( parsed != null ) {
+            return parsed
+        }
+
+        log.warn("Invalid `${TaskDirectives.NOMAD_OPTIONS}.resources.memoryMax` value `${resources.get("memoryMax")}`; falling back to task memory `${defaultMemoryMb}MB`")
+        return defaultMemoryMb
+    }
+
+    static protected Integer parseMemoryToMega(Object value) {
+        if( value == null ) {
+            return null
+        }
+        try {
+            if( value instanceof Number ) {
+                return ((Number)value).intValue()
+            }
+            return new MemoryUnit(value.toString()).toMega() as Integer
+        } catch(Exception ignored) {
+            return null
+        }
+    }
+
     static TaskGroup createTaskGroup(TaskRun taskRun, List<String> args, Map<String, String>env, NomadJobOpts jobOpts){
-        final ReschedulePolicy taskReschedulePolicy  = new ReschedulePolicy().attempts(jobOpts.rescheduleAttempts)
-        final RestartPolicy taskRestartPolicy  = new RestartPolicy().attempts(jobOpts.restartAttempts)
+        final ReschedulePolicy taskReschedulePolicy  = resolveReschedulePolicy(taskRun, jobOpts)
+        final RestartPolicy taskRestartPolicy  = resolveRestartPolicy(taskRun, jobOpts)
 
         def task = createTask(taskRun, args, env, jobOpts)
         def taskGroup = new TaskGroup(
@@ -180,6 +218,11 @@ class JobBuilder {
                 ] as Map<String, Object>,
                 env: env,
         )
+
+        Long shutdownDelay = resolveShutdownDelayMillis(task, jobOpts)
+        if( shutdownDelay != null ) {
+            taskDef.shutdownDelay(shutdownDelay)
+        }
 
         volumes(task, taskDef, workingDir, jobOpts)
         affinity(task, taskDef, jobOpts)
@@ -351,6 +394,143 @@ class JobBuilder {
                     log.warn("Unknown priority value: ${priorityValue}, ignoring")
                     return null
             }
+        }
+    }
+
+    static protected List<RequestedDevice> resolveRequestedDevices(Object value) {
+        if( value == null ) {
+            return Collections.emptyList()
+        }
+        if( !(value instanceof Collection) ) {
+            log.warn("Ignoring `${TaskDirectives.NOMAD_OPTIONS}.resources.device` because it is not a list -- value: ${value}")
+            return Collections.emptyList()
+        }
+
+        List<RequestedDevice> devices = []
+        (value as Collection).each { item ->
+            if( item instanceof Map ) {
+                String name = (item as Map).get("name")?.toString()
+                Integer count = parseInteger((item as Map).get("count")) ?: 1
+                if( name ) {
+                    devices.add(new RequestedDevice().name(name).count(count))
+                } else {
+                    log.warn("Ignoring `${TaskDirectives.NOMAD_OPTIONS}.resources.device` entry without `name` -- value: ${item}")
+                }
+            } else {
+                log.warn("Ignoring `${TaskDirectives.NOMAD_OPTIONS}.resources.device` entry because it is not a map -- value: ${item}")
+            }
+        }
+        return devices
+    }
+
+    static protected RestartPolicy resolveRestartPolicy(TaskRun task, NomadJobOpts jobOpts) {
+        Map<String, Object> effective = [:]
+        if( jobOpts?.restartPolicy ) {
+            effective.putAll(jobOpts.restartPolicy)
+        }
+        Map<String, Object> override = NomadTaskOptionsResolver.restart(task) as Map<String, Object>
+        if( override ) {
+            effective.putAll(override)
+        }
+
+        RestartPolicy policy = new RestartPolicy().attempts(parseInteger(effective.get("attempts"), jobOpts?.restartAttempts ?: 1))
+        Long delay = parseDurationToMillis(effective.get("delay"))
+        if( delay != null ) {
+            policy.delay(delay)
+        }
+        Long interval = parseDurationToMillis(effective.get("interval"))
+        if( interval != null ) {
+            policy.interval(interval)
+        }
+        String mode = effective.get("mode")?.toString()
+        if( mode ) {
+            policy.mode(mode)
+        }
+        Boolean renderTemplates = parseBoolean(effective.get("renderTemplates"))
+        if( renderTemplates != null ) {
+            policy.renderTemplates(renderTemplates)
+        }
+        return policy
+    }
+
+    static protected ReschedulePolicy resolveReschedulePolicy(TaskRun task, NomadJobOpts jobOpts) {
+        Map<String, Object> effective = [:]
+        if( jobOpts?.reschedulePolicy ) {
+            effective.putAll(jobOpts.reschedulePolicy)
+        }
+        Map<String, Object> override = NomadTaskOptionsResolver.reschedule(task) as Map<String, Object>
+        if( override ) {
+            effective.putAll(override)
+        }
+
+        ReschedulePolicy policy = new ReschedulePolicy().attempts(parseInteger(effective.get("attempts"), jobOpts?.rescheduleAttempts ?: 1))
+        Long delay = parseDurationToMillis(effective.get("delay"))
+        if( delay != null ) {
+            policy.delay(delay)
+        }
+        String delayFunction = effective.get("delayFunction")?.toString()
+        if( delayFunction ) {
+            policy.delayFunction(delayFunction)
+        }
+        Long interval = parseDurationToMillis(effective.get("interval"))
+        if( interval != null ) {
+            policy.interval(interval)
+        }
+        Long maxDelay = parseDurationToMillis(effective.get("maxDelay"))
+        if( maxDelay != null ) {
+            policy.maxDelay(maxDelay)
+        }
+        Boolean unlimited = parseBoolean(effective.get("unlimited"))
+        if( unlimited != null ) {
+            policy.unlimited(unlimited)
+        }
+        return policy
+    }
+
+    static protected Long resolveShutdownDelayMillis(TaskRun task, NomadJobOpts jobOpts) {
+        Object processValue = NomadTaskOptionsResolver.shutdownDelay(task)
+        Long processDelay = parseDurationToMillis(processValue)
+        if( processValue != null && processDelay == null ) {
+            log.warn("Ignoring invalid `${TaskDirectives.NOMAD_OPTIONS}.shutdownDelay` value `${processValue}`")
+        }
+        if( processDelay != null ) {
+            return processDelay
+        }
+        return jobOpts?.shutdownDelay?.millis as Long
+    }
+
+    static protected Integer parseInteger(Object value, Integer defaultValue = null) {
+        if( value == null ) {
+            return defaultValue
+        }
+        try {
+            return value.toString() as Integer
+        } catch(Exception ignored) {
+            return defaultValue
+        }
+    }
+
+    static protected Boolean parseBoolean(Object value) {
+        if( value == null ) {
+            return null
+        }
+        return Boolean.valueOf(value.toString())
+    }
+
+    static protected Long parseDurationToMillis(Object value) {
+        if( value == null ) {
+            return null
+        }
+        try {
+            if( value instanceof Number ) {
+                return ((Number)value).longValue()
+            }
+            if( value instanceof Duration ) {
+                return ((Duration)value).millis
+            }
+            return Duration.of(value.toString()).millis
+        } catch(Exception ignored) {
+            return null
         }
     }
 }

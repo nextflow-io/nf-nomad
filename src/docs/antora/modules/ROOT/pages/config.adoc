@@ -101,10 +101,17 @@ The plugin supports process-level Nomad directives in two forms:
 `nomadOptions` accepts a map and currently supports:
 
 - `datacenters`: list of strings
+- `namespace`: string namespace override for the process
 - `constraints`: closure using the existing constraints DSL
 - `secrets`: list of secret names
 - `spread`: spread map (`name`, `weight`, optional `targets`)
 - `priority`: priority alias or number (`critical`, `high`, `normal`, `low`, `min`, or `0..100`)
+- `meta`: map of metadata merged with global `nomad.jobs.meta` (process keys override)
+- `shutdownDelay`: duration string (e.g. `15s`, `2m`)
+- `failures`: map with optional `restart` and `reschedule` maps
+- `resources`: map of resource options
+  - `memoryMax`: memory limit for Nomad `memory_max` (defaults to task `memory` when not set)
+  - `device`: list of Nomad requested devices (e.g. GPUs)
 
 [source,groovy]
 ----
@@ -112,14 +119,22 @@ process {
     withName: sayHello {
         nomadOptions = [
             datacenters: ['dc1', 'dc2'],
+            namespace: 'bio',
             constraints: {
                 node {
                     unique = [name: params.RUN_IN_NODE]
                 }
             },
+            meta: [owner: 'team-x', step: 'align'],
+            shutdownDelay: '15s',
+            failures: [
+                restart: [attempts: 1, delay: '5s', mode: 'fail'],
+                reschedule: [attempts: 2, delay: '10s']
+            ],
             secrets: ['MY_ACCESS_KEY', 'MY_SECRET_KEY'],
             spread: [name: 'node.datacenter', weight: 50, targets: ['us-east1': 70, 'us-east2': 30]],
-            priority: 'high'
+            priority: 'high',
+            resources: [memoryMax: '64 GB', device: [[name: 'nvidia/gpu', count: 1]]]
         ]
     }
 }

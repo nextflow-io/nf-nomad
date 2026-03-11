@@ -97,6 +97,8 @@ class NomadService implements Closeable{
 
         JobBuilder.assignDatacenters(task, job)
         JobBuilder.spreads(task, job, this.config.jobOpts())
+        applyNamespace(task, job)
+        applyMeta(task, job)
 
         // Apply priority if specified in env parameter
         if (env && env.containsKey('PRIORITY')) {
@@ -127,7 +129,7 @@ class NomadService implements Closeable{
         try {
             String evalId = safeExecutor.apply {
                 JobRegisterResponse jobRegisterResponse = jobsApi.registerJob(jobRegisterRequest,
-                        config.jobOpts().region, config.jobOpts().namespace,
+                        config.jobOpts().region, job.namespace ?: config.jobOpts().namespace,
                         null, null)
                 jobRegisterResponse.evalID
             }
@@ -353,6 +355,27 @@ class NomadService implements Closeable{
         } catch (Exception e) {
             NomadLogging.logError(log, "isPlacementFailure", jobId, e)
             return false
+        }
+    }
+
+    protected void applyNamespace(TaskRun task, Job job) {
+        def namespace = NomadTaskOptionsResolver.namespace(task)
+        if( namespace ) {
+            job.namespace(namespace.toString())
+        }
+    }
+
+    protected void applyMeta(TaskRun task, Job job) {
+        Map<String, String> effectiveMeta = [:]
+        if( config.jobOpts().meta ) {
+            effectiveMeta.putAll(config.jobOpts().meta)
+        }
+        Map<String, String> processMeta = NomadTaskOptionsResolver.meta(task) as Map<String, String>
+        if( processMeta ) {
+            effectiveMeta.putAll(processMeta)
+        }
+        if( effectiveMeta ) {
+            job.meta(effectiveMeta)
         }
     }
 }

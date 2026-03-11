@@ -157,6 +157,7 @@ class MockNomadServiceSpec extends Specification{
         body.Job.TaskGroups[0].Tasks[0].Name == "nf-task"
         body.Job.TaskGroups[0].Tasks[0].Resources.Cores == 1
         body.Job.TaskGroups[0].Tasks[0].Resources.MemoryMB == 1024
+        body.Job.TaskGroups[0].Tasks[0].Resources.MemoryMaxMB == 1024
 
         body.Job.TaskGroups[0].Tasks[0].Driver == "docker"
         body.Job.TaskGroups[0].Tasks[0].Config.image == image
@@ -233,6 +234,7 @@ class MockNomadServiceSpec extends Specification{
         body.Job.TaskGroups[0].Tasks[0].Name == "nf-task"
         body.Job.TaskGroups[0].Tasks[0].Resources.Cores == 1
         body.Job.TaskGroups[0].Tasks[0].Resources.MemoryMB == 1024
+        body.Job.TaskGroups[0].Tasks[0].Resources.MemoryMaxMB == 1024
         body.Job.TaskGroups[0].Tasks[0].Driver == "docker"
         body.Job.TaskGroups[0].Tasks[0].Config.image == image
         body.Job.TaskGroups[0].Tasks[0].Config.work_dir == workingDir
@@ -244,6 +246,60 @@ class MockNomadServiceSpec extends Specification{
         body.Job.TaskGroups[0].Tasks[0].VolumeMounts.size() == 1
         body.Job.TaskGroups[0].Tasks[0].VolumeMounts[0] == [Destination:"/a", Volume:"vol_0"]
 
+    }
+
+    void "submit a task with nomadOptions resources memoryMax override"(){
+        given:
+        def config = new NomadConfig(
+                client:[
+                        address : "http://${mockWebServer.hostName}:${mockWebServer.port}"
+                ],
+        )
+        def service = new NomadService(config)
+
+        String id = "theId"
+        String name = "theName"
+        String image = "theImage"
+        List<String> args = ["theCommand", "theArgs"]
+        Map<String, String>env = [test:"test"]
+
+        def mockTask = Mock(TaskRun){
+            getName() >> name
+            getContainer() >> image
+            getConfig() >> [memory: '1 GB', cpus: 1]
+            getWorkDirStr() >> "theWorkingDir"
+            getContainer() >> "ubuntu"
+            getProcessor() >> Mock(TaskProcessor){
+                getExecutor() >> Mock(Executor){
+                    isFusionEnabled() >> false
+                }
+                getConfig() >> Mock(ProcessConfig){
+                    get(TaskDirectives.NOMAD_OPTIONS) >> [resources: [memoryMax: '3 GB']]
+                }
+            }
+            getWorkDir() >> Path.of("/tmp")
+            toTaskBean() >> Mock(TaskBean){
+                getWorkDir() >> Path.of("/tmp")
+                getScript() >> "theScript"
+                getShell() >> ["bash"]
+                getInputFiles() >> [:]
+            }
+        }
+
+        mockWebServer.enqueue(new MockResponse()
+                .setBody(JsonOutput.toJson(["EvalID":"test"]).toString())
+                .addHeader("Content-Type", "application/json"));
+        when:
+        def idJob = service.submitTask(id, mockTask, args, env)
+        def recordedRequest = mockWebServer.takeRequest();
+        def body = new JsonSlurper().parseText(recordedRequest.body.readUtf8())
+
+        then:
+        idJob
+        recordedRequest.method == "POST"
+        recordedRequest.path == "/v1/jobs"
+        body.Job.TaskGroups[0].Tasks[0].Resources.MemoryMB == 1024
+        body.Job.TaskGroups[0].Tasks[0].Resources.MemoryMaxMB == 3072
     }
 
     void "submit a task with an affinity"(){
@@ -830,6 +886,96 @@ class MockNomadServiceSpec extends Specification{
         recordedRequest.method == "POST"
         recordedRequest.path == "/v1/jobs"
         body.Job.Priority == 73
+    }
+
+    void "submit a task with extended nomadOptions overrides"(){
+        given:
+        def config = new NomadConfig(
+                client:[
+                        address : "http://${mockWebServer.hostName}:${mockWebServer.port}"
+                ],
+                jobs:[
+                        namespace: 'global-ns',
+                        meta: [pipeline: 'p1', owner: 'team-a'],
+                        failures: [
+                                restart: [attempts: 3],
+                                reschedule: [attempts: 4]
+                        ],
+                        shutdownDelay: '30s'
+                ]
+        )
+        def service = new NomadService(config)
+
+        String id = "theId"
+        String name = "theName"
+        String image = "theImage"
+        List<String> args = ["theCommand", "theArgs"]
+        String workingDir = "/a/b/c"
+        Map<String, String>env = [test:"test"]
+
+        def mockTask = Mock(TaskRun){
+            getName() >> name
+            getContainer() >> image
+            getConfig() >> [memory: '1 GB']
+            getWorkDirStr() >> workingDir
+            getContainer() >> "ubuntu"
+            getProcessor() >> Mock(TaskProcessor){
+                getExecutor() >> Mock(Executor){
+                    isFusionEnabled() >> false
+                }
+                getConfig() >> Mock(ProcessConfig){
+                    get(TaskDirectives.NOMAD_OPTIONS) >> [
+                            namespace: 'process-ns',
+                            meta: [owner: 'team-b', step: 'align'],
+                            shutdownDelay: '15s',
+                            failures: [
+                                    restart: [attempts: 1, delay: '5s', mode: 'fail'],
+                                    reschedule: [attempts: 2, delay: '10s']
+                            ],
+                            resources: [
+                                    memoryMax: '2 GB',
+                                    device: [[name: 'nvidia/gpu', count: 1]]
+                            ]
+                    ]
+                    get(TaskDirectives.PRIORITY) >> null
+                }
+            }
+            getWorkDir() >> Path.of(workingDir)
+            toTaskBean() >> Mock(TaskBean){
+                getWorkDir() >> Path.of(workingDir)
+                getScript() >> "theScript"
+                getShell() >> ["bash"]
+                getInputFiles() >> [:]
+            }
+        }
+
+        mockWebServer.enqueue(new MockResponse()
+                .setBody(JsonOutput.toJson(["EvalID":"test"]).toString())
+                .addHeader("Content-Type", "application/json"));
+        when:
+        def idJob = service.submitTask(id, mockTask, args, env)
+        def recordedRequest = mockWebServer.takeRequest();
+        def body = new JsonSlurper().parseText(recordedRequest.body.readUtf8())
+
+        then:
+        idJob
+        recordedRequest.method == "POST"
+        recordedRequest.path == "/v1/jobs?namespace=process-ns"
+        body.Job.Namespace == 'process-ns'
+        body.Job.Meta == [pipeline: 'p1', owner: 'team-b', step: 'align']
+
+        body.Job.TaskGroups[0].RestartPolicy.Attempts == 1
+        body.Job.TaskGroups[0].RestartPolicy.Delay == 5000
+        body.Job.TaskGroups[0].RestartPolicy.Mode == 'fail'
+        body.Job.TaskGroups[0].ReschedulePolicy.Attempts == 2
+        body.Job.TaskGroups[0].ReschedulePolicy.Delay == 10000
+
+        body.Job.TaskGroups[0].Tasks[0].ShutdownDelay == 15000
+        body.Job.TaskGroups[0].Tasks[0].Resources.Cores == 1
+        body.Job.TaskGroups[0].Tasks[0].Resources.MemoryMB == 1024
+        body.Job.TaskGroups[0].Tasks[0].Resources.MemoryMaxMB == 2048
+        body.Job.TaskGroups[0].Tasks[0].Resources.Devices[0].Name == 'nvidia/gpu'
+        body.Job.TaskGroups[0].Tasks[0].Resources.Devices[0].Count == 1
     }
 
     void "placement failure detection should be disabled by default"() {
