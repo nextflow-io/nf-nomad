@@ -98,6 +98,23 @@ class NomadService implements Closeable{
         JobBuilder.assignDatacenters(task, job)
         JobBuilder.spreads(task, job, this.config.jobOpts())
 
+        // Apply priority if specified in env parameter
+        if (env && env.containsKey('PRIORITY')) {
+            Integer priority = JobBuilder.resolvePriority(env.get('PRIORITY'))
+            if (priority != null) {
+                job.priority(priority)
+            }
+        }
+
+        // Apply priority if specified in task configuration
+        def priorityFromConfig = task.processor?.config?.get(TaskDirectives.PRIORITY)
+        if (priorityFromConfig && !job.priority) {
+            Integer priority = JobBuilder.resolvePriority(priorityFromConfig.toString())
+            if (priority != null) {
+                job.priority(priority)
+            }
+        }
+
         JobRegisterRequest jobRegisterRequest = new JobRegisterRequest()
         jobRegisterRequest.setJob(job)
 

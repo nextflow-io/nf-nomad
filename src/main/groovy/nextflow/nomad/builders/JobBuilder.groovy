@@ -311,5 +311,47 @@ class JobBuilder {
         jobDef
     }
 
+    /**
+     * Resolves priority string to Nomad priority integer
+     * Nomad supports priorities from 0-100, default is 50
+     *
+     * Supports:
+     * - Numeric strings (0-100)
+     * - Predefined aliases: critical, high, normal, low, min
+     *
+     * @param priorityValue string value (numeric or alias) or null
+     * @return Integer priority value or null if invalid
+     */
+    static Integer resolvePriority(String priorityValue) {
+        if (!priorityValue) {
+            return null
+        }
 
+        try {
+            // Try parsing as integer first
+            Integer intValue = priorityValue as Integer
+            if (intValue >= 0 && intValue <= 100) {
+                return intValue
+            }
+            log.warn("Priority value ${intValue} is outside valid range 0-100, ignoring")
+            return null
+        } catch (NumberFormatException ignored) {
+            // Handle string aliases for priority levels
+            switch (priorityValue.toLowerCase()) {
+                case 'critical':
+                    return 100
+                case 'high':
+                    return 80
+                case 'normal':
+                    return 50
+                case 'low':
+                    return 30
+                case 'min':
+                    return 10
+                default:
+                    log.warn("Unknown priority value: ${priorityValue}, ignoring")
+                    return null
+            }
+        }
+    }
 }
