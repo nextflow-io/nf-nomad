@@ -85,6 +85,44 @@ nomad{
 - `dockerVolume`, DEPRECATED
 - `affinitySpec`, DEPRECATED
 - `constraintSpec`, DEPRECATED
+=== Process directives
+
+The plugin supports process-level Nomad directives in two forms:
+
+- Legacy directives:
+  - `datacenters`
+  - `constraints`
+  - `secret`
+  - `spread`
+- Preferred map-based directive:
+  - `nomadOptions`
+
+`nomadOptions` accepts a map and currently supports:
+
+- `datacenters`: list of strings
+- `constraints`: closure using the existing constraints DSL
+- `secrets`: list of secret names
+- `spread`: spread map (`name`, `weight`, optional `targets`)
+
+[source,groovy]
+----
+process {
+    withName: sayHello {
+        nomadOptions = [
+            datacenters: ['dc1', 'dc2'],
+            constraints: {
+                node {
+                    unique = [name: params.RUN_IN_NODE]
+                }
+            },
+            secrets: ['MY_ACCESS_KEY', 'MY_SECRET_KEY'],
+            spread: [name: 'node.datacenter', weight: 50, targets: ['us-east1': 70, 'us-east2': 30]]
+        ]
+    }
+}
+----
+
+When both `nomadOptions.<key>` and a legacy directive are set for the same process, `nomadOptions.<key>` takes precedence for that key only.
 
 
 

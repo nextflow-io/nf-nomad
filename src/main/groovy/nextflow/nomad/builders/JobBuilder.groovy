@@ -30,6 +30,7 @@ import io.nomadproject.client.model.Template
 import io.nomadproject.client.model.VolumeMount
 import io.nomadproject.client.model.VolumeRequest
 import nextflow.nomad.config.NomadJobOpts
+import nextflow.nomad.executor.NomadTaskOptionsResolver
 import nextflow.nomad.executor.TaskDirectives
 import nextflow.nomad.models.ConstraintsBuilder
 import nextflow.nomad.models.JobConstraints
@@ -74,7 +75,7 @@ class JobBuilder {
     }
 
     static Job assignDatacenters(TaskRun task, Job job){
-        def datacenters = task.processor?.config?.get(TaskDirectives.DATACENTERS)
+        def datacenters = NomadTaskOptionsResolver.datacenters(task)
         if( datacenters ){
             if( datacenters instanceof List<String>) {
                 job.datacenters( datacenters as List<String>)
@@ -260,9 +261,8 @@ class JobBuilder {
             constraints.addAll(list)
         }
 
-        if( task.processor?.config?.get(TaskDirectives.CONSTRAINTS) &&
-                task.processor?.config?.get(TaskDirectives.CONSTRAINTS) instanceof Closure) {
-            Closure closure = task.processor?.config?.get(TaskDirectives.CONSTRAINTS) as Closure
+        Closure closure = NomadTaskOptionsResolver.constraints(task)
+        if( closure ) {
             JobConstraints constraintsSpec = JobConstraints.parse(closure)
             def list = ConstraintsBuilder.constraintsSpecToList(constraintsSpec)
             constraints.addAll(list)
@@ -276,7 +276,7 @@ class JobBuilder {
 
     protected static Task secrets(TaskRun task, Task taskDef, NomadJobOpts jobOpts){
         if( jobOpts?.secretOpts?.enabled) {
-            def secrets = task.processor?.config?.get(TaskDirectives.SECRETS)
+            def secrets = NomadTaskOptionsResolver.secrets(task)
             if (secrets) {
                 Template template = new Template(envvars: true, destPath: "/secrets/nf-nomad")
                 String secretPath = jobOpts?.secretOpts?.path
@@ -296,9 +296,8 @@ class JobBuilder {
             def list = SpreadsBuilder.spreadsSpecToList(jobOpts.spreadsSpec)
             spreads.addAll(list)
         }
-        if( task.processor?.config?.get(TaskDirectives.SPREAD) &&
-                task.processor?.config?.get(TaskDirectives.SPREAD) instanceof Map) {
-            Map map = task.processor?.config?.get(TaskDirectives.SPREAD) as Map
+        Map map = NomadTaskOptionsResolver.spread(task)
+        if( map ) {
             JobSpreads spreadSpec = new JobSpreads()
             spreadSpec.spread(map)
             def list = SpreadsBuilder.spreadsSpecToList(spreadSpec)

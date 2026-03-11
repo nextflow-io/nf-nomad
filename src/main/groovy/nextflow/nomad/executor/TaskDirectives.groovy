@@ -9,6 +9,7 @@ class TaskDirectives {
     public static final String SECRETS = "secret"
 
     public static final String SPREAD = "spread"
+    public static final String NOMAD_OPTIONS = "nomadOptions"
 
     public static final String PRIORITY = "priority"
 
@@ -17,6 +18,7 @@ class TaskDirectives {
             CONSTRAINTS,
             SECRETS,
             SPREAD,
+            NOMAD_OPTIONS,
             PRIORITY
     ]
 }
