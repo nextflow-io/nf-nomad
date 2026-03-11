@@ -47,6 +47,7 @@ class JobBuilderSpec extends Specification {
     def "test createTask method"() {
         given:
         def jobOpts = Mock(NomadJobOpts)
+        jobOpts.driver >> "docker"
         def taskRun = Mock(TaskRun)
         def args = ["arg1", "arg2"]
         def env = ["key": "value"]
@@ -67,6 +68,35 @@ class JobBuilderSpec extends Specification {
         task.env == env
         task.resources.cores == 2
         task.resources.memoryMB == 1024
+    }
+
+    def "test createTask with pbs driver produces hpc config"() {
+        given:
+        def jobOpts = Mock(NomadJobOpts)
+        jobOpts.driver >> "pbs"
+        def taskRun = Mock(TaskRun)
+        def args = ["bash", ".command.run"]
+        def env = ["key": "value"]
+
+        taskRun.container >> null
+        taskRun.workDir >> new File("/scratch/work/ab/cd1234").toPath()
+        taskRun.getConfig() >> [cpus: 4, memory: "8GB", queue: "compute"]
+
+        when:
+        def task = JobBuilder.createTask(taskRun, args, env, jobOpts)
+
+        then:
+        task.name == "nf-task"
+        task.driver == "pbs"
+        task.config.command == "bash"
+        task.config.args == [".command.run"]
+        task.config.work_dir == "/scratch/work/ab/cd1234"
+        task.config.stdout_file == "/scratch/work/ab/cd1234/.command.log"
+        task.config.stderr_file == "/scratch/work/ab/cd1234/.command.log"
+        task.config.queue == "compute"
+        // Docker-specific fields must not be present
+        !task.config.containsKey("image")
+        !task.config.containsKey("privileged")
     }
 
 

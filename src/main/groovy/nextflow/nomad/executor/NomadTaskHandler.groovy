@@ -178,7 +178,8 @@ class NomadTaskHandler extends TaskHandler implements FusionAwareTask {
     }
 
     String submitTask() {
-        if (!task.container)
+        final driver = config.jobOpts().driver ?: "docker"
+        if (driver == "docker" && !task.container)
             throw new ProcessSubmitException("[NOMAD] Missing container image for process `$task.processor.name`")
 
         def builder = createBashWrapper(task)
@@ -212,8 +213,14 @@ class NomadTaskHandler extends TaskHandler implements FusionAwareTask {
     }
 
     protected List<String> classicSubmitCli(TaskRun task) {
+        final driver = config.jobOpts().driver ?: "docker"
         final result = new ArrayList(BashWrapperBuilder.BASH)
-        result.add("${Escape.path(task.workDir)}/${TaskRun.CMD_RUN}".toString())
+        if (driver != "docker") {
+            // HPC: relative path — nomad-hpcbridge cd's to work_dir
+            result.add(TaskRun.CMD_RUN)
+        } else {
+            result.add("${Escape.path(task.workDir)}/${TaskRun.CMD_RUN}".toString())
+        }
         return result
     }
 

@@ -73,6 +73,6 @@ class NomadExecutor extends Executor implements ExtensionPoint {
 
     @Override
     boolean isContainerNative() {
-        return true
+        return nomadConfig.jobOpts().driver == "docker"
     }
 }

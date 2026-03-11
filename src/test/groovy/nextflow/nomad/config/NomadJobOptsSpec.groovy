@@ -35,6 +35,22 @@ class NomadJobOptsSpec extends Specification {
         nomadJobOpts.rescheduleAttempts == 1
         nomadJobOpts.restartAttempts == 1
         nomadJobOpts.dockerVolume == null
+        nomadJobOpts.driver == "docker"
+    }
+
+    def "test driver defaults to docker"() {
+        expect:
+        new NomadJobOpts([:]).driver == "docker"
+    }
+
+    def "test driver can be set to pbs"() {
+        expect:
+        new NomadJobOpts([driver: "pbs"]).driver == "pbs"
+    }
+
+    def "test driver can be set to slurm"() {
+        expect:
+        new NomadJobOpts([driver: "slurm"]).driver == "slurm"
     }
 
     def "test rescheduleAttempts and restartAttempts"() {

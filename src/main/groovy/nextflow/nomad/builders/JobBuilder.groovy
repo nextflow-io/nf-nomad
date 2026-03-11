@@ -159,33 +159,79 @@ class JobBuilder {
     }
 
     static Task createTask(TaskRun task, List<String> args, Map<String, String>env, NomadJobOpts jobOpts) {
-        final DRIVER = "docker"
-
-        final imageName = task.container
-        final workingDir = task.workDir.toAbsolutePath().toString()
+        final driver = jobOpts.driver ?: "docker"
         final taskResources = getResources(task)
+        Map<String, Object> config
 
+        if (driver == "docker") {
+            config = buildDockerConfig(task, args, jobOpts)
+        } else {
+            config = buildHpcConfig(task, args, jobOpts)
+        }
 
         def taskDef = new Task(
                 name: "nf-task",
-                driver: DRIVER,
+                driver: driver,
                 resources: taskResources,
-                config: [
-                        image     : imageName,
-                        privileged: (jobOpts?.privileged != null ? jobOpts.privileged : true),
-                        work_dir  : workingDir,
-                        command   : args.first(),
-                        args      : args.tail(),
-                ] as Map<String, Object>,
+                config: config,
                 env: env,
         )
 
-        volumes(task, taskDef, workingDir, jobOpts)
+        if (driver == "docker") {
+            volumes(task, taskDef, task.workDir.toAbsolutePath().toString(), jobOpts)
+        }
         affinity(task, taskDef, jobOpts)
         constraint(task, taskDef, jobOpts)
         constraints(task, taskDef, jobOpts)
         secrets(task, taskDef, jobOpts)
         return taskDef
+    }
+
+    private static Map<String, Object> buildDockerConfig(TaskRun task, List<String> args, NomadJobOpts jobOpts) {
+        return [
+                image     : task.container,
+                privileged: (jobOpts?.privileged != null ? jobOpts.privileged : true),
+                work_dir  : task.workDir.toAbsolutePath().toString(),
+                command   : args.first(),
+                args      : args.tail(),
+        ] as Map<String, Object>
+    }
+
+    private static Map<String, Object> buildHpcConfig(TaskRun task, List<String> args, NomadJobOpts jobOpts) {
+        final workDir = task.workDir.toAbsolutePath().toString()
+        final taskCfg = task.getConfig()
+
+        def config = [
+                command     : args.first(),
+                args        : args.tail(),
+                work_dir    : workDir,
+                stdout_file : "${workDir}/.command.log".toString(),
+                stderr_file : "${workDir}/.command.log".toString(),
+        ] as Map<String, Object>
+
+        // queue — from NF built-in process directive
+        if (taskCfg.queue) {
+            config.queue = taskCfg.queue.toString()
+        }
+
+        // walltime — from NF built-in 'time' directive, same as SlurmExecutor
+        if (taskCfg.getTime()) {
+            config.walltime = taskCfg.getTime().format('HH:mm:ss')
+        }
+
+        // account — from executor config (same pattern as PbsProExecutor)
+        final account = task.processor?.executor?.config?.getExecConfigProp('nomad', 'account', null) as String
+        if (account) {
+            config.account = account
+        }
+
+        // clusterOptions — maps to extra_args in nomad-hpcbridge
+        final clusterOpts = taskCfg.getClusterOptionsAsList()
+        if (clusterOpts) {
+            config.extra_args = clusterOpts
+        }
+
+        return config
     }
 
     static protected Task volumes(TaskRun task, Task taskDef, String workingDir, NomadJobOpts jobOpts){
