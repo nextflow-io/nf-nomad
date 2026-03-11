@@ -26,6 +26,7 @@ import nextflow.executor.BashWrapperBuilder
 import nextflow.fusion.FusionAwareTask
 import nextflow.nomad.config.NomadConfig
 import nextflow.nomad.NomadHelper
+import nextflow.nomad.util.NomadLogging
 import nextflow.processor.TaskHandler
 import nextflow.processor.TaskRun
 import nextflow.processor.TaskStatus
@@ -56,6 +57,8 @@ class NomadTaskHandler extends TaskHandler implements FusionAwareTask {
     private TaskState state
 
     private long timestamp
+
+    private long submissionTime = 0L
 
     private final Path outputFile
 
@@ -102,10 +105,10 @@ class NomadTaskHandler extends TaskHandler implements FusionAwareTask {
         if(isSubmitted()) {
             def state = taskState0()
 
-            log.debug "[NOMAD] checkIfRunning task=$task.name ; state=${state?.state}"
+            NomadLogging.logJobState(log, jobName, state?.state, [task: task.name])
 
             // if a state exists, include an array of states to determine task status
-            if( state?.state && ( ["running","pending","unknown"].contains(state.state))){
+            if( state?.state && ( ["running","pending","starting"].contains(state.state))){
                 this.status = TaskStatus.RUNNING
                 determineClientNode()
                 return true
@@ -117,14 +120,25 @@ class NomadTaskHandler extends TaskHandler implements FusionAwareTask {
     @Override
     boolean checkIfCompleted() {
         if( !jobName ) throw new IllegalStateException("[NOMAD] Missing Nomad Job name -- cannot check if running")
-        def isFinished = false
 
         def state = taskState0()
 
-        log.debug "[NOMAD] checkIfCompleted task=$task.name ; state=${state?.state}"
+        NomadLogging.logJobState(log, jobName, state?.state, [task: task.name])
+
+        // Check for placement failure if configured
+        if (nomadService.isPlacementFailure(jobName, submissionTime)) {
+            task.exitStatus = 1
+            task.stdout = outputFile
+            task.stderr = errorFile
+            status = TaskStatus.COMPLETED
+            task.error = new ProcessUnrecoverableException("[NOMAD] Job placement failed - no suitable nodes with available resources")
+            task.aborted = true
+            determineClientNode()
+            return true
+        }
 
         // if a state exists, include an array of states to determine task status
-        if( state?.state && ( ["dead"].contains(state.state))){
+        if( state?.state && ( ["dead","complete","failed","lost"].contains(state.state))){
             // finalize the task
             task.exitStatus = readExitFile()
             task.stdout = outputFile
@@ -177,8 +191,11 @@ class NomadTaskHandler extends TaskHandler implements FusionAwareTask {
         final taskEnv = getEnv(task)
         nomadService.submitTask(this.jobName, task, taskLauncher, taskEnv, debugPath())
 
+        // Record submission time for placement failure detection
+        this.submissionTime = System.currentTimeMillis()
+
         // submit the task execution
-        log.debug "[NOMAD] submitTask task=${task.name} ; taskId=${this.jobName} ; work-dir=${task.workDirStr}"
+        NomadLogging.logTaskSubmission(log, task.name, this.jobName, task.container, task.workDirStr)
         // update the status
         this.status = TaskStatus.SUBMITTED
     }
@@ -212,20 +229,22 @@ class NomadTaskHandler extends TaskHandler implements FusionAwareTask {
             ret += fusionLauncher().fusionEnv()
         }
 
-        //Add debug env variable
-        if( SysEnv.containsKey('NXF_DEBUG') )
-            ret.put('NXF_DEBUG', SysEnv.get('NXF_DEBUG') )
+        // Add Nomad-specific debug env variable
+        if( SysEnv.containsKey('NF_NOMAD_DEBUG') )
+            ret.put('NF_NOMAD_DEBUG', SysEnv.get('NF_NOMAD_DEBUG') )
 
         return ret
     }
 
     protected TaskState taskState0() {
         final now = System.currentTimeMillis()
-        final delta = now - timestamp;
+        final delta = now - timestamp
         if (!status || delta >= 1_000) {
 
             def newState = nomadService.getTaskState(jobName)
-            log.debug "[NOMAD] taskState0 task=$jobName ; currentState=${state?.state} ; newState=${newState?.state}"
+            if (newState && state?.state != newState.state) {
+                NomadLogging.logStateTransition(log, jobName, state?.state, newState?.state)
+            }
 
             if (newState) {
                 state = newState
@@ -254,9 +273,13 @@ class NomadTaskHandler extends TaskHandler implements FusionAwareTask {
         try {
             if ( !clientName )
                 clientName = nomadService.getClientOfJob( jobName )
-            log.debug "[NOMAD] determineClientNode: jobName:$jobName ; clientName:$clientName"
+            if (NomadLogging.isDebugEnabled()) {
+                log.info "[NOMAD] determineClientNode: jobName:$jobName ; clientName:$clientName"
+            }
         } catch ( Exception e ){
-            log.debug ("[NOMAD] Unable to get the client name of job $jobName -- awaiting for a client to be assigned.")
+            if (NomadLogging.isDebugEnabled()) {
+                log.info ("[NOMAD] Unable to get the client name of job $jobName -- awaiting for a client to be assigned.")
+            }
         }
     }
 

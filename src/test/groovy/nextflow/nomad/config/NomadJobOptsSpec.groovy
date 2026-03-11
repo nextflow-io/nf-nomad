@@ -130,4 +130,66 @@ class NomadJobOptsSpec extends Specification {
         then:
         spreads != null
     }
+
+    def "test failOnPlacementFailure default is false"() {
+        given:
+        def nomadJobOpts = new NomadJobOpts([:])
+
+        expect:
+        nomadJobOpts.failOnPlacementFailure == false
+    }
+
+    def "test failOnPlacementFailure can be set to true"() {
+        given:
+        def nomadJobOpts = new NomadJobOpts([failOnPlacementFailure: true])
+
+        expect:
+        nomadJobOpts.failOnPlacementFailure == true
+    }
+
+    def "test failOnPlacementFailure from environment variable"() {
+        given:
+        def env = ['NOMAD_FAIL_ON_PLACEMENT_FAILURE': 'true']
+        def nomadJobOpts = new NomadJobOpts([:], env)
+
+        expect:
+        nomadJobOpts.failOnPlacementFailure == true
+    }
+
+    def "test placementFailureTimeout default is 60 seconds"() {
+        given:
+        def nomadJobOpts = new NomadJobOpts([:])
+
+        expect:
+        nomadJobOpts.placementFailureTimeout.millis == 60_000L
+    }
+
+    def "test placementFailureTimeout can be customized with Duration"() {
+        given:
+        def nomadJobOpts = new NomadJobOpts([placementFailureTimeout: '2m'])
+
+        expect:
+        nomadJobOpts.placementFailureTimeout.millis == 120_000L
+    }
+
+    def "test placementFailureTimeout from environment variable"() {
+        given:
+        def env = ['NF_NOMAD_PLACEMENT_FAILURE_TIMEOUT': '30s']
+        def nomadJobOpts = new NomadJobOpts([:], env)
+
+        expect:
+        nomadJobOpts.placementFailureTimeout.millis == 30_000L
+    }
+
+    def "test placementFailureTimeout supports various duration formats"() {
+        given:
+        def nomadJobOpts1 = new NomadJobOpts([placementFailureTimeout: '20s'])
+        def nomadJobOpts2 = new NomadJobOpts([placementFailureTimeout: '5m'])
+        def nomadJobOpts3 = new NomadJobOpts([placementFailureTimeout: '1h'])
+
+        expect:
+        nomadJobOpts1.placementFailureTimeout.millis == 20_000L
+        nomadJobOpts2.placementFailureTimeout.millis == 300_000L
+        nomadJobOpts3.placementFailureTimeout.millis == 3_600_000L
+    }
 }

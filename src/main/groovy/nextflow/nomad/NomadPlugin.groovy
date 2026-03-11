@@ -20,6 +20,7 @@ package nextflow.nomad
 import groovy.transform.CompileStatic
 import groovy.util.logging.Slf4j
 import nextflow.cli.PluginAbstractExec
+import nextflow.exception.AbortOperationException
 import nextflow.nomad.secrets.NomadSecretCmd
 import nextflow.nomad.executor.TaskDirectives
 import nextflow.plugin.BasePlugin
@@ -52,10 +53,13 @@ class NomadPlugin extends BasePlugin implements PluginAbstractExec{
 
     @Override
     int exec(String cmd, List<String> args) {
-        return switch (cmd){
-            case 'secrets'-> secrets(args.first(), args.drop(1))
-            default -> -1
+        if( cmd == 'secrets' ) {
+            if( !args || args.isEmpty() ) {
+                throw new AbortOperationException("Missing action for `secrets` command")
+            }
+            return secrets(args.first(), args.drop(1))
         }
+        return -1
     }
 
     int secrets(String action, List<String>args){

@@ -156,7 +156,8 @@ class MockNomadServiceSpec extends Specification{
         body.Job.TaskGroups[0].Tasks.size() == 1
         body.Job.TaskGroups[0].Tasks[0].Name == "nf-task"
         body.Job.TaskGroups[0].Tasks[0].Resources.Cores == 1
-        body.Job.TaskGroups[0].Tasks[0].Resources.MemoryMB == 500
+        body.Job.TaskGroups[0].Tasks[0].Resources.MemoryMB == 1024
+
         body.Job.TaskGroups[0].Tasks[0].Driver == "docker"
         body.Job.TaskGroups[0].Tasks[0].Config.image == image
         body.Job.TaskGroups[0].Tasks[0].Config.work_dir == "/tmp"
@@ -231,7 +232,7 @@ class MockNomadServiceSpec extends Specification{
         body.Job.TaskGroups[0].Tasks.size() == 1
         body.Job.TaskGroups[0].Tasks[0].Name == "nf-task"
         body.Job.TaskGroups[0].Tasks[0].Resources.Cores == 1
-        body.Job.TaskGroups[0].Tasks[0].Resources.MemoryMB == 500
+        body.Job.TaskGroups[0].Tasks[0].Resources.MemoryMB == 1024
         body.Job.TaskGroups[0].Tasks[0].Driver == "docker"
         body.Job.TaskGroups[0].Tasks[0].Config.image == image
         body.Job.TaskGroups[0].Tasks[0].Config.work_dir == workingDir
@@ -492,6 +493,61 @@ class MockNomadServiceSpec extends Specification{
         ({ 'a'*10 })    | ['aaaaaaaaaa']
     }
 
+    void "submit a task with global datacenters config"(){
+        given:
+        def config = new NomadConfig(
+                client:[
+                        address : "http://${mockWebServer.hostName}:${mockWebServer.port}"
+                ],
+                jobs: [
+                        datacenters: ['dc-a', 'dc-b']
+                ]
+        )
+        def service = new NomadService(config)
+
+        String id = "theId"
+        String name = "theName"
+        String image = "theImage"
+        List<String> args = ["theCommand", "theArgs"]
+        String workingDir = "/a/b/c"
+        Map<String, String>env = [test:"test"]
+
+        def mockTask = Mock(TaskRun){
+            getName() >> name
+            getContainer() >> image
+            getConfig() >> Mock(TaskConfig)
+            getWorkDirStr() >> workingDir
+            getContainer() >> "ubuntu"
+            getProcessor() >> Mock(TaskProcessor){
+                getExecutor() >> Mock(Executor){
+                    isFusionEnabled() >> false
+                }
+            }
+            getWorkDir() >> Path.of(workingDir)
+            toTaskBean() >> Mock(TaskBean){
+                getWorkDir() >> Path.of(workingDir)
+                getScript() >> "theScript"
+                getShell() >> ["bash"]
+                getInputFiles() >> [:]
+            }
+        }
+
+        mockWebServer.enqueue(new MockResponse()
+                .setBody(JsonOutput.toJson(["EvalID":"test"]).toString())
+                .addHeader("Content-Type", "application/json"));
+
+        when:
+        def idJob = service.submitTask(id, mockTask, args, env)
+        def recordedRequest = mockWebServer.takeRequest();
+        def body = new JsonSlurper().parseText(recordedRequest.body.readUtf8())
+
+        then:
+        idJob
+        recordedRequest.method == "POST"
+        recordedRequest.path == "/v1/jobs"
+        body.Job.Datacenters == ["dc-a", "dc-b"]
+    }
+
     void "submit a task with a spread"(){
         given:
         def config = new NomadConfig(
@@ -554,5 +610,127 @@ class MockNomadServiceSpec extends Specification{
         body.Job.Spreads[0].Weight == 50
         body.Job.Spreads[0].SpreadTarget.first().Value == 'a'
         body.Job.Spreads[0].SpreadTarget.first().Percent == 30
+    }
+
+    void "placement failure detection should be disabled by default"() {
+        given:
+        def config = new NomadConfig(
+                client: [
+                        address: "http://${mockWebServer.hostName}:${mockWebServer.port}"
+                ],
+                jobs: [:]
+        )
+        def service = new NomadService(config)
+
+        when:
+        boolean isFailure = service.isPlacementFailure("test-job", System.currentTimeMillis() - 120_000L)
+
+        then:
+        !isFailure
+    }
+
+    void "placement failure detection should detect unplaced jobs after timeout"() {
+        given:
+        def config = new NomadConfig(
+                client: [
+                        address: "http://${mockWebServer.hostName}:${mockWebServer.port}"
+                ],
+                jobs: [
+                        failOnPlacementFailure: true,
+                        placementFailureTimeout: '5s'  // 5 seconds
+                ]
+        )
+        def service = new NomadService(config)
+
+        // Mock the allocation response with no node assignment
+        def allocationResponse = [
+            [
+                ID: "test-alloc-id",
+                NodeID: "",  // Empty node ID indicates placement failure
+                ClientStatus: "pending",
+                TaskStates: [:]
+            ]
+        ]
+
+        mockWebServer.enqueue(new MockResponse()
+                .setBody(JsonOutput.toJson(allocationResponse).toString())
+                .addHeader("Content-Type", "application/json"))
+
+        when:
+        // Simulate job submitted 10 seconds ago (past the 5 second timeout)
+        boolean isFailure = service.isPlacementFailure("test-job", System.currentTimeMillis() - 10_000L)
+
+        then:
+        isFailure
+    }
+
+    void "placement failure detection should not trigger before timeout"() {
+        given:
+        def config = new NomadConfig(
+                client: [
+                        address: "http://${mockWebServer.hostName}:${mockWebServer.port}"
+                ],
+                jobs: [
+                        failOnPlacementFailure: true,
+                        placementFailureTimeout: '2m'  // 2 minutes
+                ]
+        )
+        def service = new NomadService(config)
+
+        // Mock the allocation response with no node assignment
+        def allocationResponse = [
+            [
+                ID: "test-alloc-id",
+                NodeID: "",  // Empty node ID
+                ClientStatus: "pending",
+                TaskStates: [:]
+            ]
+        ]
+
+        mockWebServer.enqueue(new MockResponse()
+                .setBody(JsonOutput.toJson(allocationResponse).toString())
+                .addHeader("Content-Type", "application/json"))
+
+        when:
+        // Simulate job submitted 10 seconds ago (before the 120 second timeout)
+        boolean isFailure = service.isPlacementFailure("test-job", System.currentTimeMillis() - 10_000L)
+
+        then:
+        !isFailure
+    }
+
+    void "placement failure detection should not trigger for placed jobs"() {
+        given:
+        def config = new NomadConfig(
+                client: [
+                        address: "http://${mockWebServer.hostName}:${mockWebServer.port}"
+                ],
+                jobs: [
+                        failOnPlacementFailure: true,
+                        placementFailureTimeout: '5s'
+                ]
+        )
+        def service = new NomadService(config)
+
+        // Mock the allocation response with node assignment
+        def allocationResponse = [
+            [
+                ID: "test-alloc-id",
+                NodeID: "node-123",  // Node is assigned
+                ClientStatus: "running",
+                TaskStates: [:]
+            ]
+        ]
+
+        mockWebServer.enqueue(new MockResponse()
+                .setBody(JsonOutput.toJson(allocationResponse).toString())
+                .addHeader("Content-Type", "application/json"))
+
+        when:
+        // Even though timeout is exceeded, job is placed
+        boolean isFailure = service.isPlacementFailure("test-job", System.currentTimeMillis() - 10_000L)
+
+        then:
+        !isFailure
     }
 }

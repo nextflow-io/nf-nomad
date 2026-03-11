@@ -24,6 +24,7 @@ import nextflow.nomad.models.JobConstraint
 import nextflow.nomad.models.JobConstraints
 import nextflow.nomad.models.JobSpreads
 import nextflow.nomad.models.JobVolume
+import nextflow.util.Duration
 
 
 /**
@@ -50,32 +51,62 @@ class NomadJobOpts{
 
     Integer rescheduleAttempts
     Integer restartAttempts
+    Boolean privileged
+    Boolean failOnPlacementFailure
+    Duration placementFailureTimeout
 
     NomadSecretOpts secretOpts
 
     NomadJobOpts(Map nomadJobOpts, Map<String,String> env=null){
         assert nomadJobOpts!=null
 
-        sysEnv = env ?: new HashMap<String,String>(System.getenv())
+        sysEnv = new HashMap<String,String>(System.getenv())
+        if( env ) {
+            sysEnv.putAll(env)
+        }
 
         deleteOnCompletion = nomadJobOpts.containsKey("deleteOnCompletion") ?
                 nomadJobOpts.deleteOnCompletion : true
         if( nomadJobOpts.containsKey("datacenters") ) {
             datacenters = ((nomadJobOpts.datacenters instanceof List<String> ?
                     nomadJobOpts.datacenters : nomadJobOpts.datacenters.toString().split(","))
-                    as List<String>).findAll{it.size()}.unique()
+                    as List<String>).collect { it?.toString()?.trim() }.findAll { it?.size() }.unique()
         }else{
-            if( sysEnv.containsKey('NOMAD_DC')) {
-                datacenters = sysEnv.get('NOMAD_DC').split(",") as List<String>
+            def envDatacenters = sysEnv.get('NOMAD_DC')
+            if( envDatacenters?.toString()?.trim() ) {
+                datacenters = (envDatacenters.toString().split(",") as List<String>)
+                        .collect { it?.toString()?.trim() }
+                        .findAll { it?.size() }
+                        .unique()
             }
         }
 
-        region = nomadJobOpts.region ?: sysEnv.get('NOMAD_REGION')
-        namespace = nomadJobOpts.namespace ?: sysEnv.get('NOMAD_NAMESPACE')
+        region = sanitizeOptionalString(nomadJobOpts.region) ?: sanitizeOptionalString(sysEnv.get('NOMAD_REGION'))
+        namespace = sanitizeOptionalString(nomadJobOpts.namespace) ?: sanitizeOptionalString(sysEnv.get('NOMAD_NAMESPACE'))
 
         //NOTE: Default to a single attempt per nomad job definition
         rescheduleAttempts = nomadJobOpts.rescheduleAttempts as Integer ?: 1
         restartAttempts = nomadJobOpts.restartAttempts as Integer ?: 1
+        privileged = nomadJobOpts.containsKey("privileged")
+                ? Boolean.valueOf(nomadJobOpts.privileged.toString())
+                : true
+
+        // Placement failure handling
+        failOnPlacementFailure = nomadJobOpts.containsKey("failOnPlacementFailure") ?
+                Boolean.valueOf(nomadJobOpts.failOnPlacementFailure.toString()) :
+                Boolean.valueOf(sysEnv.get('NOMAD_FAIL_ON_PLACEMENT_FAILURE') ?: 'false')
+
+        // Placement failure timeout (default: 60 seconds)
+        // Supports Nextflow Duration format: "20s", "2m", "1h", "2d"
+        // Or long milliseconds: 60000
+        def timeoutValue = nomadJobOpts.get('placementFailureTimeout') ?: sysEnv.get('NF_NOMAD_PLACEMENT_FAILURE_TIMEOUT')
+        if (timeoutValue) {
+            placementFailureTimeout = timeoutValue instanceof Duration ?
+                (timeoutValue as Duration) :
+                Duration.of(timeoutValue.toString())
+        } else {
+            placementFailureTimeout = Duration.of('60s')
+        }
 
         dockerVolume = nomadJobOpts.dockerVolume ?: null
         if( dockerVolume ){
@@ -190,5 +221,10 @@ class NomadJobOpts{
             spec.validate()
             spec
         }
+    }
+
+    private static String sanitizeOptionalString(Object value) {
+        final str = value?.toString()?.trim()
+        str ? str : null
     }
 }

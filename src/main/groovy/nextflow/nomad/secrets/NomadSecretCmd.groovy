@@ -14,12 +14,30 @@ class NomadSecretCmd {
     int runCommand(Map config, String action, List<String> args){
         nomadConfig = new NomadConfig((config.nomad ?: Collections.emptyMap()) as Map)
         service = new NomadService(nomadConfig)
+        def actionArgs = args ?: []
         return switch (action){
-            case 'get' ->execGetSecretNames(args.removeAt(0).toString())
-            case 'set' ->execSetSecretNames(args.removeAt(0).toString(),args.removeAt(0).toString())
+            case 'get' -> {
+                requireArgs(action, actionArgs, 1)
+                execGetSecretNames(actionArgs.removeAt(0).toString())
+            }
+            case 'set' -> {
+                requireArgs(action, actionArgs, 2)
+                execSetSecretNames(actionArgs.removeAt(0).toString(), actionArgs.removeAt(0).toString())
+            }
             case 'list'->execListSecretsNames()
-            case 'delete'->execDeleteSecretNames(args.removeAt(0).toString())
-            default -> -1
+            case 'delete'-> {
+                requireArgs(action, actionArgs, 1)
+                execDeleteSecretNames(actionArgs.removeAt(0).toString())
+            }
+            default -> {
+                throw new AbortOperationException("Unknown secrets action: ${action}")
+            }
+        }
+    }
+
+    protected void requireArgs(String action, List<String> args, int expected) {
+        if( !args || args.size() < expected ) {
+            throw new AbortOperationException("Wrong number of arguments for `${action}`")
         }
     }
 

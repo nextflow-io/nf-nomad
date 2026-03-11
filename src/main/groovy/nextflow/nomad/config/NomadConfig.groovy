@@ -35,9 +35,17 @@ class NomadConfig {
     private NomadJobOpts jobOpts
     private NomadDebug debug
 
+    NomadConfig() {
+        this(Collections.emptyMap(), null)
+    }
+
     NomadConfig(Map nomadConfigMap) {
-        this.clientOpts = new NomadClientOpts((nomadConfigMap?.client ?: Collections.emptyMap()) as Map)
-        this.jobOpts = new NomadJobOpts((nomadConfigMap?.jobs ?: Collections.emptyMap()) as Map)
+        this(nomadConfigMap, null)
+    }
+
+    NomadConfig(Map nomadConfigMap, Map<String,String> env) {
+        this.clientOpts = new NomadClientOpts((nomadConfigMap?.client ?: Collections.emptyMap()) as Map, env)
+        this.jobOpts = new NomadJobOpts((nomadConfigMap?.jobs ?: Collections.emptyMap()) as Map, env)
         this.debug = new NomadDebug((nomadConfigMap?.debug ?:  Collections.emptyMap()) as Map)
     }
 

@@ -160,7 +160,6 @@ class JobBuilder {
 
     static Task createTask(TaskRun task, List<String> args, Map<String, String>env, NomadJobOpts jobOpts) {
         final DRIVER = "docker"
-        final DRIVER_PRIVILEGED = true
 
         final imageName = task.container
         final workingDir = task.workDir.toAbsolutePath().toString()
@@ -173,7 +172,7 @@ class JobBuilder {
                 resources: taskResources,
                 config: [
                         image     : imageName,
-                        privileged: DRIVER_PRIVILEGED,
+                        privileged: (jobOpts?.privileged != null ? jobOpts.privileged : true),
                         work_dir  : workingDir,
                         command   : args.first(),
                         args      : args.tail(),

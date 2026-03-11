@@ -34,7 +34,9 @@ nomad{
         address = "http://localhost:4646"
     }
     jobs{
-        deleteoncompletion = false
+        deleteOnCompletion = false
+        // privileged defaults to true. Set to false to disable privileged Docker tasks
+        // privileged = false
     }
 }
 

@@ -68,6 +68,39 @@ __You can force to rebuild latest version of the plugins with the `--build` argu
 
 __You can skip local tests with `--skiplocal` argument__
 
+### Extended real-pipeline test: nextflow-io/rnaseq-nf
+
+Use the dedicated rnaseq validation runner when you want stronger assertions and
+saved artifacts (trace/report/timeline/log):
+
+```shell
+cd validation
+./run-rnaseq-nf.sh
+```
+
+This scenario pins `nextflow-io/rnaseq-nf` to commit
+`8253a586cc5a9679d37544ac54f72167cced324b` (tag `v2.3`) by default.
+
+You can override pipeline and revision:
+
+```shell
+RNASEQ_PIPELINE_NAME=nextflow-io/rnaseq-nf \
+RNASEQ_PIPELINE_REVISION=8253a586cc5a9679d37544ac54f72167cced324b \
+./run-rnaseq-nf.sh
+```
+
+You can also invoke it through `run-all.sh` using the `--rnaseq` switch:
+
+```shell
+./run-all.sh --rnaseq
+```
+
+To run only the rnaseq scenario and skip the default local validation set:
+
+```shell
+./run-all.sh --skiplocal --rnaseq
+```
+
 ### Test remote cluster
 
 We've created a cluster with 3 nodes in azure called `nfazure` and, if you have access to it, 
