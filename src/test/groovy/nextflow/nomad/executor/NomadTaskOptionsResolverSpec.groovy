@@ -21,7 +21,8 @@ class NomadTaskOptionsResolverSpec extends Specification {
                 (TaskDirectives.DATACENTERS)  : ['dc-legacy'],
                 (TaskDirectives.CONSTRAINTS)  : legacyConstraints,
                 (TaskDirectives.SECRETS)      : ['LEGACY_SECRET'],
-                (TaskDirectives.SPREAD)       : [name: 'legacy.attr', weight: 50]
+                (TaskDirectives.SPREAD)       : [name: 'legacy.attr', weight: 50],
+                (TaskDirectives.PRIORITY)     : 'low'
         ])
 
         expect:
@@ -29,6 +30,18 @@ class NomadTaskOptionsResolverSpec extends Specification {
         NomadTaskOptionsResolver.constraints(task) == nomadOptionsConstraints
         NomadTaskOptionsResolver.secrets(task) == ['NEW_ONE', 'NEW_TWO']
         NomadTaskOptionsResolver.spread(task) == [name: 'node.class', weight: 10]
+        NomadTaskOptionsResolver.priority(task) == 'low'
+    }
+
+    void "should prefer nomadOptions priority over legacy priority"() {
+        given:
+        def task = taskWithConfig([
+                (TaskDirectives.NOMAD_OPTIONS): [priority: 'critical'],
+                (TaskDirectives.PRIORITY)     : 'low'
+        ])
+
+        expect:
+        NomadTaskOptionsResolver.priority(task) == 'critical'
     }
 
     void "should fallback to legacy directives when nomadOptions key is absent"() {
@@ -38,7 +51,8 @@ class NomadTaskOptionsResolverSpec extends Specification {
                 (TaskDirectives.NOMAD_OPTIONS): [datacenters: ['dc-new']],
                 (TaskDirectives.CONSTRAINTS)  : legacyConstraints,
                 (TaskDirectives.SECRETS)      : ['LEGACY_SECRET'],
-                (TaskDirectives.SPREAD)       : [name: 'legacy.attr', weight: 50]
+                (TaskDirectives.SPREAD)       : [name: 'legacy.attr', weight: 50],
+                (TaskDirectives.PRIORITY)     : 'high'
         ])
 
         expect:
@@ -46,6 +60,7 @@ class NomadTaskOptionsResolverSpec extends Specification {
         NomadTaskOptionsResolver.constraints(task) == legacyConstraints
         NomadTaskOptionsResolver.secrets(task) == ['LEGACY_SECRET']
         NomadTaskOptionsResolver.spread(task) == [name: 'legacy.attr', weight: 50]
+        NomadTaskOptionsResolver.priority(task) == 'high'
     }
 
     void "should ignore non-map nomadOptions and keep using legacy directives"() {

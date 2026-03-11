@@ -612,6 +612,226 @@ class MockNomadServiceSpec extends Specification{
         body.Job.Spreads[0].SpreadTarget.first().Percent == 30
     }
 
+    void "submit a task with priority from nomadOptions"(){
+        given:
+        def config = new NomadConfig(
+                client:[
+                        address : "http://${mockWebServer.hostName}:${mockWebServer.port}"
+                ],
+        )
+        def service = new NomadService(config)
+
+        String id = "theId"
+        String name = "theName"
+        String image = "theImage"
+        List<String> args = ["theCommand", "theArgs"]
+        String workingDir = "/a/b/c"
+        Map<String, String>env = [test:"test"]
+
+        def mockTask = Mock(TaskRun){
+            getName() >> name
+            getContainer() >> image
+            getConfig() >> Mock(TaskConfig)
+            getWorkDirStr() >> workingDir
+            getContainer() >> "ubuntu"
+            getProcessor() >> Mock(TaskProcessor){
+                getExecutor() >> Mock(Executor){
+                    isFusionEnabled() >> false
+                }
+                getConfig() >> Mock(ProcessConfig){
+                    get(TaskDirectives.NOMAD_OPTIONS) >> [priority: "high"]
+                    get(TaskDirectives.PRIORITY) >> null
+                }
+            }
+            getWorkDir() >> Path.of(workingDir)
+            toTaskBean() >> Mock(TaskBean){
+                getWorkDir() >> Path.of(workingDir)
+                getScript() >> "theScript"
+                getShell() >> ["bash"]
+                getInputFiles() >> [:]
+            }
+        }
+
+        mockWebServer.enqueue(new MockResponse()
+                .setBody(JsonOutput.toJson(["EvalID":"test"]).toString())
+                .addHeader("Content-Type", "application/json"));
+        when:
+        def idJob = service.submitTask(id, mockTask, args, env)
+        def recordedRequest = mockWebServer.takeRequest();
+        def body = new JsonSlurper().parseText(recordedRequest.body.readUtf8())
+
+        then:
+        idJob
+        recordedRequest.method == "POST"
+        recordedRequest.path == "/v1/jobs"
+        body.Job.Priority == 80
+    }
+
+    void "submit a task should prefer nomadOptions priority over legacy priority directive"(){
+        given:
+        def config = new NomadConfig(
+                client:[
+                        address : "http://${mockWebServer.hostName}:${mockWebServer.port}"
+                ],
+        )
+        def service = new NomadService(config)
+
+        String id = "theId"
+        String name = "theName"
+        String image = "theImage"
+        List<String> args = ["theCommand", "theArgs"]
+        String workingDir = "/a/b/c"
+        Map<String, String>env = [test:"test"]
+
+        def mockTask = Mock(TaskRun){
+            getName() >> name
+            getContainer() >> image
+            getConfig() >> Mock(TaskConfig)
+            getWorkDirStr() >> workingDir
+            getContainer() >> "ubuntu"
+            getProcessor() >> Mock(TaskProcessor){
+                getExecutor() >> Mock(Executor){
+                    isFusionEnabled() >> false
+                }
+                getConfig() >> Mock(ProcessConfig){
+                    get(TaskDirectives.NOMAD_OPTIONS) >> [priority: "low"]
+                    get(TaskDirectives.PRIORITY) >> "critical"
+                }
+            }
+            getWorkDir() >> Path.of(workingDir)
+            toTaskBean() >> Mock(TaskBean){
+                getWorkDir() >> Path.of(workingDir)
+                getScript() >> "theScript"
+                getShell() >> ["bash"]
+                getInputFiles() >> [:]
+            }
+        }
+
+        mockWebServer.enqueue(new MockResponse()
+                .setBody(JsonOutput.toJson(["EvalID":"test"]).toString())
+                .addHeader("Content-Type", "application/json"));
+        when:
+        def idJob = service.submitTask(id, mockTask, args, env)
+        def recordedRequest = mockWebServer.takeRequest();
+        def body = new JsonSlurper().parseText(recordedRequest.body.readUtf8())
+
+        then:
+        idJob
+        recordedRequest.method == "POST"
+        recordedRequest.path == "/v1/jobs"
+        body.Job.Priority == 30
+    }
+
+    void "submit a task with custom numeric priority from process directive"(){
+        given:
+        def config = new NomadConfig(
+                client:[
+                        address : "http://${mockWebServer.hostName}:${mockWebServer.port}"
+                ],
+        )
+        def service = new NomadService(config)
+
+        String id = "theId"
+        String name = "theName"
+        String image = "theImage"
+        List<String> args = ["theCommand", "theArgs"]
+        String workingDir = "/a/b/c"
+        Map<String, String>env = [test:"test"]
+
+        def mockTask = Mock(TaskRun){
+            getName() >> name
+            getContainer() >> image
+            getConfig() >> Mock(TaskConfig)
+            getWorkDirStr() >> workingDir
+            getContainer() >> "ubuntu"
+            getProcessor() >> Mock(TaskProcessor){
+                getExecutor() >> Mock(Executor){
+                    isFusionEnabled() >> false
+                }
+                getConfig() >> Mock(ProcessConfig){
+                    get(TaskDirectives.NOMAD_OPTIONS) >> null
+                    get(TaskDirectives.PRIORITY) >> "67"
+                }
+            }
+            getWorkDir() >> Path.of(workingDir)
+            toTaskBean() >> Mock(TaskBean){
+                getWorkDir() >> Path.of(workingDir)
+                getScript() >> "theScript"
+                getShell() >> ["bash"]
+                getInputFiles() >> [:]
+            }
+        }
+
+        mockWebServer.enqueue(new MockResponse()
+                .setBody(JsonOutput.toJson(["EvalID":"test"]).toString())
+                .addHeader("Content-Type", "application/json"));
+        when:
+        def idJob = service.submitTask(id, mockTask, args, env)
+        def recordedRequest = mockWebServer.takeRequest();
+        def body = new JsonSlurper().parseText(recordedRequest.body.readUtf8())
+
+        then:
+        idJob
+        recordedRequest.method == "POST"
+        recordedRequest.path == "/v1/jobs"
+        body.Job.Priority == 67
+    }
+
+    void "submit a task with custom numeric priority from nomadOptions"(){
+        given:
+        def config = new NomadConfig(
+                client:[
+                        address : "http://${mockWebServer.hostName}:${mockWebServer.port}"
+                ],
+        )
+        def service = new NomadService(config)
+
+        String id = "theId"
+        String name = "theName"
+        String image = "theImage"
+        List<String> args = ["theCommand", "theArgs"]
+        String workingDir = "/a/b/c"
+        Map<String, String>env = [test:"test"]
+
+        def mockTask = Mock(TaskRun){
+            getName() >> name
+            getContainer() >> image
+            getConfig() >> Mock(TaskConfig)
+            getWorkDirStr() >> workingDir
+            getContainer() >> "ubuntu"
+            getProcessor() >> Mock(TaskProcessor){
+                getExecutor() >> Mock(Executor){
+                    isFusionEnabled() >> false
+                }
+                getConfig() >> Mock(ProcessConfig){
+                    get(TaskDirectives.NOMAD_OPTIONS) >> [priority: "73"]
+                    get(TaskDirectives.PRIORITY) >> "high"
+                }
+            }
+            getWorkDir() >> Path.of(workingDir)
+            toTaskBean() >> Mock(TaskBean){
+                getWorkDir() >> Path.of(workingDir)
+                getScript() >> "theScript"
+                getShell() >> ["bash"]
+                getInputFiles() >> [:]
+            }
+        }
+
+        mockWebServer.enqueue(new MockResponse()
+                .setBody(JsonOutput.toJson(["EvalID":"test"]).toString())
+                .addHeader("Content-Type", "application/json"));
+        when:
+        def idJob = service.submitTask(id, mockTask, args, env)
+        def recordedRequest = mockWebServer.takeRequest();
+        def body = new JsonSlurper().parseText(recordedRequest.body.readUtf8())
+
+        then:
+        idJob
+        recordedRequest.method == "POST"
+        recordedRequest.path == "/v1/jobs"
+        body.Job.Priority == 73
+    }
+
     void "placement failure detection should be disabled by default"() {
         given:
         def config = new NomadConfig(

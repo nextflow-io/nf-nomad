@@ -107,7 +107,7 @@ class NomadService implements Closeable{
         }
 
         // Apply priority if specified in task configuration
-        def priorityFromConfig = task.processor?.config?.get(TaskDirectives.PRIORITY)
+        def priorityFromConfig = NomadTaskOptionsResolver.priority(task)
         if (priorityFromConfig && !job.priority) {
             Integer priority = JobBuilder.resolvePriority(priorityFromConfig.toString())
             if (priority != null) {

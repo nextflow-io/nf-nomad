@@ -15,6 +15,7 @@
  * limitations under the License.
  */
 package nextflow.nomad.executor
+import io.nomadproject.client.api.JobsApi
 
 import nextflow.executor.Executor
 import nextflow.nomad.config.NomadConfig
@@ -22,6 +23,7 @@ import nextflow.processor.TaskBean
 import nextflow.processor.TaskConfig
 import nextflow.processor.TaskProcessor
 import nextflow.processor.TaskRun
+import nextflow.script.ProcessConfig
 import spock.lang.Requires
 import spock.lang.Shared
 import spock.lang.Specification
@@ -55,11 +57,30 @@ class LocalNomadSchedulingIntegrationSpec extends Specification {
 
     @Shared NomadConfig config
     @Shared NomadService service
+    @Shared JobsApi jobsApi
     @Shared List<String> submittedJobIds = []
     @Shared Path testWorkDir
 
     private static boolean isSuccessfulTerminalState(def state) {
         state?.state in ['complete', 'dead']
+    }
+
+    private def awaitJobById(String jobId, int maxRetries = 20) {
+        int retries = 0
+        while (retries < maxRetries) {
+            try {
+                def job = jobsApi.getJob(jobId, config.jobOpts().region,
+                        config.jobOpts().namespace, null, null, null, null, null, null, null)
+                if (job != null) {
+                    return job
+                }
+            } catch (Exception ignored) {
+                // Ignore transient lookup failures while Nomad indexes the job
+            }
+            sleep(500)
+            retries++
+        }
+        return null
     }
 
     def setupSpec() {
@@ -72,6 +93,7 @@ class LocalNomadSchedulingIntegrationSpec extends Specification {
 
         config  = new NomadConfig(client: clientOpts, jobs: jobsOpts)
         service = new NomadService(config)
+        jobsApi = new JobsApi(service.apiClient)
         testWorkDir = Files.createTempDirectory("nf-nomad-scheduling-test")
     }
 
@@ -424,6 +446,178 @@ class LocalNomadSchedulingIntegrationSpec extends Specification {
 
         then:
         noExceptionThrown()
+    }
+
+    void "should submit a job with process priority directive"() {
+        given:
+        def jobId = "directive-priority-${System.currentTimeMillis()}"
+        submittedJobIds.add(jobId)
+
+        def mockTask = Mock(TaskRun) {
+            getName()      >> "directive-priority-job"
+            getContainer() >> "ubuntu:22.04"
+            getConfig()    >> Mock(TaskConfig)
+            getWorkDirStr() >> testWorkDir.toString()
+            getWorkDir()   >> testWorkDir
+            getProcessor() >> Mock(TaskProcessor) {
+                getExecutor() >> Mock(Executor) {
+                    isFusionEnabled() >> false
+                }
+                getConfig() >> Mock(ProcessConfig) {
+                    get(TaskDirectives.PRIORITY) >> "high"
+                    get(TaskDirectives.NOMAD_OPTIONS) >> null
+                }
+            }
+            toTaskBean()   >> Mock(TaskBean) {
+                getWorkDir()    >> testWorkDir
+                getScript()     >> "echo \"directive priority job\""
+                getShell()      >> ["bash"]
+                getInputFiles() >> [:]
+            }
+        }
+
+        when:
+        def evalId = service.submitTask(
+                jobId,
+                mockTask,
+                ["bash", "-c", "echo \"directive priority job\""],
+                [:]
+        )
+        def submittedJob = awaitJobById(jobId)
+
+        then:
+        evalId != null
+        submittedJob != null
+        submittedJob.getPriority() == 80
+    }
+
+    void "should prefer nomadOptions priority over process priority directive"() {
+        given:
+        def jobId = "nomad-options-priority-${System.currentTimeMillis()}"
+        submittedJobIds.add(jobId)
+
+        def mockTask = Mock(TaskRun) {
+            getName()      >> "nomad-options-priority-job"
+            getContainer() >> "ubuntu:22.04"
+            getConfig()    >> Mock(TaskConfig)
+            getWorkDirStr() >> testWorkDir.toString()
+            getWorkDir()   >> testWorkDir
+            getProcessor() >> Mock(TaskProcessor) {
+                getExecutor() >> Mock(Executor) {
+                    isFusionEnabled() >> false
+                }
+                getConfig() >> Mock(ProcessConfig) {
+                    get(TaskDirectives.PRIORITY) >> "critical"
+                    get(TaskDirectives.NOMAD_OPTIONS) >> [priority: "low"]
+                }
+            }
+            toTaskBean()   >> Mock(TaskBean) {
+                getWorkDir()    >> testWorkDir
+                getScript()     >> "echo \"nomad options priority job\""
+                getShell()      >> ["bash"]
+                getInputFiles() >> [:]
+            }
+        }
+
+        when:
+        def evalId = service.submitTask(
+                jobId,
+                mockTask,
+                ["bash", "-c", "echo \"nomad options priority job\""],
+                [:]
+        )
+        def submittedJob = awaitJobById(jobId)
+
+        then:
+        evalId != null
+        submittedJob != null
+        submittedJob.getPriority() == 30
+    }
+
+    void "should submit a job with custom numeric process priority directive"() {
+        given:
+        def jobId = "custom-directive-priority-${System.currentTimeMillis()}"
+        submittedJobIds.add(jobId)
+
+        def mockTask = Mock(TaskRun) {
+            getName()      >> "custom-directive-priority-job"
+            getContainer() >> "ubuntu:22.04"
+            getConfig()    >> Mock(TaskConfig)
+            getWorkDirStr() >> testWorkDir.toString()
+            getWorkDir()   >> testWorkDir
+            getProcessor() >> Mock(TaskProcessor) {
+                getExecutor() >> Mock(Executor) {
+                    isFusionEnabled() >> false
+                }
+                getConfig() >> Mock(ProcessConfig) {
+                    get(TaskDirectives.PRIORITY) >> "67"
+                    get(TaskDirectives.NOMAD_OPTIONS) >> null
+                }
+            }
+            toTaskBean()   >> Mock(TaskBean) {
+                getWorkDir()    >> testWorkDir
+                getScript()     >> "echo \"custom directive priority job\""
+                getShell()      >> ["bash"]
+                getInputFiles() >> [:]
+            }
+        }
+
+        when:
+        def evalId = service.submitTask(
+                jobId,
+                mockTask,
+                ["bash", "-c", "echo \"custom directive priority job\""],
+                [:]
+        )
+        def submittedJob = awaitJobById(jobId)
+
+        then:
+        evalId != null
+        submittedJob != null
+        submittedJob.getPriority() == 67
+    }
+
+    void "should submit a job with custom numeric nomadOptions priority"() {
+        given:
+        def jobId = "custom-nomad-options-priority-${System.currentTimeMillis()}"
+        submittedJobIds.add(jobId)
+
+        def mockTask = Mock(TaskRun) {
+            getName()      >> "custom-nomad-options-priority-job"
+            getContainer() >> "ubuntu:22.04"
+            getConfig()    >> Mock(TaskConfig)
+            getWorkDirStr() >> testWorkDir.toString()
+            getWorkDir()   >> testWorkDir
+            getProcessor() >> Mock(TaskProcessor) {
+                getExecutor() >> Mock(Executor) {
+                    isFusionEnabled() >> false
+                }
+                getConfig() >> Mock(ProcessConfig) {
+                    get(TaskDirectives.PRIORITY) >> "high"
+                    get(TaskDirectives.NOMAD_OPTIONS) >> [priority: "73"]
+                }
+            }
+            toTaskBean()   >> Mock(TaskBean) {
+                getWorkDir()    >> testWorkDir
+                getScript()     >> "echo \"custom nomad options priority job\""
+                getShell()      >> ["bash"]
+                getInputFiles() >> [:]
+            }
+        }
+
+        when:
+        def evalId = service.submitTask(
+                jobId,
+                mockTask,
+                ["bash", "-c", "echo \"custom nomad options priority job\""],
+                [:]
+        )
+        def submittedJob = awaitJobById(jobId)
+
+        then:
+        evalId != null
+        submittedJob != null
+        submittedJob.getPriority() == 73
     }
 
     void "should complete all priority jobs"() {

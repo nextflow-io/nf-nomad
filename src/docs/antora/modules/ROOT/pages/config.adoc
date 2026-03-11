@@ -94,6 +94,7 @@ The plugin supports process-level Nomad directives in two forms:
   - `constraints`
   - `secret`
   - `spread`
+  - `priority`
 - Preferred map-based directive:
   - `nomadOptions`
 
@@ -103,6 +104,7 @@ The plugin supports process-level Nomad directives in two forms:
 - `constraints`: closure using the existing constraints DSL
 - `secrets`: list of secret names
 - `spread`: spread map (`name`, `weight`, optional `targets`)
+- `priority`: priority alias or number (`critical`, `high`, `normal`, `low`, `min`, or `0..100`)
 
 [source,groovy]
 ----
@@ -116,7 +118,8 @@ process {
                 }
             },
             secrets: ['MY_ACCESS_KEY', 'MY_SECRET_KEY'],
-            spread: [name: 'node.datacenter', weight: 50, targets: ['us-east1': 70, 'us-east2': 30]]
+            spread: [name: 'node.datacenter', weight: 50, targets: ['us-east1': 70, 'us-east2': 30]],
+            priority: 'high'
         ]
     }
 }

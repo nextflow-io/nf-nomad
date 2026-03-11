@@ -12,6 +12,7 @@ class NomadTaskOptionsResolver {
     public static final String CONSTRAINTS = "constraints"
     public static final String SECRETS = "secrets"
     public static final String SPREAD = "spread"
+    public static final String PRIORITY = "priority"
 
     protected static Map getNomadOptions(TaskRun task) {
         def options = task?.processor?.config?.get(TaskDirectives.NOMAD_OPTIONS)
@@ -72,5 +73,9 @@ class NomadTaskOptionsResolver {
         }
         log.warn("Ignoring `${TaskDirectives.NOMAD_OPTIONS}.${SPREAD}` because it is not a map -- value: ${value}")
         return null
+    }
+
+    static Object priority(TaskRun task) {
+        return getOption(task, PRIORITY, TaskDirectives.PRIORITY)
     }
 }
