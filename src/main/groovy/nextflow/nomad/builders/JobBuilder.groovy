@@ -205,8 +205,9 @@ class JobBuilder {
     static TaskGroup createTaskGroup(TaskRun taskRun, List<String> args, Map<String, String>env, NomadJobOpts jobOpts){
         final ReschedulePolicy taskReschedulePolicy  = resolveReschedulePolicy(taskRun, jobOpts)
         final RestartPolicy taskRestartPolicy  = resolveRestartPolicy(taskRun, jobOpts)
+        final List<JobVolume> volumeSpecs = resolveVolumeSpecs(taskRun, jobOpts)
 
-        def task = createTask(taskRun, args, env, jobOpts)
+        def task = createTask(taskRun, args, env, jobOpts, volumeSpecs)
         def taskGroup = new TaskGroup(
                 name: "nf-taskgroup",
                 tasks: [ task ],
@@ -214,10 +215,9 @@ class JobBuilder {
                 restartPolicy: taskRestartPolicy
         )
 
-
-        if( jobOpts.volumeSpec ) {
+        if( volumeSpecs ) {
             taskGroup.volumes = [:]
-            jobOpts.volumeSpec.eachWithIndex { volumeSpec , idx->
+            volumeSpecs.eachWithIndex { volumeSpec , idx->
                 if (volumeSpec && volumeSpec.type == JobVolume.VOLUME_CSI_TYPE) {
                     taskGroup.volumes["vol_${idx}".toString()] = new VolumeRequest(
                             type: volumeSpec.type,
@@ -241,6 +241,10 @@ class JobBuilder {
     }
 
     static Task createTask(TaskRun task, List<String> args, Map<String, String>env, NomadJobOpts jobOpts) {
+        return createTask(task, args, env, jobOpts, resolveVolumeSpecs(task, jobOpts))
+    }
+
+    static Task createTask(TaskRun task, List<String> args, Map<String, String>env, NomadJobOpts jobOpts, List<JobVolume> volumeSpecs) {
         final DRIVER = "docker"
 
         final imageName = task.container
@@ -267,7 +271,7 @@ class JobBuilder {
             taskDef.shutdownDelay(shutdownDelay)
         }
 
-        volumes(task, taskDef, workingDir, jobOpts)
+        volumes(task, taskDef, workingDir, jobOpts, volumeSpecs)
         affinity(task, taskDef, jobOpts)
         constraint(task, taskDef, jobOpts)
         constraints(task, taskDef, jobOpts)
@@ -275,7 +279,7 @@ class JobBuilder {
         return taskDef
     }
 
-    static protected Task volumes(TaskRun task, Task taskDef, String workingDir, NomadJobOpts jobOpts){
+    static protected Task volumes(TaskRun task, Task taskDef, String workingDir, NomadJobOpts jobOpts, List<JobVolume> volumeSpecs){
         if( jobOpts.dockerVolume){
             String destinationDir = workingDir.split(File.separator).dropRight(2).join(File.separator)
             taskDef.config.mount = [
@@ -286,9 +290,9 @@ class JobBuilder {
             ]
         }
 
-        if( jobOpts.volumeSpec){
+        if( volumeSpecs ){
             taskDef.volumeMounts = []
-            jobOpts.volumeSpec.eachWithIndex { volumeSpec, idx ->
+            volumeSpecs.eachWithIndex { volumeSpec, idx ->
                 String destinationDir = volumeSpec.workDir && !volumeSpec.path ?
                         workingDir.split(File.separator).dropRight(2).join(File.separator) : volumeSpec.path
                 taskDef.volumeMounts.add new VolumeMount(
@@ -299,6 +303,47 @@ class JobBuilder {
         }
 
         taskDef
+    }
+
+    static protected List<JobVolume> resolveVolumeSpecs(TaskRun task, NomadJobOpts jobOpts) {
+        List<JobVolume> result = []
+        if( jobOpts?.volumeSpec ) {
+            result.addAll(jobOpts.volumeSpec as List<JobVolume>)
+        }
+        List<Map<String, Object>> processVolumes = NomadTaskOptionsResolver.volumes(task)
+        processVolumes.eachWithIndex { Map<String, Object> spec, int idx ->
+            result.add(parseProcessVolumeSpec(task, spec, idx))
+        }
+        return result
+    }
+
+    static protected JobVolume parseProcessVolumeSpec(TaskRun task, Map<String, Object> spec, int idx) {
+        JobVolume volume = new JobVolume()
+        if( spec.containsKey('type') ) {
+            volume.type(spec.get('type')?.toString())
+        }
+        if( spec.containsKey('name') ) {
+            volume.name(spec.get('name')?.toString())
+        }
+        if( spec.containsKey('path') ) {
+            volume.path(spec.get('path')?.toString())
+        }
+        if( spec.containsKey('workDir') ) {
+            Boolean workDir = parseBoolean(spec.get('workDir'))
+            volume.workDir(workDir ?: false)
+        }
+        if( spec.containsKey('readOnly') ) {
+            Boolean readOnly = parseBoolean(spec.get('readOnly'))
+            volume.readOnly(readOnly ?: false)
+        }
+
+        try {
+            volume.validate()
+        }
+        catch (IllegalArgumentException e) {
+            invalidOption(task, "${TaskDirectives.NOMAD_OPTIONS}.volumes[${idx}]", spec, e.message)
+        }
+        return volume
     }
 
     static protected Task affinity(TaskRun task, Task taskDef, NomadJobOpts jobOpts) {

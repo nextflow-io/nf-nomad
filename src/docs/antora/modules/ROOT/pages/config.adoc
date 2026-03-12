@@ -90,6 +90,7 @@ nomad{
 - `failOnPlacementFailure`: A boolean flag to automatically fail jobs that cannot be placed on any node due to insufficient resources (default `false`). When enabled, jobs that remain unscheduled (have no node assignment) beyond the `placementFailureTimeout` threshold will be marked as failed instead of indefinitely waiting.
 - `placementFailureTimeout`: The time to wait before considering a job as failed due to placement failure (default `60s`). Supports Nextflow duration format: `20s`, `2m`, `5m`, `1h`, `2d`, etc. Can also be set via the `NF_NOMAD_PLACEMENT_FAILURE_TIMEOUT` environment variable.
 - `pollInterval`: Frequency for polling Nomad task state updates (default `1s`). Can also be set via `NF_NOMAD_POLL_INTERVAL`.
+- `submitThrottle`: Minimum delay between Nomad job submissions (default `0s`). Can be set via `NF_NOMAD_SUBMIT_THROTTLE` to reduce API bursts.
 - Failed tasks include enriched Nomad state messages; memory/OOM signals from Nomad task events are surfaced explicitly when available.
 - Task traces include Nomad metadata when available: `nomad_job_id`, `nomad_alloc_id`, `nomad_node_id`, `nomad_node_name`, and `nomad_datacenter`.
 - Failure messages include Nomad inspection hints (job/allocation/node identifiers and allocation API URL when available).
@@ -118,6 +119,7 @@ The plugin supports process-level Nomad directives in two forms:
 - `secrets`: list of secret names
 - `spread`: spread map (`name`, `weight`, optional `targets`)
 - `affinity`: affinity map (`attribute`, optional `operator`, `value`, optional `weight`)
+- `volumes`: list of safe volume maps (`type`, `name`, optional `path`, optional `workDir`, optional `readOnly`)
 - `priority`: priority alias or number (`critical`, `high`, `normal`, `low`, `min`, or `0..100`)
 - `meta`: map of metadata merged with global `nomad.jobs.meta` (process keys override)
 - `shutdownDelay`: duration string (e.g. `15s`, `2m`)
@@ -151,6 +153,7 @@ process {
             secrets: ['MY_ACCESS_KEY', 'MY_SECRET_KEY'],
             spread: [name: 'node.datacenter', weight: 50, targets: ['us-east1': 70, 'us-east2': 30]],
             priority: 'high',
+            volumes: [[type: 'host', name: 'ref-data', path: '/ref', readOnly: true]],
             resources: [memoryMax: '64 GB', cores: 4, device: [[name: 'nvidia/gpu', count: 1]]]
         ]
     }

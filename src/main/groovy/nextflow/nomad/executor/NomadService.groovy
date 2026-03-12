@@ -50,6 +50,7 @@ class NomadService implements Closeable{
     JobsApi jobsApi
     VariablesApi variablesApi
     FailsafeExecutor safeExecutor
+    private long lastSubmitAt = 0L
 
     NomadService(NomadConfig config) {
         this.config = config
@@ -130,6 +131,7 @@ class NomadService implements Closeable{
         }
 
         try {
+            applySubmitThrottle()
             String evalId = safeExecutor.apply {
                 JobRegisterResponse jobRegisterResponse = jobsApi.registerJob(jobRegisterRequest,
                         config.jobOpts().region, job.namespace ?: config.jobOpts().namespace,
@@ -150,6 +152,26 @@ class NomadService implements Closeable{
             NomadLogging.logError(log, "submitTask", id, e, [taskName: task.name])
             throw new ProcessSubmitException("[NOMAD] Failed to submit ${job.name} -- Cause: ${e.message ?: e}", e)
         }
+    }
+
+    protected synchronized void applySubmitThrottle() {
+        final long throttle = config.jobOpts().submitThrottle?.millis ?: 0L
+        if( throttle <= 0L ) {
+            return
+        }
+        final long now = System.currentTimeMillis()
+        final long elapsed = now - lastSubmitAt
+        final long waitMillis = throttle - elapsed
+        if( waitMillis > 0L ) {
+            try {
+                Thread.sleep(waitMillis)
+            }
+            catch( InterruptedException e ) {
+                Thread.currentThread().interrupt()
+                throw new ProcessSubmitException("[NOMAD] Submit throttling interrupted", e)
+            }
+        }
+        lastSubmitAt = System.currentTimeMillis()
     }
 
     private static TaskState stateFromAllocation(AllocationListStub allocation) {

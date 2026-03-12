@@ -39,6 +39,7 @@ class NomadJobOptsSpec extends Specification {
         nomadJobOpts.acceleratorAutoDevice == true
         nomadJobOpts.acceleratorDeviceName == 'nvidia/gpu'
         nomadJobOpts.pollInterval.millis == 1_000L
+        nomadJobOpts.submitThrottle.millis == 0L
     }
 
     def "test cpuMode can be set to cpu"() {
@@ -279,5 +280,22 @@ class NomadJobOptsSpec extends Specification {
 
         expect:
         nomadJobOpts.pollInterval.millis == 3_000L
+    }
+
+    def "test submitThrottle can be customized"() {
+        given:
+        def nomadJobOpts = new NomadJobOpts([submitThrottle: '750ms'])
+
+        expect:
+        nomadJobOpts.submitThrottle.millis == 750L
+    }
+
+    def "test submitThrottle from environment variable"() {
+        given:
+        def env = ['NF_NOMAD_SUBMIT_THROTTLE': '2s']
+        def nomadJobOpts = new NomadJobOpts([:], env)
+
+        expect:
+        nomadJobOpts.submitThrottle.millis == 2_000L
     }
 }

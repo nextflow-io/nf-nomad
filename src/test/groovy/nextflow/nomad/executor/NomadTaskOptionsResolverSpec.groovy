@@ -18,6 +18,7 @@ class NomadTaskOptionsResolverSpec extends Specification {
                         secrets    : ['NEW_ONE', 'NEW_TWO'],
                         spread     : [name: 'node.class', weight: 10],
                         affinity   : [attribute: '${meta.workload}', operator: '=', value: 'batch', weight: 10],
+                        volumes    : [[type: 'host', name: 'ref', path: '/ref', readOnly: true]],
                         resources  : [memoryMax: '4 GB'],
                         namespace  : 'process-ns',
                         meta       : [owner: 'team-b'],
@@ -40,6 +41,7 @@ class NomadTaskOptionsResolverSpec extends Specification {
         NomadTaskOptionsResolver.secrets(task) == ['NEW_ONE', 'NEW_TWO']
         NomadTaskOptionsResolver.spread(task) == [name: 'node.class', weight: 10]
         NomadTaskOptionsResolver.affinity(task) == [attribute: '${meta.workload}', operator: '=', value: 'batch', weight: 10]
+        NomadTaskOptionsResolver.volumes(task) == [[type: 'host', name: 'ref', path: '/ref', readOnly: true]]
         NomadTaskOptionsResolver.priority(task) == 'low'
         NomadTaskOptionsResolver.resources(task) == [memoryMax: '4 GB']
         NomadTaskOptionsResolver.namespace(task) == 'process-ns'
@@ -87,6 +89,36 @@ class NomadTaskOptionsResolverSpec extends Specification {
         ])
         when:
         NomadTaskOptionsResolver.validate(task)
+
+        then:
+        thrown(IllegalArgumentException)
+    }
+
+    void "should fail on invalid nomadOptions volumes shape"() {
+        given:
+        def task = taskWithConfig([
+                (TaskDirectives.NOMAD_OPTIONS): [
+                        volumes: 'invalid'
+                ]
+        ])
+
+        when:
+        NomadTaskOptionsResolver.volumes(task)
+
+        then:
+        thrown(IllegalArgumentException)
+    }
+
+    void "should fail on unsupported nomadOptions volumes keys"() {
+        given:
+        def task = taskWithConfig([
+                (TaskDirectives.NOMAD_OPTIONS): [
+                        volumes: [[type: 'host', name: 'data', path: '/data', unsupported: true]]
+                ]
+        ])
+
+        when:
+        NomadTaskOptionsResolver.volumes(task)
 
         then:
         thrown(IllegalArgumentException)

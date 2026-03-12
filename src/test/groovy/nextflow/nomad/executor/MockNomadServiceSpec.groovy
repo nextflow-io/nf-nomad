@@ -155,6 +155,28 @@ class MockNomadServiceSpec extends Specification{
         !state.failed
     }
 
+    void "should throttle consecutive submissions when submitThrottle is configured"() {
+        given:
+        def config = new NomadConfig(
+                client:[
+                        address : "http://${mockWebServer.hostName}:${mockWebServer.port}"
+                ],
+                jobs: [
+                        submitThrottle: '200ms'
+                ]
+        )
+        def service = new NomadService(config)
+
+        when:
+        long start = System.currentTimeMillis()
+        service.applySubmitThrottle()
+        service.applySubmitThrottle()
+        long elapsed = System.currentTimeMillis() - start
+
+        then:
+        elapsed >= 180L
+    }
+
     void "should retrieve allocation metadata for latest allocation"() {
         given:
         def config = new NomadConfig(

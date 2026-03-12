@@ -5,11 +5,14 @@ import io.nomadproject.client.model.Task
 import nextflow.executor.res.AcceleratorResource
 import nextflow.nomad.config.NomadJobOpts
 import nextflow.nomad.executor.TaskDirectives
+import nextflow.nomad.models.JobVolume
 import nextflow.processor.TaskConfig
 import nextflow.processor.TaskProcessor
 import nextflow.processor.TaskRun
 import nextflow.script.ProcessConfig
 import spock.lang.Specification
+
+import java.nio.file.Path
 
 class JobBuilderNomadOptionsSpec extends Specification {
 
@@ -204,6 +207,73 @@ class JobBuilderNomadOptionsSpec extends Specification {
 
         when:
         JobBuilder.getResources(task)
+
+        then:
+        thrown(IllegalArgumentException)
+    }
+
+    void "createTaskGroup should merge global and process volume specs"() {
+        given:
+        def processConfig = Mock(ProcessConfig)
+        processConfig.get(_ as String) >> { String key ->
+            key == TaskDirectives.NOMAD_OPTIONS
+                    ? [volumes: [[type: 'host', name: 'process-vol', path: '/data', readOnly: true]]]
+                    : null
+        }
+        def processor = Mock(TaskProcessor) {
+            getConfig() >> processConfig
+        }
+        def task = Mock(TaskRun) {
+            getProcessor() >> processor
+            getConfig() >> [memory: '1 GB', cpus: 1]
+            getContainer() >> 'ubuntu:22.04'
+            getWorkDir() >> Path.of('/tmp/nf/work')
+        }
+        def globalVolume = new JobVolume().type('host').name('global-workdir').workDir(true)
+        def jobOpts = Stub(NomadJobOpts) {
+            getVolumeSpec() >> ([globalVolume] as JobVolume[])
+            getDockerVolume() >> null
+            getPrivileged() >> true
+            getRestartAttempts() >> 1
+            getRescheduleAttempts() >> 1
+        }
+
+        when:
+        def group = JobBuilder.createTaskGroup(task, ['bash', '-c', 'echo test'], [:], jobOpts)
+
+        then:
+        group.volumes.keySet().toList() == ['vol_0', 'vol_1']
+        group.tasks[0].volumeMounts*.destination.contains('/tmp')
+        group.tasks[0].volumeMounts*.destination.contains('/data')
+    }
+
+    void "createTaskGroup should fail for invalid process volume entries"() {
+        given:
+        def processConfig = Mock(ProcessConfig)
+        processConfig.get(_ as String) >> { String key ->
+            key == TaskDirectives.NOMAD_OPTIONS
+                    ? [volumes: [[type: 'host', name: 'broken-volume']]]
+                    : null
+        }
+        def processor = Mock(TaskProcessor) {
+            getConfig() >> processConfig
+        }
+        def task = Mock(TaskRun) {
+            getProcessor() >> processor
+            getConfig() >> [memory: '1 GB', cpus: 1]
+            getContainer() >> 'ubuntu:22.04'
+            getWorkDir() >> Path.of('/tmp/nf/work')
+        }
+        def jobOpts = Stub(NomadJobOpts) {
+            getVolumeSpec() >> null
+            getDockerVolume() >> null
+            getPrivileged() >> true
+            getRestartAttempts() >> 1
+            getRescheduleAttempts() >> 1
+        }
+
+        when:
+        JobBuilder.createTaskGroup(task, ['bash', '-c', 'echo test'], [:], jobOpts)
 
         then:
         thrown(IllegalArgumentException)

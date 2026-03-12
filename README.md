@@ -103,6 +103,7 @@ process {
         restart: [attempts: 1, delay: '5s', mode: 'fail'],
         reschedule: [attempts: 2, delay: '10s']
       ],
+      volumes: [[type: 'host', name: 'ref-data', path: '/ref', readOnly: true]],
       secrets: ['MY_ACCESS_KEY', 'MY_SECRET_KEY'],
       spread: [name: 'node.datacenter', weight: 50, targets: ['us-east1': 70, 'us-east2': 30]],
       priority: 'high',
@@ -121,6 +122,8 @@ When Nomad reports memory-limit/OOM task events, nf-nomad surfaces an explicit o
 Task traces now include Nomad metadata fields when available: `nomad_job_id`, `nomad_alloc_id`, `nomad_node_id`, `nomad_node_name`, and `nomad_datacenter`.
 Task failure messages include Nomad inspection hints (job/allocation/node identifiers and allocation API URL when available).
 Global `nomad.jobs.pollInterval` controls task-state polling frequency (default `1s`) and can reduce Nomad API pressure for large workloads.
+Global `nomad.jobs.submitThrottle` enforces a minimum delay between Nomad job submissions (default `0s`) to smooth API load during large bursts.
+Process-level `nomadOptions.volumes` can add additional safe volume mounts without exposing arbitrary driver config.
 
 ## Testing and debugging
 

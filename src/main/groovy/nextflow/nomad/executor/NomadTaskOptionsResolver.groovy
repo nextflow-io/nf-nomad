@@ -21,10 +21,12 @@ class NomadTaskOptionsResolver {
     public static final String RESCHEDULE = "reschedule"
     public static final String SHUTDOWN_DELAY = "shutdownDelay"
     public static final String AFFINITY = "affinity"
+    public static final String VOLUMES = "volumes"
     public static final String CPU = "cpu"
     public static final String CORES = "cores"
     private static final Set<String> SUPPORTED_RESOURCE_OPTIONS = ["memoryMax", "device", CPU, CORES] as Set<String>
     private static final Set<String> SUPPORTED_AFFINITY_OPTIONS = ["attribute", "operator", "value", "weight"] as Set<String>
+    private static final Set<String> SUPPORTED_VOLUME_OPTIONS = ["type", "name", "path", "workDir", "readOnly"] as Set<String>
 
     private static final Set<String> SUPPORTED_OPTIONS = [
             DATACENTERS,
@@ -37,7 +39,8 @@ class NomadTaskOptionsResolver {
             META,
             FAILURES,
             SHUTDOWN_DELAY,
-            AFFINITY
+            AFFINITY,
+            VOLUMES
     ] as Set<String>
 
     static void validate(TaskRun task) {
@@ -60,6 +63,7 @@ class NomadTaskOptionsResolver {
         reschedule(task)
         shutdownDelay(task)
         affinity(task)
+        volumes(task)
     }
 
     protected static Map getNomadOptions(TaskRun task) {
@@ -248,6 +252,38 @@ class NomadTaskOptionsResolver {
         }
         invalidOption(task, "${TaskDirectives.NOMAD_OPTIONS}.${AFFINITY}", value, "must be a map")
         return Collections.emptyMap()
+    }
+
+    static List<Map<String, Object>> volumes(TaskRun task) {
+        Map options = getNomadOptions(task)
+        if( !options.containsKey(VOLUMES) ) {
+            return Collections.emptyList()
+        }
+        def value = options.get(VOLUMES)
+        if( value == null ) {
+            return Collections.emptyList()
+        }
+        if( !(value instanceof Collection) ) {
+            invalidOption(task, "${TaskDirectives.NOMAD_OPTIONS}.${VOLUMES}", value, "must be a list of maps")
+        }
+
+        List<Map<String, Object>> result = []
+        int idx = 0
+        (value as Collection).each { item ->
+            if( !(item instanceof Map) ) {
+                invalidOption(task, "${TaskDirectives.NOMAD_OPTIONS}.${VOLUMES}[${idx}]", item, "must be a map")
+            }
+            Map map = (Map)item
+            map.keySet().each { key ->
+                if( !SUPPORTED_VOLUME_OPTIONS.contains(key?.toString()) ) {
+                    invalidOption(task, "${TaskDirectives.NOMAD_OPTIONS}.${VOLUMES}[${idx}]", key,
+                            "contains unsupported key; supported keys: ${SUPPORTED_VOLUME_OPTIONS.sort().join(', ')}")
+                }
+            }
+            result.add(map.collectEntries { k, v -> [(k?.toString()): v] } as Map<String, Object>)
+            idx++
+        }
+        return result
     }
 
     protected static void invalidOption(TaskRun task, String optionPath, Object value, String reason) {
