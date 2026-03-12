@@ -269,6 +269,43 @@ class NomadTaskHandlerSpec extends Specification{
         !assignedAborted
     }
 
+    void "should resolve debug dump path relative to task workDir"() {
+        given:
+        Path workDir = Path.of('/tmp/nf-debug-work')
+        def task = Mock(TaskRun) {
+            getWorkDir() >> workDir
+            getConfig() >> [tag: null]
+            getProcessor() >> Mock(TaskProcessor)
+        }
+        def debugCfg = new NomadConfig.NomadDebug([json: true, path: 'debug/job-spec.json'])
+        def config = Mock(NomadConfig) {
+            debug() >> debugCfg
+        }
+        def handler = new NomadTaskHandler(task, config, Mock(NomadService))
+
+        expect:
+        handler.debugPath() == workDir.resolve('debug/job-spec.json')
+    }
+
+    void "should keep absolute debug dump path unchanged"() {
+        given:
+        Path workDir = Path.of('/tmp/nf-debug-work')
+        Path dumpPath = Path.of('/tmp/nomad-debug/job.json')
+        def task = Mock(TaskRun) {
+            getWorkDir() >> workDir
+            getConfig() >> [tag: null]
+            getProcessor() >> Mock(TaskProcessor)
+        }
+        def debugCfg = new NomadConfig.NomadDebug([path: dumpPath.toString()])
+        def config = Mock(NomadConfig) {
+            debug() >> debugCfg
+        }
+        def handler = new NomadTaskHandler(task, config, Mock(NomadService))
+
+        expect:
+        handler.debugPath() == dumpPath
+    }
+
     void "should use recoverable process exception for placement failure"() {
         given:
         Throwable assignedError = null

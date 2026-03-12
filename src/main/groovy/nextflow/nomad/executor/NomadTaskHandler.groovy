@@ -204,8 +204,13 @@ class NomadTaskHandler extends TaskHandler implements FusionAwareTask {
     }
 
     protected Path debugPath() {
-        boolean debug = config.debug()?.getJson()
-        return debug ? task.workDir.resolve('.job.json') : null
+        def debug = config.debug()
+        if( debug == null || !debug.getEnabled() ) {
+            return null
+        }
+        String fileName = debug.getPath() ?: '.job.json'
+        Path path = Path.of(fileName)
+        return path.isAbsolute() ? path : task.workDir.resolve(path)
     }
 
     protected List<String> getSubmitCommand(TaskRun task) {

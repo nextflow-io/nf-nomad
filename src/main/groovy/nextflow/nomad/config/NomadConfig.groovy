@@ -66,5 +66,14 @@ class NomadConfig {
         }
 
         boolean getJson() { Boolean.valueOf( target.json as String ) }
+
+        String getPath() {
+            String value = target.path?.toString()?.trim()
+            return value ? value : null
+        }
+
+        boolean getEnabled() {
+            return getJson() || getPath() != null
+        }
     }
 }

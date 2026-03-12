@@ -349,4 +349,28 @@ class NomadConfigSpec extends Specification {
         config2.jobOpts.spreadsSpec.getRaws().first().right.first().left == 'a'
         config2.jobOpts.spreadsSpec.getRaws().first().right.first().right == 50
     }
+
+    void "should enable debug output when debug json is true"() {
+        given:
+        def config = new NomadConfig([
+                debug: [json: true]
+        ])
+
+        expect:
+        config.debug.getJson()
+        config.debug.getEnabled()
+        config.debug.getPath() == null
+    }
+
+    void "should enable debug output when debug path is configured"() {
+        given:
+        def config = new NomadConfig([
+                debug: [path: 'debug/job-spec.json']
+        ])
+
+        expect:
+        !config.debug.getJson()
+        config.debug.getEnabled()
+        config.debug.getPath() == 'debug/job-spec.json'
+    }
 }

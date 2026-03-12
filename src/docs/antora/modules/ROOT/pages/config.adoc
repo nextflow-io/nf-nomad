@@ -173,7 +173,8 @@ Nomad task failures are surfaced as recoverable process errors so Nextflow `erro
 
 
 === Debug configuration
-- `debug`: Enabling this flag will dump the job definitions for troubleshooting.
+- `debug.json`: Enable rendered job-spec dumps for troubleshooting.
+- `debug.path`: Optional output path for rendered job specs. Relative paths resolve under each task work directory; absolute paths are used as provided.
 
 === Secrets configuration
 

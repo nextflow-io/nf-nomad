@@ -128,6 +128,7 @@ Process-level `nomadOptions.volumes` can add additional safe volume mounts witho
 When global and process volume specs are merged, only one `workDir` volume is allowed and `readOnly` is preserved on generated task mounts.
 Process-level `nomadOptions.secretsPath` overrides `nomad.jobs.secrets.path` for that process only.
 Nomad task failures are reported as recoverable process errors so Nextflow `process.errorStrategy` / `maxRetries` remain authoritative.
+`nomad.debug.path` can be used to dump rendered Nomad job specs to a custom file path (relative paths resolve under task work directories).
 
 ## Testing and debugging
 
