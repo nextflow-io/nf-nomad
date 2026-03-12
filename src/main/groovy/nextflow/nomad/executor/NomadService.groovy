@@ -85,6 +85,7 @@ class NomadService implements Closeable{
 
     String submitTask(String id, TaskRun task, List<String> args, Map<String, String> env, Path saveJsonPath = null) {
         long startTime = System.currentTimeMillis()
+        NomadTaskOptionsResolver.validate(task)
 
         Job job = new JobBuilder()
                 .withId(id)

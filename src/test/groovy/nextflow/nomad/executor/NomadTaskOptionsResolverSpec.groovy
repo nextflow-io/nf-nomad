@@ -17,6 +17,7 @@ class NomadTaskOptionsResolverSpec extends Specification {
                         constraints: nomadOptionsConstraints,
                         secrets    : ['NEW_ONE', 'NEW_TWO'],
                         spread     : [name: 'node.class', weight: 10],
+                        affinity   : [attribute: '${meta.workload}', operator: '=', value: 'batch', weight: 10],
                         resources  : [memoryMax: '4 GB'],
                         namespace  : 'process-ns',
                         meta       : [owner: 'team-b'],
@@ -38,6 +39,7 @@ class NomadTaskOptionsResolverSpec extends Specification {
         NomadTaskOptionsResolver.constraints(task) == nomadOptionsConstraints
         NomadTaskOptionsResolver.secrets(task) == ['NEW_ONE', 'NEW_TWO']
         NomadTaskOptionsResolver.spread(task) == [name: 'node.class', weight: 10]
+        NomadTaskOptionsResolver.affinity(task) == [attribute: '${meta.workload}', operator: '=', value: 'batch', weight: 10]
         NomadTaskOptionsResolver.priority(task) == 'low'
         NomadTaskOptionsResolver.resources(task) == [memoryMax: '4 GB']
         NomadTaskOptionsResolver.namespace(task) == 'process-ns'
@@ -77,29 +79,32 @@ class NomadTaskOptionsResolverSpec extends Specification {
         NomadTaskOptionsResolver.priority(task) == 'high'
     }
 
-    void "should ignore non-map nomadOptions and keep using legacy directives"() {
+    void "should fail on non-map nomadOptions"() {
         given:
         def task = taskWithConfig([
                 (TaskDirectives.NOMAD_OPTIONS): 'invalid',
                 (TaskDirectives.DATACENTERS)  : ['dc-legacy']
         ])
+        when:
+        NomadTaskOptionsResolver.validate(task)
 
-        expect:
-        NomadTaskOptionsResolver.datacenters(task) == ['dc-legacy']
-        NomadTaskOptionsResolver.resources(task).isEmpty()
+        then:
+        thrown(IllegalArgumentException)
     }
 
-    void "should ignore non-map nomadOptions resources value"() {
+    void "should fail on non-map nomadOptions resources value"() {
         given:
         def task = taskWithConfig([
                 (TaskDirectives.NOMAD_OPTIONS): [resources: 'invalid']
         ])
+        when:
+        NomadTaskOptionsResolver.resources(task)
 
-        expect:
-        NomadTaskOptionsResolver.resources(task).isEmpty()
+        then:
+        thrown(IllegalArgumentException)
     }
 
-    void "should ignore invalid map-based values for meta and failures"() {
+    void "should fail on invalid map-based values for meta and failures"() {
         given:
         def task = taskWithConfig([
                 (TaskDirectives.NOMAD_OPTIONS): [
@@ -107,11 +112,41 @@ class NomadTaskOptionsResolverSpec extends Specification {
                         failures: [restart: 'invalid', reschedule: 1]
                 ]
         ])
+        when:
+        NomadTaskOptionsResolver.meta(task)
 
-        expect:
-        NomadTaskOptionsResolver.meta(task).isEmpty()
-        NomadTaskOptionsResolver.restart(task).isEmpty()
-        NomadTaskOptionsResolver.reschedule(task).isEmpty()
+        then:
+        thrown(IllegalArgumentException)
+    }
+
+    void "should fail when both resources cpu and cores are provided"() {
+        given:
+        def task = taskWithConfig([
+                (TaskDirectives.NOMAD_OPTIONS): [
+                        resources: [cpu: 2000, cores: 2]
+                ]
+        ])
+
+        when:
+        NomadTaskOptionsResolver.resources(task)
+
+        then:
+        thrown(IllegalArgumentException)
+    }
+
+    void "should fail on unsupported nomadOptions keys"() {
+        given:
+        def task = taskWithConfig([
+                (TaskDirectives.NOMAD_OPTIONS): [
+                        unsupportedKey: true
+                ]
+        ])
+
+        when:
+        NomadTaskOptionsResolver.validate(task)
+
+        then:
+        thrown(IllegalArgumentException)
     }
 
     private TaskRun taskWithConfig(Map<String, Object> configValues) {

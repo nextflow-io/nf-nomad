@@ -489,6 +489,9 @@ class MockNomadServiceSpec extends Specification{
                 client:[
                         address : "http://${mockWebServer.hostName}:${mockWebServer.port}"
                 ],
+                jobs: [
+                        datacenters: []
+                ]
         )
         def service = new NomadService(config)
 

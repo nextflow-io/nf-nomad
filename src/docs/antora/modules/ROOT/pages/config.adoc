@@ -105,12 +105,15 @@ The plugin supports process-level Nomad directives in two forms:
 - `constraints`: closure using the existing constraints DSL
 - `secrets`: list of secret names
 - `spread`: spread map (`name`, `weight`, optional `targets`)
+- `affinity`: affinity map (`attribute`, optional `operator`, `value`, optional `weight`)
 - `priority`: priority alias or number (`critical`, `high`, `normal`, `low`, `min`, or `0..100`)
 - `meta`: map of metadata merged with global `nomad.jobs.meta` (process keys override)
 - `shutdownDelay`: duration string (e.g. `15s`, `2m`)
 - `failures`: map with optional `restart` and `reschedule` maps
 - `resources`: map of resource options
   - `memoryMax`: memory limit for Nomad `memory_max` (defaults to task `memory` when not set)
+  - `cpu`: Nomad CPU shares (MHz) override
+  - `cores`: Nomad CPU cores override
   - `device`: list of Nomad requested devices (e.g. GPUs)
 
 [source,groovy]
@@ -125,6 +128,7 @@ process {
                     unique = [name: params.RUN_IN_NODE]
                 }
             },
+            affinity: [attribute: '${meta.workload}', operator: '=', value: 'batch', weight: 25],
             meta: [owner: 'team-x', step: 'align'],
             shutdownDelay: '15s',
             failures: [
@@ -134,13 +138,15 @@ process {
             secrets: ['MY_ACCESS_KEY', 'MY_SECRET_KEY'],
             spread: [name: 'node.datacenter', weight: 50, targets: ['us-east1': 70, 'us-east2': 30]],
             priority: 'high',
-            resources: [memoryMax: '64 GB', device: [[name: 'nvidia/gpu', count: 1]]]
+            resources: [memoryMax: '64 GB', cores: 4, device: [[name: 'nvidia/gpu', count: 1]]]
         ]
     }
 }
 ----
 
 When both `nomadOptions.<key>` and a legacy directive are set for the same process, `nomadOptions.<key>` takes precedence for that key only.
+For list-valued options such as datacenters, global and process values are concatenated in order (global first, then process) and deduplicated.
+`nomadOptions` values are validated strictly before submission; invalid shapes or conflicting options (for example, setting both `resources.cpu` and `resources.cores`) fail fast.
 
 
 

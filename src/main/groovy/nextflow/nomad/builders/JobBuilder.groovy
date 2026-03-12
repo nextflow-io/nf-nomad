@@ -77,21 +77,38 @@ class JobBuilder {
     }
 
     static Job assignDatacenters(TaskRun task, Job job){
-        def datacenters = NomadTaskOptionsResolver.datacenters(task)
-        if( datacenters ){
-            if( datacenters instanceof List<String>) {
-                job.datacenters( datacenters as List<String>)
-                return job;
-            }
-            if( datacenters instanceof Closure) {
-                String str = datacenters.call().toString()
-                job.datacenters( [str])
-                return job;
-            }
-            job.datacenters( [datacenters.toString()] as List<String>)
-            return job
+        final merged = [] as List<String>
+        if( job.datacenters ) {
+            merged.addAll(normalizeDatacenters(job.datacenters))
         }
-        job
+
+        final processDatacenters = NomadTaskOptionsResolver.datacenters(task)
+        if( processDatacenters != null ) {
+            merged.addAll(normalizeDatacenters(processDatacenters))
+        }
+
+        if( merged ) {
+            job.datacenters(new ArrayList<String>(new LinkedHashSet<String>(merged)))
+        }
+        return job
+    }
+
+    static protected List<String> normalizeDatacenters(Object value) {
+        if( value == null ) {
+            return Collections.emptyList()
+        }
+        if( value instanceof Closure ) {
+            return normalizeDatacenters((value as Closure).call())
+        }
+        if( value instanceof Collection ) {
+            return (value as Collection)
+                    .collect { it?.toString()?.trim() }
+                    .findAll { it } as List<String>
+        }
+        return value.toString()
+                .split(',')
+                .collect { it?.toString()?.trim() }
+                .findAll { it } as List<String>
     }
 
     JobBuilder withNamespace(String namespace) {
@@ -113,15 +130,22 @@ class JobBuilder {
         final DEFAULT_MEMORY = "1.GB"
 
         final taskCfg = task.getConfig()
-        final taskCores =  !taskCfg.get("cpus") ? DEFAULT_CPUS :  taskCfg.get("cpus") as Integer
         final resourceOptions = NomadTaskOptionsResolver.resources(task)
+        final taskCores = parseInteger(taskCfg.get("cpus"), DEFAULT_CPUS)
+        final optionCpu = parseIntegerOption(task, "${TaskDirectives.NOMAD_OPTIONS}.resources.cpu", resourceOptions.get("cpu"))
+        final optionCores = parseIntegerOption(task, "${TaskDirectives.NOMAD_OPTIONS}.resources.cores", resourceOptions.get("cores"))
         final taskMemory = new MemoryUnit( taskCfg.get("memory")?.toString() ?:  DEFAULT_MEMORY)
         final taskMemoryMb = taskMemory.toMega() as Integer
 
         final res = new Resources()
-                .cores(taskCores)
                 .memoryMB(taskMemoryMb)
                 .memoryMaxMB(resolveMemoryMaxMb(task, taskMemoryMb))
+        if( optionCpu != null ) {
+            res.CPU(optionCpu)
+        }
+        else {
+            res.cores(optionCores ?: taskCores)
+        }
         final devices = resolveRequestedDevices(resourceOptions.get("device"))
         if( devices ) {
             res.devices(devices)
@@ -140,9 +164,9 @@ class JobBuilder {
         if( parsed != null ) {
             return parsed
         }
-
-        log.warn("Invalid `${TaskDirectives.NOMAD_OPTIONS}.resources.memoryMax` value `${resources.get("memoryMax")}`; falling back to task memory `${defaultMemoryMb}MB`")
-        return defaultMemoryMb
+        invalidOption(task, "${TaskDirectives.NOMAD_OPTIONS}.resources.memoryMax", resources.get("memoryMax"),
+                "must be a valid memory value")
+        return null
     }
 
     static protected Integer parseMemoryToMega(Object value) {
@@ -259,6 +283,7 @@ class JobBuilder {
     }
 
     static protected Task affinity(TaskRun task, Task taskDef, NomadJobOpts jobOpts) {
+        final affinities = [] as List<Affinity>
         if (jobOpts.affinitySpec) {
             def affinity = new Affinity()
             if (jobOpts.affinitySpec.attribute) {
@@ -273,7 +298,39 @@ class JobBuilder {
             if (jobOpts.affinitySpec.weight != null) {
                 affinity.weight(jobOpts.affinitySpec.weight)
             }
-            taskDef.affinities([affinity])
+            affinities.add(affinity)
+        }
+
+        Map affinityOption = NomadTaskOptionsResolver.affinity(task)
+        if( affinityOption ) {
+            String attribute = affinityOption.get("attribute")?.toString()
+            if( !attribute ) {
+                invalidOption(task, "${TaskDirectives.NOMAD_OPTIONS}.affinity.attribute", affinityOption.get("attribute"),
+                        "must be a non-empty string")
+            }
+
+            String value = affinityOption.get("value")?.toString()
+            if( !value ) {
+                invalidOption(task, "${TaskDirectives.NOMAD_OPTIONS}.affinity.value", affinityOption.get("value"),
+                        "must be a non-empty string")
+            }
+
+            String operator = affinityOption.get("operator")?.toString() ?: "="
+            Integer weight = parseIntegerOption(task, "${TaskDirectives.NOMAD_OPTIONS}.affinity.weight", affinityOption.get("weight"))
+
+            def affinity = new Affinity()
+                    .ltarget(attribute)
+                    .operand(operator)
+                    .rtarget(value)
+
+            if( weight != null ) {
+                affinity.weight(weight)
+            }
+            affinities.add(affinity)
+        }
+
+        if( affinities ) {
+            taskDef.affinities(affinities)
         }
         taskDef
     }
@@ -491,12 +548,24 @@ class JobBuilder {
         Object processValue = NomadTaskOptionsResolver.shutdownDelay(task)
         Long processDelay = parseDurationToMillis(processValue)
         if( processValue != null && processDelay == null ) {
-            log.warn("Ignoring invalid `${TaskDirectives.NOMAD_OPTIONS}.shutdownDelay` value `${processValue}`")
+            invalidOption(task, "${TaskDirectives.NOMAD_OPTIONS}.shutdownDelay", processValue,
+                    "must be a valid duration")
         }
         if( processDelay != null ) {
             return processDelay
         }
         return jobOpts?.shutdownDelay?.millis as Long
+    }
+    static protected Integer parseIntegerOption(TaskRun task, String optionPath, Object value) {
+        if( value == null ) {
+            return null
+        }
+        Integer parsed = parseInteger(value)
+        if( parsed != null ) {
+            return parsed
+        }
+        invalidOption(task, optionPath, value, "must be an integer")
+        return null
     }
 
     static protected Integer parseInteger(Object value, Integer defaultValue = null) {
@@ -504,6 +573,9 @@ class JobBuilder {
             return defaultValue
         }
         try {
+            if( value instanceof Number ) {
+                return ((Number)value).intValue()
+            }
             return value.toString() as Integer
         } catch(Exception ignored) {
             return defaultValue
@@ -532,5 +604,10 @@ class JobBuilder {
         } catch(Exception ignored) {
             return null
         }
+    }
+
+    static protected void invalidOption(TaskRun task, String optionPath, Object value, String reason) {
+        String process = task?.processor?.name?.toString() ?: task?.name?.toString() ?: "<unknown>"
+        throw new IllegalArgumentException("Invalid Nomad option for process `${process}`: `${optionPath}` ${reason} -- value: ${value}")
     }
 }

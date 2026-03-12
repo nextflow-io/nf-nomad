@@ -20,6 +20,45 @@ class NomadTaskOptionsResolver {
     public static final String RESTART = "restart"
     public static final String RESCHEDULE = "reschedule"
     public static final String SHUTDOWN_DELAY = "shutdownDelay"
+    public static final String AFFINITY = "affinity"
+    public static final String CPU = "cpu"
+    public static final String CORES = "cores"
+
+    private static final Set<String> SUPPORTED_OPTIONS = [
+            DATACENTERS,
+            CONSTRAINTS,
+            SECRETS,
+            SPREAD,
+            PRIORITY,
+            RESOURCES,
+            NAMESPACE,
+            META,
+            FAILURES,
+            SHUTDOWN_DELAY,
+            AFFINITY
+    ] as Set<String>
+
+    static void validate(TaskRun task) {
+        Map options = getNomadOptions(task)
+        options.keySet().each { key ->
+            if( !SUPPORTED_OPTIONS.contains(key?.toString()) ) {
+                invalidOption(task, TaskDirectives.NOMAD_OPTIONS, key, "contains unsupported key; supported keys: ${SUPPORTED_OPTIONS.sort().join(', ')}")
+            }
+        }
+
+        datacenters(task)
+        constraints(task)
+        secrets(task)
+        spread(task)
+        priority(task)
+        resources(task)
+        namespace(task)
+        meta(task)
+        restart(task)
+        reschedule(task)
+        shutdownDelay(task)
+        affinity(task)
+    }
 
     protected static Map getNomadOptions(TaskRun task) {
         def options = task?.processor?.config?.get(TaskDirectives.NOMAD_OPTIONS)
@@ -29,7 +68,7 @@ class NomadTaskOptionsResolver {
         if( options instanceof Map ) {
             return (Map)options
         }
-        log.warn("Ignoring process directive `${TaskDirectives.NOMAD_OPTIONS}` because it is not a map -- value: ${options}")
+        invalidOption(task, TaskDirectives.NOMAD_OPTIONS, options, "must be a map")
         return Collections.emptyMap()
     }
 
@@ -53,7 +92,7 @@ class NomadTaskOptionsResolver {
         if( value instanceof Closure ) {
             return (Closure)value
         }
-        log.warn("Ignoring `${TaskDirectives.NOMAD_OPTIONS}.${CONSTRAINTS}` because it is not a closure -- value: ${value}")
+        invalidOption(task, "${TaskDirectives.NOMAD_OPTIONS}.${CONSTRAINTS}", value, "must be a closure")
         return null
     }
 
@@ -78,7 +117,7 @@ class NomadTaskOptionsResolver {
         if( value instanceof Map ) {
             return (Map)value
         }
-        log.warn("Ignoring `${TaskDirectives.NOMAD_OPTIONS}.${SPREAD}` because it is not a map -- value: ${value}")
+        invalidOption(task, "${TaskDirectives.NOMAD_OPTIONS}.${SPREAD}", value, "must be a map")
         return null
     }
 
@@ -102,8 +141,7 @@ class NomadTaskOptionsResolver {
         if( value instanceof Map ) {
             return ((Map)value).collectEntries { k, v -> [(k?.toString()): v?.toString()] } as Map<String, String>
         }
-
-        log.warn("Ignoring `${TaskDirectives.NOMAD_OPTIONS}.${META}` because it is not a map -- value: ${value}")
+        invalidOption(task, "${TaskDirectives.NOMAD_OPTIONS}.${META}", value, "must be a map")
         return Collections.emptyMap()
     }
 
@@ -124,8 +162,7 @@ class NomadTaskOptionsResolver {
         if( value instanceof Map ) {
             return (Map)value
         }
-
-        log.warn("Ignoring `${TaskDirectives.NOMAD_OPTIONS}.${FAILURES}` because it is not a map -- value: ${value}")
+        invalidOption(task, "${TaskDirectives.NOMAD_OPTIONS}.${FAILURES}", value, "must be a map")
         return Collections.emptyMap()
     }
 
@@ -139,7 +176,7 @@ class NomadTaskOptionsResolver {
             return (Map)value
         }
         if( value != null ) {
-            log.warn("Ignoring `${TaskDirectives.NOMAD_OPTIONS}.${FAILURES}.${RESTART}` because it is not a map -- value: ${value}")
+            invalidOption(task, "${TaskDirectives.NOMAD_OPTIONS}.${FAILURES}.${RESTART}", value, "must be a map")
         }
         return Collections.emptyMap()
     }
@@ -154,7 +191,7 @@ class NomadTaskOptionsResolver {
             return (Map)value
         }
         if( value != null ) {
-            log.warn("Ignoring `${TaskDirectives.NOMAD_OPTIONS}.${FAILURES}.${RESCHEDULE}` because it is not a map -- value: ${value}")
+            invalidOption(task, "${TaskDirectives.NOMAD_OPTIONS}.${FAILURES}.${RESCHEDULE}", value, "must be a map")
         }
         return Collections.emptyMap()
     }
@@ -170,10 +207,40 @@ class NomadTaskOptionsResolver {
             return Collections.emptyMap()
         }
         if( value instanceof Map ) {
+            Map resources = (Map)value
+            if( resources.containsKey(CPU) && resources.containsKey(CORES)
+                    && resources.get(CPU) != null && resources.get(CORES) != null ) {
+                invalidOption(task, "${TaskDirectives.NOMAD_OPTIONS}.${RESOURCES}", resources,
+                        "contains conflicting keys `${CPU}` and `${CORES}`; provide only one")
+            }
+            return resources
+        }
+        invalidOption(task, "${TaskDirectives.NOMAD_OPTIONS}.${RESOURCES}", value, "must be a map")
+        return Collections.emptyMap()
+    }
+
+    static Map affinity(TaskRun task) {
+        Map options = getNomadOptions(task)
+        if( !options.containsKey(AFFINITY) ) {
+            return Collections.emptyMap()
+        }
+        def value = options.get(AFFINITY)
+        if( value == null ) {
+            return Collections.emptyMap()
+        }
+        if( value instanceof Map ) {
             return (Map)value
         }
-
-        log.warn("Ignoring `${TaskDirectives.NOMAD_OPTIONS}.${RESOURCES}` because it is not a map -- value: ${value}")
+        invalidOption(task, "${TaskDirectives.NOMAD_OPTIONS}.${AFFINITY}", value, "must be a map")
         return Collections.emptyMap()
+    }
+
+    protected static void invalidOption(TaskRun task, String optionPath, Object value, String reason) {
+        String process = processName(task)
+        throw new IllegalArgumentException("Invalid Nomad option for process `${process}`: `${optionPath}` ${reason} -- value: ${value}")
+    }
+
+    protected static String processName(TaskRun task) {
+        return task?.processor?.name?.toString() ?: task?.name?.toString() ?: "<unknown>"
     }
 }

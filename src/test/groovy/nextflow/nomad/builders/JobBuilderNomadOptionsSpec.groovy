@@ -11,7 +11,7 @@ import spock.lang.Specification
 
 class JobBuilderNomadOptionsSpec extends Specification {
 
-    void "assignDatacenters should prefer nomadOptions over legacy datacenters"() {
+    void "assignDatacenters should merge global and process datacenters deterministically"() {
         given:
         def task = taskWithConfig([
                 (TaskDirectives.NOMAD_OPTIONS): [datacenters: ['dc-new']],
@@ -23,7 +23,7 @@ class JobBuilderNomadOptionsSpec extends Specification {
         JobBuilder.assignDatacenters(task, job)
 
         then:
-        job.datacenters == ['dc-new']
+        job.datacenters == ['dc-global', 'dc-new']
     }
 
     void "assignDatacenters should keep legacy behavior when nomadOptions is absent"() {
@@ -110,7 +110,44 @@ class JobBuilderNomadOptionsSpec extends Specification {
         resources.getMemoryMaxMB() == 2048
     }
 
-    void "getResources should ignore nomadOptions resources cores and keep task cpus"() {
+    void "affinity should include global and process nomadOptions affinity entries"() {
+        given:
+        def task = taskWithConfig([
+                (TaskDirectives.NOMAD_OPTIONS): [affinity: [attribute: '${meta.workload}', operator: '=', value: 'batch', weight: 20]]
+        ])
+        def taskDef = new Task()
+        def jobOpts = Stub(NomadJobOpts) {
+            getAffinitySpec() >> new nextflow.nomad.models.JobAffinity()
+                    .attribute('${meta.global}')
+                    .operator('=')
+                    .value('true')
+                    .weight(10)
+        }
+
+        when:
+        JobBuilder.affinity(task, taskDef, jobOpts)
+
+        then:
+        taskDef.affinities.size() == 2
+        taskDef.affinities[0].getLtarget() == '${meta.global}'
+        taskDef.affinities[1].getLtarget() == '${meta.workload}'
+    }
+
+    void "affinity should fail when process affinity is missing required fields"() {
+        given:
+        def task = taskWithConfig([
+                (TaskDirectives.NOMAD_OPTIONS): [affinity: [operator: '=']]
+        ])
+        def taskDef = new Task()
+
+        when:
+        JobBuilder.affinity(task, taskDef, Stub(NomadJobOpts))
+
+        then:
+        thrown(IllegalArgumentException)
+    }
+
+    void "getResources should apply nomadOptions resources cores override"() {
         given:
         def task = taskWithConfig([
                 (TaskDirectives.NOMAD_OPTIONS): [resources: [cores: 6]]
@@ -120,7 +157,34 @@ class JobBuilderNomadOptionsSpec extends Specification {
         def resources = JobBuilder.getResources(task)
 
         then:
-        resources.getCores() == 2
+        resources.getCores() == 6
+    }
+
+    void "getResources should apply nomadOptions resources cpu override"() {
+        given:
+        def task = taskWithConfig([
+                (TaskDirectives.NOMAD_OPTIONS): [resources: [cpu: 1500]]
+        ], [cpus: 2, memory: '2 GB'])
+
+        when:
+        def resources = JobBuilder.getResources(task)
+
+        then:
+        resources.getCPU() == 1500
+        resources.getCores() == null
+    }
+
+    void "getResources should fail when both nomadOptions resources cpu and cores are set"() {
+        given:
+        def task = taskWithConfig([
+                (TaskDirectives.NOMAD_OPTIONS): [resources: [cpu: 1500, cores: 3]]
+        ], [cpus: 2, memory: '2 GB'])
+
+        when:
+        JobBuilder.getResources(task)
+
+        then:
+        thrown(IllegalArgumentException)
     }
 
     void "getResources should apply nomadOptions resources device list"() {
@@ -206,18 +270,17 @@ class JobBuilderNomadOptionsSpec extends Specification {
         resources.getMemoryMaxMB() == 3072
     }
 
-    void "getResources should fallback to task memory when nomadOptions resources memoryMax is invalid"() {
+    void "getResources should fail when nomadOptions resources memoryMax is invalid"() {
         given:
         def task = taskWithConfig([
                 (TaskDirectives.NOMAD_OPTIONS): [resources: [memoryMax: 'invalid']]
         ], [cpus: 2, memory: '2 GB'])
 
         when:
-        def resources = JobBuilder.getResources(task)
+        JobBuilder.getResources(task)
 
         then:
-        resources.getMemoryMB() == 2048
-        resources.getMemoryMaxMB() == 2048
+        thrown(IllegalArgumentException)
     }
 
     private TaskRun taskWithConfig(Map<String, Object> configValues, Map<String, Object> taskConfigValues = [:]) {

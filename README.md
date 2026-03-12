@@ -96,6 +96,7 @@ process {
       datacenters: ['dc1', 'dc2'],
       namespace: 'bio',
       constraints: { node { unique = [name: params.RUN_IN_NODE] } },
+      affinity: [attribute: '${meta.workload}', operator: '=', value: 'batch', weight: 25],
       meta: [owner: 'team-x', step: 'align'],
       shutdownDelay: '15s',
       failures: [
@@ -105,7 +106,7 @@ process {
       secrets: ['MY_ACCESS_KEY', 'MY_SECRET_KEY'],
       spread: [name: 'node.datacenter', weight: 50, targets: ['us-east1': 70, 'us-east2': 30]],
       priority: 'high',
-      resources: [memoryMax: '64 GB', device: [[name: 'nvidia/gpu', count: 1]]]
+      resources: [memoryMax: '64 GB', cores: 4, device: [[name: 'nvidia/gpu', count: 1]]]
     ]
   }
 }
