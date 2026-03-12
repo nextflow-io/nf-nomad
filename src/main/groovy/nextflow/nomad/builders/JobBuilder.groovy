@@ -443,7 +443,7 @@ class JobBuilder {
             def secrets = NomadTaskOptionsResolver.secrets(task)
             if (secrets) {
                 Template template = new Template(envvars: true, destPath: "/secrets/nf-nomad")
-                String secretPath = jobOpts?.secretOpts?.path
+                String secretPath = NomadTaskOptionsResolver.secretsPath(task) ?: jobOpts?.secretOpts?.path
                 String tmpl = secrets.collect { String name ->
                     "${name}={{ with nomadVar \"$secretPath/${name}\" }}{{ .${name} }}{{ end }}"
                 }.join('\n').stripIndent()

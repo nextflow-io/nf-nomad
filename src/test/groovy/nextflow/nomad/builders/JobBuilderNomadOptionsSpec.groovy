@@ -85,6 +85,28 @@ class JobBuilderNomadOptionsSpec extends Specification {
         !taskDef.templates[0].embeddedTmpl.contains('OLD_SECRET')
     }
 
+    void "secrets should use nomadOptions secretsPath override when provided"() {
+        given:
+        def task = taskWithConfig([
+                (TaskDirectives.NOMAD_OPTIONS): [
+                        secrets: ['NEW_ACCESS'],
+                        secretsPath: 'secret/process'
+                ]
+        ])
+        def taskDef = new Task()
+        def jobOpts = Stub(NomadJobOpts) {
+            getSecretOpts() >> [enabled: true, path: 'secret/global']
+        }
+
+        when:
+        JobBuilder.secrets(task, taskDef, jobOpts)
+
+        then:
+        taskDef.templates.size() == 1
+        taskDef.templates[0].embeddedTmpl.contains('NEW_ACCESS={{ with nomadVar \"secret/process/NEW_ACCESS\" }}{{ .NEW_ACCESS }}{{ end }}')
+        !taskDef.templates[0].embeddedTmpl.contains('secret/global/NEW_ACCESS')
+    }
+
     void "spreads should prefer nomadOptions spread map"() {
         given:
         def task = taskWithConfig([

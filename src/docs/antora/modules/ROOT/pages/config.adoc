@@ -117,6 +117,7 @@ The plugin supports process-level Nomad directives in two forms:
 - `namespace`: string namespace override for the process
 - `constraints`: closure using the existing constraints DSL
 - `secrets`: list of secret names
+- `secretsPath`: per-process Nomad secret path override (string)
 - `spread`: spread map (`name`, `weight`, optional `targets`)
 - `affinity`: affinity map (`attribute`, optional `operator`, `value`, optional `weight`)
 - `volumes`: list of safe volume maps (`type`, `name`, optional `path`, optional `workDir`, optional `readOnly`)
@@ -150,6 +151,7 @@ process {
                 restart: [attempts: 1, delay: '5s', mode: 'fail'],
                 reschedule: [attempts: 2, delay: '10s']
             ],
+            secretsPath: 'secret/projects/team-x',
             secrets: ['MY_ACCESS_KEY', 'MY_SECRET_KEY'],
             spread: [name: 'node.datacenter', weight: 50, targets: ['us-east1': 70, 'us-east2': 30]],
             priority: 'high',
@@ -163,6 +165,7 @@ process {
 When both `nomadOptions.<key>` and a legacy directive are set for the same process, `nomadOptions.<key>` takes precedence for that key only.
 For list-valued options such as datacenters, global and process values are concatenated in order (global first, then process) and deduplicated.
 `nomadOptions` values are validated strictly before submission; invalid shapes or conflicting options (for example, setting both `resources.cpu` and `resources.cores`) fail fast.
+When `nomadOptions.secretsPath` is set, it overrides `nomad.jobs.secrets.path` for that process only.
 
 
 

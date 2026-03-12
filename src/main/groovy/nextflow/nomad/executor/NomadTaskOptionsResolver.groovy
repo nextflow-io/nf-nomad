@@ -11,6 +11,7 @@ class NomadTaskOptionsResolver {
     public static final String DATACENTERS = "datacenters"
     public static final String CONSTRAINTS = "constraints"
     public static final String SECRETS = "secrets"
+    public static final String SECRETS_PATH = "secretsPath"
     public static final String SPREAD = "spread"
     public static final String PRIORITY = "priority"
     public static final String RESOURCES = "resources"
@@ -32,6 +33,7 @@ class NomadTaskOptionsResolver {
             DATACENTERS,
             CONSTRAINTS,
             SECRETS,
+            SECRETS_PATH,
             SPREAD,
             PRIORITY,
             RESOURCES,
@@ -54,6 +56,7 @@ class NomadTaskOptionsResolver {
         datacenters(task)
         constraints(task)
         secrets(task)
+        secretsPath(task)
         spread(task)
         priority(task)
         resources(task)
@@ -113,6 +116,25 @@ class NomadTaskOptionsResolver {
                     .findAll { String item -> item } as List<String>
         }
         return [value.toString()]
+    }
+
+    static String secretsPath(TaskRun task) {
+        Map options = getNomadOptions(task)
+        if( !options.containsKey(SECRETS_PATH) ) {
+            return null
+        }
+        def value = options.get(SECRETS_PATH)
+        if( value == null ) {
+            return null
+        }
+        if( value instanceof CharSequence ) {
+            String path = value.toString().trim()
+            if( path ) {
+                return path
+            }
+        }
+        invalidOption(task, "${TaskDirectives.NOMAD_OPTIONS}.${SECRETS_PATH}", value, "must be a non-empty string")
+        return null
     }
 
     static Map spread(TaskRun task) {

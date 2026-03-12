@@ -16,6 +16,7 @@ class NomadTaskOptionsResolverSpec extends Specification {
                         datacenters: ['dc-new'],
                         constraints: nomadOptionsConstraints,
                         secrets    : ['NEW_ONE', 'NEW_TWO'],
+                        secretsPath: 'secret/process-path',
                         spread     : [name: 'node.class', weight: 10],
                         affinity   : [attribute: '${meta.workload}', operator: '=', value: 'batch', weight: 10],
                         volumes    : [[type: 'host', name: 'ref', path: '/ref', readOnly: true]],
@@ -39,6 +40,7 @@ class NomadTaskOptionsResolverSpec extends Specification {
         NomadTaskOptionsResolver.datacenters(task) == ['dc-new']
         NomadTaskOptionsResolver.constraints(task) == nomadOptionsConstraints
         NomadTaskOptionsResolver.secrets(task) == ['NEW_ONE', 'NEW_TWO']
+        NomadTaskOptionsResolver.secretsPath(task) == 'secret/process-path'
         NomadTaskOptionsResolver.spread(task) == [name: 'node.class', weight: 10]
         NomadTaskOptionsResolver.affinity(task) == [attribute: '${meta.workload}', operator: '=', value: 'batch', weight: 10]
         NomadTaskOptionsResolver.volumes(task) == [[type: 'host', name: 'ref', path: '/ref', readOnly: true]]
@@ -119,6 +121,21 @@ class NomadTaskOptionsResolverSpec extends Specification {
 
         when:
         NomadTaskOptionsResolver.volumes(task)
+
+        then:
+        thrown(IllegalArgumentException)
+    }
+
+    void "should fail on invalid nomadOptions secretsPath value"() {
+        given:
+        def task = taskWithConfig([
+                (TaskDirectives.NOMAD_OPTIONS): [
+                        secretsPath: 123
+                ]
+        ])
+
+        when:
+        NomadTaskOptionsResolver.secretsPath(task)
 
         then:
         thrown(IllegalArgumentException)
