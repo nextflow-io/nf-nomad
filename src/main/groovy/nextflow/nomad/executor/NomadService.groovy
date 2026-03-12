@@ -33,6 +33,7 @@ import org.codehaus.groovy.runtime.InvokerHelper
 import org.threeten.bp.OffsetDateTime
 
 import java.nio.file.Path
+import java.util.concurrent.TimeoutException
 
 /**
  * Nomad Service
@@ -151,6 +152,75 @@ class NomadService implements Closeable{
         }
     }
 
+    private static TaskState stateFromAllocation(AllocationListStub allocation) {
+        String status = allocation?.clientStatus?.toLowerCase()
+        if( !status ) {
+            return null
+        }
+        boolean failed = status in ['failed', 'lost']
+        boolean finished = status in ['complete', 'dead', 'failed', 'lost']
+        return new TaskState(
+                state: status,
+                failed: failed,
+                finishedAt: finished ? OffsetDateTime.now() : null
+        )
+    }
+
+    private static TaskState pendingState() {
+        new TaskState(state: 'pending', failed: false)
+    }
+
+    private static TaskState unknownState() {
+        new TaskState(state: 'unknown', failed: false, finishedAt: OffsetDateTime.now())
+    }
+
+    private static boolean isTransientStateError(Throwable error) {
+        ApiException apiException = findApiException(error)
+        if( apiException != null ) {
+            int code = apiException.code
+            return code == 0 || code in [408, 429, 500, 502, 503, 504]
+        }
+        if( error instanceof IOException || error.cause instanceof IOException ) {
+            return true
+        }
+        if( error instanceof TimeoutException || error.cause instanceof TimeoutException ) {
+            return true
+        }
+        return false
+    }
+
+    private TaskState emptyAllocationState(String jobId) {
+        if( !jobExists(jobId) ) {
+            return unknownState()
+        }
+        return pendingState()
+    }
+
+    private boolean jobExists(String jobId) {
+        try {
+            Job job = safeExecutor.apply {
+                jobsApi.getJob(jobId, config.jobOpts().region, config.jobOpts().namespace,
+                        null, null, null, null, null, null, null)
+            }
+            return job != null
+        }
+        catch (ApiException e) {
+            if( e.code == 404 ) {
+                return false
+            }
+            if( isTransientStateError(e) ) {
+                return true
+            }
+            throw e
+        }
+        catch (Exception e) {
+            if( isTransientStateError(e) ) {
+                return true
+            }
+            throw e
+        }
+    }
+
 
     TaskState getTaskState(String jobId){
         try {
@@ -159,15 +229,27 @@ class NomadService implements Closeable{
                         null, null, null, null, null, null,
                         null, null)
             }
+            if( !allocations ) {
+                return emptyAllocationState(jobId)
+            }
             AllocationListStub last = allocations ? allocations.sort {
                 it.modifyIndex
             }?.last() : null
-            TaskState currentState = last?.taskStates?.values()?.last()
+            TaskState currentState = last?.taskStates?.values()?.last() ?: stateFromAllocation(last)
             NomadLogging.logJobState(log, jobId, currentState?.state)
-            currentState ?: new TaskState(state: "unknown", failed: true, finishedAt: OffsetDateTime.now())
+            currentState ?: pendingState()
+        }catch(ApiException e){
+            NomadLogging.logError(log, "getTaskState", jobId, e, [statusCode: e.code])
+            if( isTransientStateError(e) ) {
+                return pendingState()
+            }
+            unknownState()
         }catch(Exception e){
             NomadLogging.logError(log, "getTaskState", jobId, e)
-            new TaskState(state: "unknown", failed: true, finishedAt: OffsetDateTime.now())
+            if( isTransientStateError(e) ) {
+                return pendingState()
+            }
+            unknownState()
         }
     }
 

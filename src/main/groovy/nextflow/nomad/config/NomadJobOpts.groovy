@@ -67,6 +67,7 @@ class NomadJobOpts{
     String acceleratorDeviceName
     Boolean failOnPlacementFailure
     Duration placementFailureTimeout
+    Duration pollInterval
 
     NomadSecretOpts secretOpts
 
@@ -133,6 +134,15 @@ class NomadJobOpts{
                 Duration.of(timeoutValue.toString())
         } else {
             placementFailureTimeout = Duration.of('60s')
+        }
+
+        def pollValue = nomadJobOpts.get('pollInterval') ?: sysEnv.get('NF_NOMAD_POLL_INTERVAL')
+        if( pollValue ) {
+            pollInterval = pollValue instanceof Duration
+                    ? (pollValue as Duration)
+                    : Duration.of(pollValue.toString())
+        } else {
+            pollInterval = Duration.of('1s')
         }
 
         dockerVolume = nomadJobOpts.dockerVolume ?: null

@@ -38,6 +38,7 @@ class NomadJobOptsSpec extends Specification {
         nomadJobOpts.cpuMode == NomadJobOpts.CPU_MODE_CORES
         nomadJobOpts.acceleratorAutoDevice == true
         nomadJobOpts.acceleratorDeviceName == 'nvidia/gpu'
+        nomadJobOpts.pollInterval.millis == 1_000L
     }
 
     def "test cpuMode can be set to cpu"() {
@@ -261,5 +262,22 @@ class NomadJobOptsSpec extends Specification {
         nomadJobOpts1.placementFailureTimeout.millis == 20_000L
         nomadJobOpts2.placementFailureTimeout.millis == 300_000L
         nomadJobOpts3.placementFailureTimeout.millis == 3_600_000L
+    }
+
+    def "test pollInterval can be customized"() {
+        given:
+        def nomadJobOpts = new NomadJobOpts([pollInterval: '2500ms'])
+
+        expect:
+        nomadJobOpts.pollInterval.millis == 2_500L
+    }
+
+    def "test pollInterval from environment variable"() {
+        given:
+        def env = ['NF_NOMAD_POLL_INTERVAL': '3s']
+        def nomadJobOpts = new NomadJobOpts([:], env)
+
+        expect:
+        nomadJobOpts.pollInterval.millis == 3_000L
     }
 }

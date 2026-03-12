@@ -23,6 +23,7 @@ import nextflow.executor.Executor
 import nextflow.nomad.config.NomadConfig
 import nextflow.nomad.config.NomadJobOpts
 import nextflow.processor.*
+import nextflow.util.Duration
 import spock.lang.Specification
 
 import java.nio.file.Files
@@ -174,6 +175,63 @@ class NomadTaskHandlerSpec extends Specification{
         getPrivateField(handler, 'datacenter') == 'dc-west'
     }
 
+    void "should include nomad identifiers and allocation api hint in failure message"() {
+        given:
+        def task = taskWithExitStatus(2)
+        def config = configWithCleanupAndAddress(NomadJobOpts.CLEANUP_ALWAYS, true, 'http://nomad.example/v1')
+        def service = Mock(NomadService) {
+            getAllocationMetadata('job-123') >> [
+                    allocationId: 'alloc-789',
+                    nodeId: 'node-456',
+                    nodeName: 'worker-a',
+                    datacenter: 'dc-west'
+            ]
+        }
+        def handler = new NomadTaskHandler(task, config, service)
+        setPrivateField(handler, 'jobName', 'job-123')
+        def state = new TaskState(
+                failed: true,
+                state: 'dead',
+                events: [[displayMessage: 'Task exited with non-zero status']]
+        )
+
+        when:
+        def message = handler.failureMessage(state, 2)
+
+        then:
+        message.contains("job 'job-123'")
+        message.contains("allocation 'alloc-789'")
+        message.contains("node 'worker-a'")
+        message.contains("datacenter 'dc-west'")
+        message.contains('Allocation API:')
+        message.contains('/allocation/alloc-789')
+    }
+
+    void "should respect configured poll interval when fetching task state"() {
+        given:
+        def opts = Stub(NomadJobOpts) {
+            getCleanup() >> NomadJobOpts.CLEANUP_ALWAYS
+            getDeleteOnCompletion() >> true
+            getPollInterval() >> Duration.of('10s')
+        }
+        def config = Mock(NomadConfig) {
+            jobOpts() >> opts
+        }
+        def service = Mock(NomadService) {
+            1 * getTaskState('job-123') >> new TaskState(state: 'running', failed: false)
+        }
+        def handler = new NomadTaskHandler(taskWithExitStatus(0), config, service)
+        setPrivateField(handler, 'jobName', 'job-123')
+        setPrivateField(handler, 'status', TaskStatus.SUBMITTED)
+
+        when:
+        handler.taskState0()
+        handler.taskState0()
+
+        then:
+        noExceptionThrown()
+    }
+
     private TaskRun taskWithExitStatus(int exitStatus) {
         Mock(TaskRun) {
             getWorkDir() >> Path.of('.')
@@ -193,14 +251,25 @@ class NomadTaskHandlerSpec extends Specification{
         }
     }
 
+    private NomadConfig configWithCleanupAndAddress(String cleanup, boolean deleteOnCompletion, String address) {
+        def opts = Stub(NomadJobOpts) {
+            getCleanup() >> cleanup
+            getDeleteOnCompletion() >> deleteOnCompletion
+        }
+        Mock(NomadConfig) {
+            jobOpts() >> opts
+            clientOpts() >> [address: address]
+        }
+    }
+
     private static void setPrivateField(Object target, String field, Object value) {
-        def f = target.class.getDeclaredField(field)
+        def f = findField(target.class, field)
         f.setAccessible(true)
         f.set(target, value)
     }
 
     private static Object getPrivateField(Object target, String field) {
-        def f = target.class.getDeclaredField(field)
+        def f = findField(target.class, field)
         f.setAccessible(true)
         return f.get(target)
     }
@@ -209,5 +278,17 @@ class NomadTaskHandlerSpec extends Specification{
         def m = target.class.getDeclaredMethod(methodName)
         m.setAccessible(true)
         return m.invoke(target)
+    }
+
+    private static java.lang.reflect.Field findField(Class type, String field) {
+        Class current = type
+        while( current ) {
+            try {
+                return current.getDeclaredField(field)
+            } catch (NoSuchFieldException ignored) {
+                current = current.getSuperclass()
+            }
+        }
+        throw new NoSuchFieldException(field)
     }
 }

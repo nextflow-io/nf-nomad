@@ -244,7 +244,8 @@ class NomadTaskHandler extends TaskHandler implements FusionAwareTask {
     protected TaskState taskState0() {
         final now = System.currentTimeMillis()
         final delta = now - timestamp
-        if (!status || delta >= 1_000) {
+        final long pollMillis = config?.jobOpts()?.pollInterval?.millis ?: 1_000L
+        if (!status || delta >= pollMillis) {
 
             def newState = nomadService.getTaskState(jobName)
             if (newState && state?.state != newState.state) {
@@ -286,7 +287,9 @@ class NomadTaskHandler extends TaskHandler implements FusionAwareTask {
 
     protected String failureMessage(TaskState state, Integer exitStatus) {
         if( isOutOfMemoryFailure(state, exitStatus) ) {
-            return '[NOMAD] Task failed due to an out-of-memory condition. Increase process memory or review `nomadOptions.resources.memoryMax`.'
+            final hint = nomadFailureHint()
+            final base = '[NOMAD] Task failed due to an out-of-memory condition. Increase process memory or review `nomadOptions.resources.memoryMax`.'
+            return hint ? "${base} ${hint}" : base
         }
 
         final stateName = state?.state ?: 'unknown'
@@ -294,9 +297,11 @@ class NomadTaskHandler extends TaskHandler implements FusionAwareTask {
                 ? " with exit status ${exitStatus}"
                 : ''
         final String details = taskEventSummary(state)
-        return details
+        final String base = details
                 ? "[NOMAD] Task failed in Nomad state ${stateName}${exitPart}. ${details}"
                 : "[NOMAD] Task failed in Nomad state ${stateName}${exitPart}."
+        final hint = nomadFailureHint()
+        return hint ? "${base} ${hint}" : base
     }
 
     protected boolean isOutOfMemoryFailure(TaskState state, Integer exitStatus) {
@@ -348,6 +353,42 @@ class NomadTaskHandler extends TaskHandler implements FusionAwareTask {
         } catch (Throwable ignored) {
             return null
         }
+    }
+
+    protected String nomadFailureHint() {
+        if( jobName && (!allocationId || !clientName || !nodeId || !datacenter) ) {
+            determineClientNode()
+        }
+
+        List<String> targets = new ArrayList<>()
+        if( jobName ) {
+            targets.add("job '" + jobName + "'")
+        }
+        if( allocationId ) {
+            targets.add("allocation '" + allocationId + "'")
+        }
+        if( clientName ) {
+            targets.add("node '" + clientName + "'")
+        }
+        if( datacenter ) {
+            targets.add("datacenter '" + datacenter + "'")
+        }
+        if( !targets ) {
+            return null
+        }
+
+        final apiUrl = allocationApiUrl()
+        final prefix = "[NOMAD] Inspect ${targets.join(', ')}."
+        return apiUrl ? "${prefix} Allocation API: ${apiUrl}" : prefix
+    }
+
+    protected String allocationApiUrl() {
+        final base = config?.clientOpts()?.address?.toString()?.trim()
+        if( !base || !allocationId ) {
+            return null
+        }
+        String normalized = base.endsWith('/') ? base.substring(0, base.length()-1) : base
+        return "${normalized}/allocation/${allocationId}"
     }
 
     private void determineClientNode(){

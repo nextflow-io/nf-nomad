@@ -66,17 +66,24 @@ class MockNomadServiceSpec extends Specification{
 
         when:
         mockWebServer.enqueue(new MockResponse()
+                .setBody("[]")
+                .addHeader("Content-Type", "application/json"));
+        mockWebServer.enqueue(new MockResponse()
+                .setBody("{}")
                 .addHeader("Content-Type", "application/json"));
 
         def state = service.getTaskState("theId")
         def recordedRequest = mockWebServer.takeRequest();
+        def recordedJobRequest = mockWebServer.takeRequest();
 
         then:
         recordedRequest.method == "GET"
         recordedRequest.path == "/v1/job/theId/allocations"
+        recordedJobRequest.method == "GET"
+        recordedJobRequest.path == "/v1/job/theId"
 
         and:
-        state.state == "unknown"
+        state.state == "pending"
 
         when:
         mockWebServer.enqueue(new MockResponse()
@@ -93,6 +100,59 @@ class MockNomadServiceSpec extends Specification{
         and:
         state.state == "running"
 
+    }
+
+    void "should return pending state when allocations list is empty"() {
+        given:
+        def config = new NomadConfig(
+                client:[
+                        address : "http://${mockWebServer.hostName}:${mockWebServer.port}"
+                ]
+        )
+        def service = new NomadService(config)
+
+        mockWebServer.enqueue(new MockResponse()
+                .setBody("[]")
+                .addHeader("Content-Type", "application/json"))
+        mockWebServer.enqueue(new MockResponse()
+                .setBody("{}")
+                .addHeader("Content-Type", "application/json"))
+
+        when:
+        def state = service.getTaskState("theId")
+        def recordedRequest = mockWebServer.takeRequest()
+        def recordedJobRequest = mockWebServer.takeRequest()
+
+        then:
+        recordedRequest.method == "GET"
+        recordedRequest.path == "/v1/job/theId/allocations"
+        recordedJobRequest.method == "GET"
+        recordedJobRequest.path == "/v1/job/theId"
+        state.state == "pending"
+        !state.failed
+    }
+
+    void "should return pending state for transient api errors"() {
+        given:
+        def config = new NomadConfig(
+                client:[
+                        address : "http://${mockWebServer.hostName}:${mockWebServer.port}",
+                        retryConfig: [maxAttempts: 1]
+                ]
+        )
+        def service = new NomadService(config)
+
+        mockWebServer.enqueue(new MockResponse()
+                .setResponseCode(503)
+                .setBody("service unavailable")
+                .addHeader("Content-Type", "text/plain"))
+
+        when:
+        def state = service.getTaskState("theId")
+
+        then:
+        state.state == "pending"
+        !state.failed
     }
 
     void "should retrieve allocation metadata for latest allocation"() {
