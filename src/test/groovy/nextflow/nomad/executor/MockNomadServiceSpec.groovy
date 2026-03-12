@@ -376,7 +376,7 @@ class MockNomadServiceSpec extends Specification{
         body.Job.TaskGroups[0].Volumes.size() == 1
         body.Job.TaskGroups[0].Volumes['vol_0'] == [AccessMode:"multi-node-multi-writer", AttachmentMode:"file-system", Source:"test", Type:"csi", ReadOnly:false]
         body.Job.TaskGroups[0].Tasks[0].VolumeMounts.size() == 1
-        body.Job.TaskGroups[0].Tasks[0].VolumeMounts[0] == [Destination:"/a", Volume:"vol_0"]
+        body.Job.TaskGroups[0].Tasks[0].VolumeMounts[0] == [Destination:"/a", ReadOnly:false, Volume:"vol_0"]
 
     }
 

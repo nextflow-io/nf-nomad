@@ -20,8 +20,8 @@ package nextflow.nomad.executor
 import groovy.transform.CompileStatic
 import groovy.util.logging.Slf4j
 import io.nomadproject.client.model.TaskState
+import nextflow.exception.ProcessException
 import nextflow.exception.ProcessSubmitException
-import nextflow.exception.ProcessUnrecoverableException
 import nextflow.executor.BashWrapperBuilder
 import nextflow.fusion.FusionAwareTask
 import nextflow.nomad.config.NomadConfig
@@ -137,8 +137,7 @@ class NomadTaskHandler extends TaskHandler implements FusionAwareTask {
             task.stdout = outputFile
             task.stderr = errorFile
             status = TaskStatus.COMPLETED
-            task.error = new ProcessUnrecoverableException("[NOMAD] Job placement failed - no suitable nodes with available resources")
-            task.aborted = true
+            task.error = new ProcessException("[NOMAD] Job placement failed - no suitable nodes with available resources")
             determineClientNode()
             return true
         }
@@ -151,8 +150,7 @@ class NomadTaskHandler extends TaskHandler implements FusionAwareTask {
             task.stderr = errorFile
             status = TaskStatus.COMPLETED
             if ( !state || state.failed ) {
-                task.error = new ProcessUnrecoverableException(failureMessage(state, task.exitStatus as Integer))
-                task.aborted = true
+                task.error = new ProcessException(failureMessage(state, task.exitStatus as Integer))
             }
             if (shouldDelete(state)) {
                 nomadService.jobPurge(this.jobName)

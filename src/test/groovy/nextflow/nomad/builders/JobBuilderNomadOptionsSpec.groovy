@@ -267,6 +267,7 @@ class JobBuilderNomadOptionsSpec extends Specification {
         group.volumes.keySet().toList() == ['vol_0', 'vol_1']
         group.tasks[0].volumeMounts*.destination.contains('/tmp')
         group.tasks[0].volumeMounts*.destination.contains('/data')
+        group.tasks[0].volumeMounts.find { it.destination == '/data' }?.readOnly == true
     }
 
     void "createTaskGroup should fail for invalid process volume entries"() {
@@ -288,6 +289,39 @@ class JobBuilderNomadOptionsSpec extends Specification {
         }
         def jobOpts = Stub(NomadJobOpts) {
             getVolumeSpec() >> null
+            getDockerVolume() >> null
+            getPrivileged() >> true
+            getRestartAttempts() >> 1
+            getRescheduleAttempts() >> 1
+        }
+
+        when:
+        JobBuilder.createTaskGroup(task, ['bash', '-c', 'echo test'], [:], jobOpts)
+
+        then:
+        thrown(IllegalArgumentException)
+    }
+
+    void "createTaskGroup should fail when merged global and process volumes define multiple workDir mounts"() {
+        given:
+        def processConfig = Mock(ProcessConfig)
+        processConfig.get(_ as String) >> { String key ->
+            key == TaskDirectives.NOMAD_OPTIONS
+                    ? [volumes: [[type: 'host', name: 'process-work', workDir: true]]]
+                    : null
+        }
+        def processor = Mock(TaskProcessor) {
+            getConfig() >> processConfig
+        }
+        def task = Mock(TaskRun) {
+            getProcessor() >> processor
+            getConfig() >> [memory: '1 GB', cpus: 1]
+            getContainer() >> 'ubuntu:22.04'
+            getWorkDir() >> Path.of('/tmp/nf/work')
+        }
+        def globalVolume = new JobVolume().type('host').name('global-work').workDir(true)
+        def jobOpts = Stub(NomadJobOpts) {
+            getVolumeSpec() >> ([globalVolume] as JobVolume[])
             getDockerVolume() >> null
             getPrivileged() >> true
             getRestartAttempts() >> 1

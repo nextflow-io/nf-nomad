@@ -68,6 +68,7 @@ nomad{
 - `retryConfig.jitter`: Jitter value when retrying failed API requests (default: 0.25)
 - `retryConfig.maxAttempts`: Max attempts when retrying failed API requests (default: 10)
 - `retryConfig.maxDelay`: Max delay when retrying failed API requests (default: 90s)
+- Retries apply to transient failures (`408`, `429`, `5xx`, IO errors, and timeouts).
 
 
 === Jobs configuration
@@ -166,6 +167,8 @@ When both `nomadOptions.<key>` and a legacy directive are set for the same proce
 For list-valued options such as datacenters, global and process values are concatenated in order (global first, then process) and deduplicated.
 `nomadOptions` values are validated strictly before submission; invalid shapes or conflicting options (for example, setting both `resources.cpu` and `resources.cores`) fail fast.
 When `nomadOptions.secretsPath` is set, it overrides `nomad.jobs.secrets.path` for that process only.
+When global and process volume specs are merged, only one `workDir` volume is allowed and `readOnly` flags are preserved on generated task mounts.
+Nomad task failures are surfaced as recoverable process errors so Nextflow `errorStrategy` and `maxRetries` policies remain in control.
 
 
 

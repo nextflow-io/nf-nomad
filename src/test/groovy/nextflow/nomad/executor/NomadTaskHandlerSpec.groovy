@@ -17,8 +17,10 @@
 
 package nextflow.nomad.executor
 import io.nomadproject.client.model.TaskState
+import nextflow.exception.ProcessException
 
 import nextflow.exception.ProcessSubmitException
+import nextflow.exception.ProcessUnrecoverableException
 import nextflow.executor.Executor
 import nextflow.nomad.config.NomadConfig
 import nextflow.nomad.config.NomadJobOpts
@@ -230,6 +232,77 @@ class NomadTaskHandlerSpec extends Specification{
 
         then:
         noExceptionThrown()
+    }
+
+    void "should use recoverable process exception for failed task completion"() {
+        given:
+        Throwable assignedError = null
+        Boolean assignedAborted = null
+        Integer assignedExit = null
+        def task = Mock(TaskRun) {
+            getWorkDir() >> Path.of('.')
+            getConfig() >> [tag: null]
+            getProcessor() >> Mock(TaskProcessor)
+            setError(_ as Throwable) >> { Throwable value -> assignedError = value }
+            getError() >> { assignedError }
+            setAborted(_ as Boolean) >> { Boolean value -> assignedAborted = value }
+            getAborted() >> { assignedAborted ?: false }
+            setExitStatus(_ as Integer) >> { Integer value -> assignedExit = value }
+            getExitStatus() >> { assignedExit }
+        }
+        def config = configWithCleanup(NomadJobOpts.CLEANUP_NEVER, false)
+        def service = Mock(NomadService) {
+            isPlacementFailure('job-failed', _ as Long) >> false
+            getTaskState('job-failed') >> new TaskState(state: 'failed', failed: true, events: [[displayMessage: 'boom']])
+        }
+        def handler = new NomadTaskHandler(task, config, service)
+        setPrivateField(handler, 'jobName', 'job-failed')
+        setPrivateField(handler, 'status', TaskStatus.SUBMITTED)
+
+        when:
+        def completed = handler.checkIfCompleted()
+
+        then:
+        completed
+        assignedError instanceof ProcessException
+        !(assignedError instanceof ProcessUnrecoverableException)
+        !assignedAborted
+    }
+
+    void "should use recoverable process exception for placement failure"() {
+        given:
+        Throwable assignedError = null
+        Boolean assignedAborted = null
+        Integer assignedExit = null
+        def task = Mock(TaskRun) {
+            getWorkDir() >> Path.of('.')
+            getConfig() >> [tag: null]
+            getProcessor() >> Mock(TaskProcessor)
+            setError(_ as Throwable) >> { Throwable value -> assignedError = value }
+            getError() >> { assignedError }
+            setAborted(_ as Boolean) >> { Boolean value -> assignedAborted = value }
+            getAborted() >> { assignedAborted ?: false }
+            setExitStatus(_ as Integer) >> { Integer value -> assignedExit = value }
+            getExitStatus() >> { assignedExit }
+        }
+        def config = configWithCleanup(NomadJobOpts.CLEANUP_NEVER, false)
+        def service = Mock(NomadService) {
+            isPlacementFailure('job-placement', _ as Long) >> true
+            getTaskState('job-placement') >> new TaskState(state: 'pending', failed: false)
+        }
+        def handler = new NomadTaskHandler(task, config, service)
+        setPrivateField(handler, 'jobName', 'job-placement')
+        setPrivateField(handler, 'status', TaskStatus.SUBMITTED)
+
+        when:
+        def completed = handler.checkIfCompleted()
+
+        then:
+        completed
+        assignedExit == 1
+        assignedError instanceof ProcessException
+        !(assignedError instanceof ProcessUnrecoverableException)
+        !assignedAborted
     }
 
     private TaskRun taskWithExitStatus(int exitStatus) {

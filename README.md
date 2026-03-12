@@ -125,7 +125,9 @@ Task failure messages include Nomad inspection hints (job/allocation/node identi
 Global `nomad.jobs.pollInterval` controls task-state polling frequency (default `1s`) and can reduce Nomad API pressure for large workloads.
 Global `nomad.jobs.submitThrottle` enforces a minimum delay between Nomad job submissions (default `0s`) to smooth API load during large bursts.
 Process-level `nomadOptions.volumes` can add additional safe volume mounts without exposing arbitrary driver config.
+When global and process volume specs are merged, only one `workDir` volume is allowed and `readOnly` is preserved on generated task mounts.
 Process-level `nomadOptions.secretsPath` overrides `nomad.jobs.secrets.path` for that process only.
+Nomad task failures are reported as recoverable process errors so Nextflow `process.errorStrategy` / `maxRetries` remain authoritative.
 
 ## Testing and debugging
 

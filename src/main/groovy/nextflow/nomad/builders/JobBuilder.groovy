@@ -297,7 +297,8 @@ class JobBuilder {
                         workingDir.split(File.separator).dropRight(2).join(File.separator) : volumeSpec.path
                 taskDef.volumeMounts.add new VolumeMount(
                         destination: destinationDir,
-                        volume: "vol_${idx}".toString()
+                        volume: "vol_${idx}".toString(),
+                        readOnly: volumeSpec.readOnly
                 )
             }
         }
@@ -314,7 +315,24 @@ class JobBuilder {
         processVolumes.eachWithIndex { Map<String, Object> spec, int idx ->
             result.add(parseProcessVolumeSpec(task, spec, idx))
         }
+        validateMergedVolumeSpecs(task, result)
         return result
+    }
+
+    static protected void validateMergedVolumeSpecs(TaskRun task, List<JobVolume> volumeSpecs) {
+        if( !volumeSpecs ) {
+            return
+        }
+        int workDirCount = 0
+        volumeSpecs.each { JobVolume volume ->
+            if( volume?.workDir ) {
+                workDirCount++
+            }
+        }
+        if( workDirCount > 1 ) {
+            invalidOption(task, "${TaskDirectives.NOMAD_OPTIONS}.volumes", volumeSpecs,
+                    "defines multiple `workDir` volumes across global and process scopes; only one is allowed")
+        }
     }
 
     static protected JobVolume parseProcessVolumeSpec(TaskRun task, Map<String, Object> spec, int idx) {
