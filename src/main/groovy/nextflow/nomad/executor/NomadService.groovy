@@ -29,6 +29,7 @@ import nextflow.nomad.config.NomadConfig
 import nextflow.nomad.util.NomadLogging
 import nextflow.processor.TaskRun
 import nextflow.exception.ProcessSubmitException
+import org.codehaus.groovy.runtime.InvokerHelper
 import org.threeten.bp.OffsetDateTime
 
 import java.nio.file.Path
@@ -195,6 +196,11 @@ class NomadService implements Closeable{
     }
 
     String getClientOfJob(String jobId) {
+        Map<String, String> metadata = getAllocationMetadata(jobId)
+        return metadata.get('nodeName')
+    }
+
+    Map<String, String> getAllocationMetadata(String jobId) {
         try{
             List<AllocationListStub> allocations = safeExecutor.apply {
                 jobsApi.getJobAllocations(jobId, config.jobOpts().region, config.jobOpts().namespace,
@@ -202,19 +208,47 @@ class NomadService implements Closeable{
                         null, null)
             }
             if( !allocations ){
-                return null
+                return Collections.emptyMap()
             }
-            AllocationListStub jobAllocation = allocations.first()
+            AllocationListStub jobAllocation = allocations.sort {
+                it.modifyIndex
+            }?.last()
+            if( !jobAllocation ) {
+                return Collections.emptyMap()
+            }
+
+            String allocationId = readStringProperty(jobAllocation, 'id') ?: readStringProperty(jobAllocation, 'ID')
+            String nodeId = readStringProperty(jobAllocation, 'nodeID') ?: readStringProperty(jobAllocation, 'NodeID')
+            String nodeName = jobAllocation.nodeName
+            String datacenter = readStringProperty(jobAllocation, 'datacenter') ?: readStringProperty(jobAllocation, 'Datacenter')
             NomadLogging.logAllocationDetails(log, jobId, [
+                allocationId: allocationId,
+                nodeId: nodeId,
                 nodeName: jobAllocation.nodeName,
+                datacenter: datacenter,
                 clientStatus: jobAllocation.clientStatus,
                 desiredStatus: jobAllocation.desiredStatus,
                 modifyIndex: jobAllocation.modifyIndex
             ])
-            return jobAllocation.nodeName
+
+            Map<String, String> result = new LinkedHashMap<>()
+            if( allocationId ) result.put('allocationId', allocationId)
+            if( nodeId ) result.put('nodeId', nodeId)
+            if( nodeName ) result.put('nodeName', nodeName)
+            if( datacenter ) result.put('datacenter', datacenter)
+            return result
         }catch (Exception e){
             NomadLogging.logError(log, "getClientOfJob", jobId, e)
             throw new ProcessSubmitException("[NOMAD] Failed to get alloactions ${jobId} -- Cause: ${e.message ?: e}", e)
+        }
+    }
+
+    private static String readStringProperty(Object target, String property) {
+        try {
+            String value = InvokerHelper.getProperty(target, property)?.toString()?.trim()
+            return value ?: null
+        } catch (Throwable ignored) {
+            return null
         }
     }
 

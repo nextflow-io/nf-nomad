@@ -23,6 +23,8 @@ class NomadTaskOptionsResolver {
     public static final String AFFINITY = "affinity"
     public static final String CPU = "cpu"
     public static final String CORES = "cores"
+    private static final Set<String> SUPPORTED_RESOURCE_OPTIONS = ["memoryMax", "device", CPU, CORES] as Set<String>
+    private static final Set<String> SUPPORTED_AFFINITY_OPTIONS = ["attribute", "operator", "value", "weight"] as Set<String>
 
     private static final Set<String> SUPPORTED_OPTIONS = [
             DATACENTERS,
@@ -208,6 +210,12 @@ class NomadTaskOptionsResolver {
         }
         if( value instanceof Map ) {
             Map resources = (Map)value
+            resources.keySet().each { key ->
+                if( !SUPPORTED_RESOURCE_OPTIONS.contains(key?.toString()) ) {
+                    invalidOption(task, "${TaskDirectives.NOMAD_OPTIONS}.${RESOURCES}", key,
+                            "contains unsupported key; supported keys: ${SUPPORTED_RESOURCE_OPTIONS.sort().join(', ')}")
+                }
+            }
             if( resources.containsKey(CPU) && resources.containsKey(CORES)
                     && resources.get(CPU) != null && resources.get(CORES) != null ) {
                 invalidOption(task, "${TaskDirectives.NOMAD_OPTIONS}.${RESOURCES}", resources,
@@ -229,7 +237,14 @@ class NomadTaskOptionsResolver {
             return Collections.emptyMap()
         }
         if( value instanceof Map ) {
-            return (Map)value
+            Map affinity = (Map)value
+            affinity.keySet().each { key ->
+                if( !SUPPORTED_AFFINITY_OPTIONS.contains(key?.toString()) ) {
+                    invalidOption(task, "${TaskDirectives.NOMAD_OPTIONS}.${AFFINITY}", key,
+                            "contains unsupported key; supported keys: ${SUPPORTED_AFFINITY_OPTIONS.sort().join(', ')}")
+                }
+            }
+            return affinity
         }
         invalidOption(task, "${TaskDirectives.NOMAD_OPTIONS}.${AFFINITY}", value, "must be a map")
         return Collections.emptyMap()

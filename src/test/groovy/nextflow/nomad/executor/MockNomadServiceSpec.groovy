@@ -95,6 +95,56 @@ class MockNomadServiceSpec extends Specification{
 
     }
 
+    void "should retrieve allocation metadata for latest allocation"() {
+        given:
+        def config = new NomadConfig(
+                client:[
+                        address : "http://${mockWebServer.hostName}:${mockWebServer.port}"
+                ]
+        )
+        def service = new NomadService(config)
+
+        def allocations = [
+                [
+                        ID: 'alloc-1',
+                        NodeID: 'node-1',
+                        NodeName: 'worker-a',
+                        Datacenter: 'dc-a',
+                        ClientStatus: 'pending',
+                        DesiredStatus: 'run',
+                        ModifyIndex: 2,
+                        TaskStates: [:]
+                ],
+                [
+                        ID: 'alloc-2',
+                        NodeID: 'node-2',
+                        NodeName: 'worker-b',
+                        Datacenter: 'dc-b',
+                        ClientStatus: 'running',
+                        DesiredStatus: 'run',
+                        ModifyIndex: 7,
+                        TaskStates: [:]
+                ]
+        ]
+
+        mockWebServer.enqueue(new MockResponse()
+                .setBody(JsonOutput.toJson(allocations).toString())
+                .addHeader("Content-Type", "application/json"));
+
+        when:
+        def metadata = service.getAllocationMetadata("theId")
+        def recordedRequest = mockWebServer.takeRequest()
+
+        then:
+        recordedRequest.method == "GET"
+        recordedRequest.path == "/v1/job/theId/allocations"
+        metadata == [
+                allocationId: 'alloc-2',
+                nodeId: 'node-2',
+                nodeName: 'worker-b'
+        ]
+    }
+
     void "submit a task"(){
         given:
         def config = new NomadConfig(

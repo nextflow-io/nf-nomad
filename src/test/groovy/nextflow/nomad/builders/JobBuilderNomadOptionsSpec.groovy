@@ -2,8 +2,10 @@ package nextflow.nomad.builders
 
 import io.nomadproject.client.model.Job
 import io.nomadproject.client.model.Task
+import nextflow.executor.res.AcceleratorResource
 import nextflow.nomad.config.NomadJobOpts
 import nextflow.nomad.executor.TaskDirectives
+import nextflow.processor.TaskConfig
 import nextflow.processor.TaskProcessor
 import nextflow.processor.TaskRun
 import nextflow.script.ProcessConfig
@@ -174,6 +176,26 @@ class JobBuilderNomadOptionsSpec extends Specification {
         resources.getCores() == null
     }
 
+    void "getResources should map task cpus to Nomad CPU when global cpuMode is cpu"() {
+        given:
+        def taskConfig = Mock(TaskConfig)
+        taskConfig.get("cpus") >> 3
+        taskConfig.get("memory") >> "2 GB"
+        taskConfig.getAccelerator() >> null
+        def task = taskWithConfig([:], taskConfig)
+        def jobOpts = Stub(NomadJobOpts) {
+            getCpuMode() >> NomadJobOpts.CPU_MODE_CPU
+            getAcceleratorAutoDevice() >> false
+        }
+
+        when:
+        def resources = JobBuilder.getResources(task, jobOpts)
+
+        then:
+        resources.getCPU() == 3000
+        resources.getCores() == null
+    }
+
     void "getResources should fail when both nomadOptions resources cpu and cores are set"() {
         given:
         def task = taskWithConfig([
@@ -200,6 +222,52 @@ class JobBuilderNomadOptionsSpec extends Specification {
         resources.getDevices().size() == 1
         resources.getDevices().first().getName() == 'nvidia/gpu'
         resources.getDevices().first().getCount() == 2
+    }
+
+    void "getResources should infer device request from accelerator when enabled"() {
+        given:
+        def taskConfig = Mock(TaskConfig)
+        taskConfig.get("cpus") >> 2
+        taskConfig.get("memory") >> "2 GB"
+        taskConfig.getAccelerator() >> new AcceleratorResource([request: 2, type: 'nvidia'])
+        def task = taskWithConfig([:], taskConfig)
+        def jobOpts = Stub(NomadJobOpts) {
+            getCpuMode() >> NomadJobOpts.CPU_MODE_CORES
+            getAcceleratorAutoDevice() >> true
+            getAcceleratorDeviceName() >> 'nvidia/gpu'
+        }
+
+        when:
+        def resources = JobBuilder.getResources(task, jobOpts)
+
+        then:
+        resources.getDevices().size() == 1
+        resources.getDevices().first().getName() == 'nvidia/gpu'
+        resources.getDevices().first().getCount() == 2
+    }
+
+    void "getResources should prefer explicit device request over inferred accelerator mapping"() {
+        given:
+        def taskConfig = Mock(TaskConfig)
+        taskConfig.get("cpus") >> 2
+        taskConfig.get("memory") >> "2 GB"
+        taskConfig.getAccelerator() >> new AcceleratorResource([request: 3, type: 'nvidia'])
+        def task = taskWithConfig([
+                (TaskDirectives.NOMAD_OPTIONS): [resources: [device: [[name: 'custom/gpu', count: 1]]]]
+        ], taskConfig)
+        def jobOpts = Stub(NomadJobOpts) {
+            getCpuMode() >> NomadJobOpts.CPU_MODE_CORES
+            getAcceleratorAutoDevice() >> true
+            getAcceleratorDeviceName() >> 'nvidia/gpu'
+        }
+
+        when:
+        def resources = JobBuilder.getResources(task, jobOpts)
+
+        then:
+        resources.getDevices().size() == 1
+        resources.getDevices().first().getName() == 'custom/gpu'
+        resources.getDevices().first().getCount() == 1
     }
 
     void "resolveRestartPolicy should merge global and process options with process precedence"() {
@@ -283,7 +351,7 @@ class JobBuilderNomadOptionsSpec extends Specification {
         thrown(IllegalArgumentException)
     }
 
-    private TaskRun taskWithConfig(Map<String, Object> configValues, Map<String, Object> taskConfigValues = [:]) {
+    private TaskRun taskWithConfig(Map<String, Object> configValues, Object taskConfigValues = [:]) {
         def processConfig = Mock(ProcessConfig)
         processConfig.get(_ as String) >> { String key -> configValues.get(key) }
 

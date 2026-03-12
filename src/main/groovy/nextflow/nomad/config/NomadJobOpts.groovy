@@ -36,9 +36,15 @@ import nextflow.util.Duration
 @Slf4j
 @CompileStatic
 class NomadJobOpts{
+    static final String CPU_MODE_CORES = 'cores'
+    static final String CPU_MODE_CPU = 'cpu'
+    static final String CLEANUP_ALWAYS = 'always'
+    static final String CLEANUP_NEVER = 'never'
+    static final String CLEANUP_ON_SUCCESS = 'onSuccess'
     private Map<String,String> sysEnv
 
     boolean deleteOnCompletion
+    String cleanup
     List<String> datacenters
     String region
     String namespace
@@ -56,6 +62,9 @@ class NomadJobOpts{
     Integer rescheduleAttempts
     Integer restartAttempts
     Boolean privileged
+    String cpuMode
+    Boolean acceleratorAutoDevice
+    String acceleratorDeviceName
     Boolean failOnPlacementFailure
     Duration placementFailureTimeout
 
@@ -71,6 +80,7 @@ class NomadJobOpts{
 
         deleteOnCompletion = nomadJobOpts.containsKey("deleteOnCompletion") ?
                 nomadJobOpts.deleteOnCompletion : true
+        cleanup = parseCleanup(nomadJobOpts.get('cleanup') ?: sysEnv.get('NF_NOMAD_CLEANUP'), deleteOnCompletion)
         if( nomadJobOpts.containsKey("datacenters") ) {
             datacenters = ((nomadJobOpts.datacenters instanceof List<String> ?
                     nomadJobOpts.datacenters : nomadJobOpts.datacenters.toString().split(","))
@@ -100,6 +110,13 @@ class NomadJobOpts{
         privileged = nomadJobOpts.containsKey("privileged")
                 ? Boolean.valueOf(nomadJobOpts.privileged.toString())
                 : true
+        cpuMode = parseCpuMode(nomadJobOpts.get('cpuMode') ?: sysEnv.get('NF_NOMAD_CPU_MODE'))
+        acceleratorAutoDevice = nomadJobOpts.containsKey('acceleratorAutoDevice')
+                ? Boolean.valueOf(nomadJobOpts.get('acceleratorAutoDevice')?.toString())
+                : Boolean.valueOf(sysEnv.get('NF_NOMAD_ACCELERATOR_AUTO_DEVICE') ?: 'true')
+        acceleratorDeviceName = sanitizeOptionalString(nomadJobOpts.get('acceleratorDeviceName'))
+                ?: sanitizeOptionalString(sysEnv.get('NF_NOMAD_ACCELERATOR_DEVICE_NAME'))
+                ?: 'nvidia/gpu'
 
         // Placement failure handling
         failOnPlacementFailure = nomadJobOpts.containsKey("failOnPlacementFailure") ?
@@ -253,5 +270,29 @@ class NomadJobOpts{
             return (Duration)value
         }
         return Duration.of(value.toString())
+    }
+
+    private static String parseCpuMode(Object value) {
+        String mode = sanitizeOptionalString(value)?.toLowerCase()
+        if( !mode ) {
+            return CPU_MODE_CORES
+        }
+        if( mode == CPU_MODE_CORES || mode == CPU_MODE_CPU ) {
+            return mode
+        }
+        throw new IllegalArgumentException("Invalid nomad.jobs.cpuMode value `${value}` -- expected `${CPU_MODE_CORES}` or `${CPU_MODE_CPU}`")
+    }
+
+    private static String parseCleanup(Object value, boolean deleteOnCompletion) {
+        String mode = sanitizeOptionalString(value)
+        if( !mode ) {
+            return deleteOnCompletion ? CLEANUP_ALWAYS : CLEANUP_NEVER
+        }
+
+        String normalized = mode.equalsIgnoreCase('onSuccess') ? CLEANUP_ON_SUCCESS : mode.toLowerCase()
+        if( normalized == CLEANUP_ALWAYS || normalized == CLEANUP_NEVER || normalized == CLEANUP_ON_SUCCESS ) {
+            return normalized
+        }
+        throw new IllegalArgumentException("Invalid nomad.jobs.cleanup value `${value}` -- expected `${CLEANUP_ALWAYS}`, `${CLEANUP_NEVER}` or `${CLEANUP_ON_SUCCESS}`")
     }
 }

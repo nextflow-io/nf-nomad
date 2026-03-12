@@ -114,6 +114,11 @@ process {
 
 If both `nomadOptions.<key>` and a legacy directive are present for the same process, `nomadOptions.<key>` wins for that key.
 If `nomadOptions.resources.memoryMax` is not set, it defaults to the task `memory` value.
+Global `nomad.jobs.cpuMode` controls default CPU mapping (`cores` or `cpu`) when process-level `resources.cpu/cores` is not set.
+When `nomad.jobs.acceleratorAutoDevice=true` (default), Nextflow `accelerator` requests are translated into Nomad `resources.device` using `nomad.jobs.acceleratorDeviceName`.
+Global `nomad.jobs.cleanup` supports `always`, `never`, and `onSuccess` policies and supersedes `deleteOnCompletion` when set.
+When Nomad reports memory-limit/OOM task events, nf-nomad surfaces an explicit out-of-memory error message to reduce generic exit-code ambiguity.
+Task traces now include Nomad metadata fields when available: `nomad_job_id`, `nomad_alloc_id`, `nomad_node_id`, `nomad_node_name`, and `nomad_datacenter`.
 
 ## Testing and debugging
 

@@ -24,7 +24,11 @@ nomad{
 
         namespace = 'nf-nomad'
         deleteOnCompletion = false
+        cleanup = 'onSuccess'             // always | never | onSuccess
         privileged = true
+        cpuMode = 'cores'                 // or 'cpu'
+        acceleratorAutoDevice = true      // map Nextflow accelerator directive to Nomad resources.device
+        acceleratorDeviceName = 'nvidia/gpu'
 
         volumes = [
               { type "host" name "scratchdir" },
@@ -69,10 +73,14 @@ nomad{
 === Jobs configuration
 
 - `deleteOnCompletion`: A boolean indicating if the job will be removed once completed
+- `cleanup`: Cleanup policy for completed jobs. Allowed values are `always`, `never`, and `onSuccess`. If omitted, it derives from `deleteOnCompletion` for backward compatibility.
 - `datacenters`: A list of datacenters for the job submission.
 - `region`: The region for job submission.
 - `namespace`: The namespace to be used for all Nextflow jobs.
 - `privileged`: Run Docker tasks in privileged mode (default `true`).
+- `cpuMode`: How task `cpus` maps to Nomad resources when process-level overrides are not set. Use `cores` (default) or `cpu`.
+- `acceleratorAutoDevice`: When `true` (default), map Nextflow `accelerator` requests to Nomad `resources.device` automatically.
+- `acceleratorDeviceName`: Device name to use for automatic accelerator mapping (default `nvidia/gpu`).
 - `volumeSpec`: The volumes which should be accessible to the jobs.
 - `affinitiesSpec`: The affinities which should be attached to the job spec.
 - `constraintsSpec`: The constraints which should be attached to the job spec.
@@ -81,6 +89,8 @@ nomad{
 - `restartAttempts`: Number of restart (on the same node) attempts for the generated jobs.
 - `failOnPlacementFailure`: A boolean flag to automatically fail jobs that cannot be placed on any node due to insufficient resources (default `false`). When enabled, jobs that remain unscheduled (have no node assignment) beyond the `placementFailureTimeout` threshold will be marked as failed instead of indefinitely waiting.
 - `placementFailureTimeout`: The time to wait before considering a job as failed due to placement failure (default `60s`). Supports Nextflow duration format: `20s`, `2m`, `5m`, `1h`, `2d`, etc. Can also be set via the `NF_NOMAD_PLACEMENT_FAILURE_TIMEOUT` environment variable.
+- Failed tasks include enriched Nomad state messages; memory/OOM signals from Nomad task events are surfaced explicitly when available.
+- Task traces include Nomad metadata when available: `nomad_job_id`, `nomad_alloc_id`, `nomad_node_id`, `nomad_node_name`, and `nomad_datacenter`.
 - `secretOpts`: The configuration for Nomad Secret Store.
 - `dockerVolume`, DEPRECATED
 - `affinitySpec`, DEPRECATED
@@ -115,6 +125,7 @@ The plugin supports process-level Nomad directives in two forms:
   - `cpu`: Nomad CPU shares (MHz) override
   - `cores`: Nomad CPU cores override
   - `device`: list of Nomad requested devices (e.g. GPUs)
+  - when `resources.device` is not set and `acceleratorAutoDevice` is enabled, Nextflow `accelerator` is mapped automatically
 
 [source,groovy]
 ----

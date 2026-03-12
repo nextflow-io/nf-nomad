@@ -38,6 +38,8 @@ import nextflow.nomad.models.JobConstraints
 import nextflow.nomad.models.JobSpreads
 import nextflow.nomad.models.JobVolume
 import nextflow.nomad.models.SpreadsBuilder
+import nextflow.executor.res.AcceleratorResource
+import nextflow.processor.TaskConfig
 import nextflow.processor.TaskRun
 import nextflow.util.Duration
 import nextflow.util.MemoryUnit
@@ -126,6 +128,10 @@ class JobBuilder {
     }
 
     static protected Resources getResources(TaskRun task) {
+        return getResources(task, null)
+    }
+
+    static protected Resources getResources(TaskRun task, NomadJobOpts jobOpts) {
         final DEFAULT_CPUS = 1
         final DEFAULT_MEMORY = "1.GB"
 
@@ -143,12 +149,25 @@ class JobBuilder {
         if( optionCpu != null ) {
             res.CPU(optionCpu)
         }
+        else if( optionCores != null ) {
+            res.cores(optionCores)
+        }
+        else if( (jobOpts?.cpuMode ?: NomadJobOpts.CPU_MODE_CORES) == NomadJobOpts.CPU_MODE_CPU ) {
+            res.CPU(taskCores * 1_000)
+        }
         else {
-            res.cores(optionCores ?: taskCores)
+            res.cores(taskCores)
         }
         final devices = resolveRequestedDevices(resourceOptions.get("device"))
         if( devices ) {
             res.devices(devices)
+        }
+        else if( jobOpts?.acceleratorAutoDevice ) {
+            final accelerator = resolveAccelerator(taskCfg)
+            final acceleratorDevice = resolveAcceleratorDevice(accelerator, jobOpts?.acceleratorDeviceName)
+            if( acceleratorDevice ) {
+                res.devices([acceleratorDevice])
+            }
         }
 
         return res
@@ -226,7 +245,7 @@ class JobBuilder {
 
         final imageName = task.container
         final workingDir = task.workDir.toAbsolutePath().toString()
-        final taskResources = getResources(task)
+        final taskResources = getResources(task, jobOpts)
 
 
         def taskDef = new Task(
@@ -478,6 +497,29 @@ class JobBuilder {
             }
         }
         return devices
+    }
+
+    static protected AcceleratorResource resolveAccelerator(Object taskConfig) {
+        if( taskConfig instanceof TaskConfig ) {
+            return (taskConfig as TaskConfig).getAccelerator()
+        }
+        return null
+    }
+
+    static protected RequestedDevice resolveAcceleratorDevice(AcceleratorResource accelerator, String defaultDeviceName) {
+        if( accelerator == null ) {
+            return null
+        }
+
+        Integer count = accelerator.request ?: accelerator.limit ?: 1
+        if( count <= 0 ) {
+            return null
+        }
+
+        String deviceName = defaultDeviceName ?: 'nvidia/gpu'
+        return new RequestedDevice()
+                .name(deviceName)
+                .count(count)
     }
 
     static protected RestartPolicy resolveRestartPolicy(TaskRun task, NomadJobOpts jobOpts) {

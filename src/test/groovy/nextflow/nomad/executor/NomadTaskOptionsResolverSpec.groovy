@@ -134,6 +134,36 @@ class NomadTaskOptionsResolverSpec extends Specification {
         thrown(IllegalArgumentException)
     }
 
+    void "should fail on unsupported nomadOptions resources keys"() {
+        given:
+        def task = taskWithConfig([
+                (TaskDirectives.NOMAD_OPTIONS): [
+                        resources: [unsupported: true]
+                ]
+        ])
+
+        when:
+        NomadTaskOptionsResolver.resources(task)
+
+        then:
+        thrown(IllegalArgumentException)
+    }
+
+    void "should fail on unsupported nomadOptions affinity keys"() {
+        given:
+        def task = taskWithConfig([
+                (TaskDirectives.NOMAD_OPTIONS): [
+                        affinity: [attribute: '${meta.gpu}', value: 'true', unsupported: true]
+                ]
+        ])
+
+        when:
+        NomadTaskOptionsResolver.affinity(task)
+
+        then:
+        thrown(IllegalArgumentException)
+    }
+
     void "should fail on unsupported nomadOptions keys"() {
         given:
         def task = taskWithConfig([

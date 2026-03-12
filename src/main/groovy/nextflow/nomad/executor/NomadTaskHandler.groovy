@@ -33,6 +33,7 @@ import nextflow.processor.TaskStatus
 import nextflow.trace.TraceRecord
 import nextflow.util.Escape
 import nextflow.SysEnv
+import org.codehaus.groovy.runtime.InvokerHelper
 import org.threeten.bp.OffsetDateTime
 
 import java.nio.file.Path
@@ -53,6 +54,11 @@ class NomadTaskHandler extends TaskHandler implements FusionAwareTask {
     private String jobName
 
     private String clientName = null
+    private String allocationId = null
+
+    private String nodeId = null
+
+    private String datacenter = null
 
     private TaskState state
 
@@ -145,11 +151,10 @@ class NomadTaskHandler extends TaskHandler implements FusionAwareTask {
             task.stderr = errorFile
             status = TaskStatus.COMPLETED
             if ( !state || state.failed ) {
-                task.error = new ProcessUnrecoverableException()
+                task.error = new ProcessUnrecoverableException(failureMessage(state, task.exitStatus as Integer))
                 task.aborted = true
             }
-
-            if (shouldDelete()) {
+            if (shouldDelete(state)) {
                 nomadService.jobPurge(this.jobName)
             }
 
@@ -264,17 +269,103 @@ class NomadTaskHandler extends TaskHandler implements FusionAwareTask {
         }
     }
 
-    private Boolean shouldDelete() {
-        config.jobOpts().deleteOnCompletion
+    protected Boolean shouldDelete(TaskState state) {
+        final cleanup = config.jobOpts().cleanup
+        if( cleanup == nextflow.nomad.config.NomadJobOpts.CLEANUP_ALWAYS ) {
+            return true
+        }
+        if( cleanup == nextflow.nomad.config.NomadJobOpts.CLEANUP_NEVER ) {
+            return false
+        }
+        if( cleanup == nextflow.nomad.config.NomadJobOpts.CLEANUP_ON_SUCCESS ) {
+            Integer exitStatus = task.exitStatus as Integer
+            return !(state?.failed ?: false) && exitStatus != null && exitStatus == 0
+        }
+        return config.jobOpts().deleteOnCompletion
     }
 
+    protected String failureMessage(TaskState state, Integer exitStatus) {
+        if( isOutOfMemoryFailure(state, exitStatus) ) {
+            return '[NOMAD] Task failed due to an out-of-memory condition. Increase process memory or review `nomadOptions.resources.memoryMax`.'
+        }
+
+        final stateName = state?.state ?: 'unknown'
+        final String exitPart = exitStatus != null && exitStatus != Integer.MAX_VALUE
+                ? " with exit status ${exitStatus}"
+                : ''
+        final String details = taskEventSummary(state)
+        return details
+                ? "[NOMAD] Task failed in Nomad state ${stateName}${exitPart}. ${details}"
+                : "[NOMAD] Task failed in Nomad state ${stateName}${exitPart}."
+    }
+
+    protected boolean isOutOfMemoryFailure(TaskState state, Integer exitStatus) {
+        final summary = taskEventSummary(state)?.toLowerCase()
+        final hasMemorySignal = summary && (
+                summary.contains('out of memory') ||
+                        summary.contains('oom') ||
+                        summary.contains('memory limit') ||
+                        summary.contains('memory exhausted') ||
+                        summary.contains('evict')
+        )
+        if( hasMemorySignal ) {
+            return true
+        }
+        return (exitStatus == 137 || exitStatus == 247) && summary?.contains('memory')
+    }
+
+    protected String taskEventSummary(TaskState state) {
+        List events = readListProperty(state, 'events')
+        if( !events ) {
+            return null
+        }
+        List<String> rendered = new ArrayList<>()
+        for( Object event : events ) {
+            String message = readStringProperty(event, 'displayMessage') ?: readStringProperty(event, 'message')
+            if( !message ) {
+                message = event?.toString()
+            }
+            if( message ) {
+                rendered.add(message.trim())
+            }
+        }
+        return rendered ? rendered.join(' | ') : null
+    }
+
+    private static List readListProperty(Object target, String property) {
+        try {
+            Object value = InvokerHelper.getProperty(target, property)
+            return value instanceof List ? (List)value : null
+        } catch (Throwable ignored) {
+            return null
+        }
+    }
+
+    private static String readStringProperty(Object target, String property) {
+        try {
+            String value = InvokerHelper.getProperty(target, property)?.toString()?.trim()
+            return value ?: null
+        } catch (Throwable ignored) {
+            return null
+        }
+    }
 
     private void determineClientNode(){
         try {
-            if ( !clientName )
-                clientName = nomadService.getClientOfJob( jobName )
+            if( !jobName ) {
+                return
+            }
+            if( !clientName || !allocationId || !nodeId || !datacenter ) {
+                Map<String, String> metadata = nomadService.getAllocationMetadata(jobName)
+                if( metadata ) {
+                    clientName = metadata.get('nodeName') ?: clientName
+                    allocationId = metadata.get('allocationId') ?: allocationId
+                    nodeId = metadata.get('nodeId') ?: nodeId
+                    datacenter = metadata.get('datacenter') ?: datacenter
+                }
+            }
             if (NomadLogging.isDebugEnabled()) {
-                log.info "[NOMAD] determineClientNode: jobName:$jobName ; clientName:$clientName"
+                log.info "[NOMAD] determineClientNode: jobName:$jobName ; clientName:$clientName ; allocationId:$allocationId ; nodeId:$nodeId ; datacenter:$datacenter"
             }
         } catch ( Exception e ){
             if (NomadLogging.isDebugEnabled()) {
@@ -284,9 +375,27 @@ class NomadTaskHandler extends TaskHandler implements FusionAwareTask {
     }
 
     TraceRecord getTraceRecord() {
+        if( jobName && (!clientName || !allocationId || !nodeId || !datacenter) ) {
+            determineClientNode()
+        }
         final result = super.getTraceRecord()
-        result.put('native_id', jobName)
-        result.put( 'hostname', clientName )
+        if( jobName ) {
+            result.put('native_id', jobName)
+            result.put('nomad_job_id', jobName)
+        }
+        if( clientName ) {
+            result.put('hostname', clientName)
+            result.put('nomad_node_name', clientName)
+        }
+        if( allocationId ) {
+            result.put('nomad_alloc_id', allocationId)
+        }
+        if( nodeId ) {
+            result.put('nomad_node_id', nodeId)
+        }
+        if( datacenter ) {
+            result.put('nomad_datacenter', datacenter)
+        }
         return result
     }
 
