@@ -19,6 +19,8 @@ package nextflow.nomad.executor
 
 import groovy.transform.CompileStatic
 import groovy.util.logging.Slf4j
+import groovy.json.JsonOutput
+import groovy.json.JsonSlurper
 import io.nomadproject.client.ApiClient
 import io.nomadproject.client.ApiException
 import io.nomadproject.client.api.JobsApi
@@ -31,6 +33,7 @@ import nextflow.processor.TaskRun
 import nextflow.exception.ProcessSubmitException
 import org.codehaus.groovy.runtime.InvokerHelper
 import org.threeten.bp.OffsetDateTime
+import java.nio.file.Files
 
 import java.nio.file.Path
 import java.util.concurrent.TimeoutException
@@ -124,10 +127,17 @@ class NomadService implements Closeable{
         JobRegisterRequest jobRegisterRequest = new JobRegisterRequest()
         jobRegisterRequest.setJob(job)
 
-        if (saveJsonPath) try {
-            saveJsonPath.text = job.toString()
-        } catch (Exception e) {
-            log.debug "WARN: unable to save request json -- cause: ${e.message ?: e}"
+        if (saveJsonPath) {
+            writeDebugDump(saveJsonPath, [
+                    nomad_job_id    : id,
+                    nomad_alloc_id  : null,
+                    nomad_node_id   : null,
+                    nomad_node_name : null,
+                    nomad_datacenter: null,
+                    task_name       : task.name,
+                    generated_at    : OffsetDateTime.now().toString(),
+                    job_spec        : job.toString()
+            ])
         }
 
         try {
@@ -172,6 +182,50 @@ class NomadService implements Closeable{
             }
         }
         lastSubmitAt = System.currentTimeMillis()
+    }
+
+    void writeDebugMetadata(Path saveJsonPath, Map<String, ?> metadata) {
+        if( saveJsonPath == null || metadata == null || metadata.isEmpty() ) {
+            return
+        }
+        Map<String, Object> payload = readDebugDump(saveJsonPath)
+        payload.putAll(metadata.collectEntries { k, v -> [(k?.toString()): v] } as Map<String, Object>)
+        writeDebugDump(saveJsonPath, payload)
+    }
+
+    protected Map<String, Object> readDebugDump(Path saveJsonPath) {
+        if( saveJsonPath == null || !Files.exists(saveJsonPath) ) {
+            return new LinkedHashMap<>()
+        }
+        String content = saveJsonPath.text
+        if( !content?.trim() ) {
+            return new LinkedHashMap<>()
+        }
+        try {
+            def parsed = new JsonSlurper().parseText(content)
+            if( parsed instanceof Map ) {
+                return new LinkedHashMap<>((Map<String, Object>)parsed)
+            }
+        }
+        catch (Exception ignored) {
+            // fallback to preserving previous content as raw spec text
+        }
+        return new LinkedHashMap<>([job_spec: content])
+    }
+
+    protected void writeDebugDump(Path saveJsonPath, Map<String, Object> payload) {
+        if( saveJsonPath == null ) {
+            return
+        }
+        try {
+            if( saveJsonPath.parent ) {
+                Files.createDirectories(saveJsonPath.parent)
+            }
+            saveJsonPath.text = JsonOutput.prettyPrint(JsonOutput.toJson(payload ?: Collections.emptyMap()))
+        }
+        catch (Exception e) {
+            log.debug "WARN: unable to save request json -- cause: ${e.message ?: e}"
+        }
     }
 
     private static TaskState stateFromAllocation(AllocationListStub allocation) {

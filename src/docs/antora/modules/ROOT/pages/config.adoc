@@ -93,7 +93,7 @@ nomad{
 - `pollInterval`: Frequency for polling Nomad task state updates (default `1s`). Can also be set via `NF_NOMAD_POLL_INTERVAL`.
 - `submitThrottle`: Minimum delay between Nomad job submissions (default `0s`). Can be set via `NF_NOMAD_SUBMIT_THROTTLE` to reduce API bursts.
 - Failed tasks include enriched Nomad state messages; memory/OOM signals from Nomad task events are surfaced explicitly when available.
-- Task traces include Nomad metadata when available: `nomad_job_id`, `nomad_alloc_id`, `nomad_node_id`, `nomad_node_name`, and `nomad_datacenter`.
+- When debug JSON dumping is enabled (`nomad.debug.json` or `nomad.debug.path`), dumped job JSON files include Nomad metadata fields: `nomad_job_id`, `nomad_alloc_id`, `nomad_node_id`, `nomad_node_name`, and `nomad_datacenter`.
 - Failure messages include Nomad inspection hints (job/allocation/node identifiers and allocation API URL when available).
 - `secretOpts`: The configuration for Nomad Secret Store.
 - `dockerVolume`, DEPRECATED

@@ -193,6 +193,7 @@ class NomadTaskHandler extends TaskHandler implements FusionAwareTask {
         final taskLauncher = getSubmitCommand(task)
         final taskEnv = getEnv(task)
         nomadService.submitTask(this.jobName, task, taskLauncher, taskEnv, debugPath())
+        writeDebugMetadataSnapshot()
 
         // Record submission time for placement failure detection
         this.submissionTime = System.currentTimeMillis()
@@ -408,6 +409,7 @@ class NomadTaskHandler extends TaskHandler implements FusionAwareTask {
                     datacenter = metadata.get('datacenter') ?: datacenter
                 }
             }
+            writeDebugMetadataSnapshot()
             if (NomadLogging.isDebugEnabled()) {
                 log.info "[NOMAD] determineClientNode: jobName:$jobName ; clientName:$clientName ; allocationId:$allocationId ; nodeId:$nodeId ; datacenter:$datacenter"
             }
@@ -425,22 +427,25 @@ class NomadTaskHandler extends TaskHandler implements FusionAwareTask {
         final result = super.getTraceRecord()
         if( jobName ) {
             result.put('native_id', jobName)
-            result.put('nomad_job_id', jobName)
         }
         if( clientName ) {
             result.put('hostname', clientName)
-            result.put('nomad_node_name', clientName)
-        }
-        if( allocationId ) {
-            result.put('nomad_alloc_id', allocationId)
-        }
-        if( nodeId ) {
-            result.put('nomad_node_id', nodeId)
-        }
-        if( datacenter ) {
-            result.put('nomad_datacenter', datacenter)
         }
         return result
+    }
+
+    protected void writeDebugMetadataSnapshot() {
+        Path dumpPath = debugPath()
+        if( dumpPath == null || !jobName ) {
+            return
+        }
+        nomadService.writeDebugMetadata(dumpPath, [
+                nomad_job_id    : jobName,
+                nomad_alloc_id  : allocationId,
+                nomad_node_id   : nodeId,
+                nomad_node_name : clientName,
+                nomad_datacenter: datacenter
+        ])
     }
 
     void updateTimestamps(OffsetDateTime start, OffsetDateTime end){

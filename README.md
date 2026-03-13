@@ -120,7 +120,7 @@ Global `nomad.jobs.cpuMode` controls default CPU mapping (`cores` or `cpu`) when
 When `nomad.jobs.acceleratorAutoDevice=true` (default), Nextflow `accelerator` requests are translated into Nomad `resources.device` using `nomad.jobs.acceleratorDeviceName`.
 Global `nomad.jobs.cleanup` supports `always`, `never`, and `onSuccess` policies and supersedes `deleteOnCompletion` when set.
 When Nomad reports memory-limit/OOM task events, nf-nomad surfaces an explicit out-of-memory error message to reduce generic exit-code ambiguity.
-Task traces now include Nomad metadata fields when available: `nomad_job_id`, `nomad_alloc_id`, `nomad_node_id`, `nomad_node_name`, and `nomad_datacenter`.
+When `nomad.debug.json`/`nomad.debug.path` is enabled, Nomad metadata fields are persisted in dumped job JSON files: `nomad_job_id`, `nomad_alloc_id`, `nomad_node_id`, `nomad_node_name`, and `nomad_datacenter`.
 Task failure messages include Nomad inspection hints (job/allocation/node identifiers and allocation API URL when available).
 Global `nomad.jobs.pollInterval` controls task-state polling frequency (default `1s`) and can reduce Nomad API pressure for large workloads.
 Global `nomad.jobs.submitThrottle` enforces a minimum delay between Nomad job submissions (default `0s`) to smooth API load during large bursts.

@@ -209,6 +209,44 @@ class NomadTaskHandlerSpec extends Specification{
         message.contains('/allocation/alloc-789')
     }
 
+
+    void "should write nomad metadata to debug dump when enabled"() {
+        given:
+        Path workDir = Path.of('/tmp/nf-debug-work')
+        def task = Mock(TaskRun) {
+            getWorkDir() >> workDir
+            getConfig() >> [tag: null]
+            getProcessor() >> Mock(TaskProcessor)
+        }
+        def debugCfg = new NomadConfig.NomadDebug([json: true, path: 'debug/job-spec.json'])
+        def config = Mock(NomadConfig) {
+            debug() >> debugCfg
+        }
+        def service = Mock(NomadService) {
+            getAllocationMetadata('job-123') >> [
+                    allocationId: 'alloc-789',
+                    nodeId: 'node-456',
+                    nodeName: 'worker-a',
+                    datacenter: 'dc-west'
+            ]
+        }
+        def handler = new NomadTaskHandler(task, config, service)
+        setPrivateField(handler, 'jobName', 'job-123')
+
+        when:
+        invokePrivateMethod(handler, 'determineClientNode')
+
+        then:
+        1 * service.writeDebugMetadata(workDir.resolve('debug/job-spec.json'), {
+            Map payload ->
+                payload.nomad_job_id == 'job-123' &&
+                        payload.nomad_alloc_id == 'alloc-789' &&
+                        payload.nomad_node_id == 'node-456' &&
+                        payload.nomad_node_name == 'worker-a' &&
+                        payload.nomad_datacenter == 'dc-west'
+        })
+    }
+
     void "should respect configured poll interval when fetching task state"() {
         given:
         def opts = Stub(NomadJobOpts) {
