@@ -83,6 +83,46 @@ class NomadConfigSpec extends Specification {
         config.clientOpts.token == "theToken"
     }
 
+    void "should use client pollInterval and submitThrottle if provided"() {
+        given:
+        def config = new NomadConfig([
+                client: [
+                        address: "http://nomad",
+                        pollInterval: '2500ms',
+                        submitThrottle: '750ms'
+                ]
+        ])
+
+        expect:
+        config.clientOpts.pollInterval.millis == 2_500L
+        config.clientOpts.submitThrottle.millis == 750L
+    }
+
+    void "should derive client pollInterval and submitThrottle from environment variables"() {
+        given:
+        def config = new NomadConfig([
+                client: [address: "http://nomad"]
+        ], [
+                NF_NOMAD_POLL_INTERVAL: '3s',
+                NF_NOMAD_SUBMIT_THROTTLE: '2s'
+        ])
+
+        expect:
+        config.clientOpts.pollInterval.millis == 3_000L
+        config.clientOpts.submitThrottle.millis == 2_000L
+    }
+
+    void "should default client pollInterval and submitThrottle when absent"() {
+        given:
+        def config = new NomadConfig([
+                client: [address: "http://nomad"]
+        ])
+
+        expect:
+        config.clientOpts.pollInterval.millis == 1_000L
+        config.clientOpts.submitThrottle.millis == 0L
+    }
+
     void "should use the NOMAD_DC variable if no datacenters are provided"() {
         given:
         def config = new NomadConfig([

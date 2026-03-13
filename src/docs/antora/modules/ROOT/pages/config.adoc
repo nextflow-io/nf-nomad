@@ -12,6 +12,8 @@ nomad{
         connectionTimeout = 6000
         readTimeout = 6000
         writeTimeout = 6000
+        pollInterval = '1s'
+        submitThrottle = '100ms'
         retryConfig = {
             delay = 500
             maxDelay = 90
@@ -64,11 +66,14 @@ nomad{
 - `connectionTimeout`: The maximum time to wait before giving up on establishing a connection with the cluster (default `6000` ms).
 - `readTimeout`: The maximum time to wait before indicating inability to read from the connection (default `6000` ms).
 - `writeTimeout`: The maximum time to wait before indicating inability to write to the connection (default `6000` ms).
+- `pollInterval`: Frequency for polling Nomad task state updates (default `1s`). Can also be set via `NF_NOMAD_POLL_INTERVAL`.
+- `submitThrottle`: Minimum delay between Nomad job submissions (default `0s`). Can be set via `NF_NOMAD_SUBMIT_THROTTLE` to reduce API bursts.
 - `retryConfig.delay`:  Delay when retrying failed API requests (default: 500ms).
 - `retryConfig.jitter`: Jitter value when retrying failed API requests (default: 0.25)
 - `retryConfig.maxAttempts`: Max attempts when retrying failed API requests (default: 10)
 - `retryConfig.maxDelay`: Max delay when retrying failed API requests (default: 90s)
 - Retries apply to transient failures (`408`, `429`, `5xx`, IO errors, and timeouts).
+- `retryConfig` and `submitThrottle` are complementary: `retryConfig` applies after request failures, while `submitThrottle` proactively spaces out new submissions.
 
 
 === Jobs configuration
@@ -90,8 +95,6 @@ nomad{
 - `restartAttempts`: Number of restart (on the same node) attempts for the generated jobs.
 - `failOnPlacementFailure`: A boolean flag to automatically fail jobs that cannot be placed on any node due to insufficient resources (default `false`). When enabled, jobs that remain unscheduled (have no node assignment) beyond the `placementFailureTimeout` threshold will be marked as failed instead of indefinitely waiting.
 - `placementFailureTimeout`: The time to wait before considering a job as failed due to placement failure (default `60s`). Supports Nextflow duration format: `20s`, `2m`, `5m`, `1h`, `2d`, etc. Can also be set via the `NF_NOMAD_PLACEMENT_FAILURE_TIMEOUT` environment variable.
-- `pollInterval`: Frequency for polling Nomad task state updates (default `1s`). Can also be set via `NF_NOMAD_POLL_INTERVAL`.
-- `submitThrottle`: Minimum delay between Nomad job submissions (default `0s`). Can be set via `NF_NOMAD_SUBMIT_THROTTLE` to reduce API bursts.
 - Failed tasks include enriched Nomad state messages; memory/OOM signals from Nomad task events are surfaced explicitly when available.
 - When debug JSON dumping is enabled (`nomad.debug.json` or `nomad.debug.path`), dumped job JSON files include Nomad metadata fields: `nomad_job_id`, `nomad_alloc_id`, `nomad_node_id`, `nomad_node_name`, and `nomad_datacenter`.
 - Failure messages include Nomad inspection hints (job/allocation/node identifiers and allocation API URL when available).
@@ -108,7 +111,6 @@ The plugin supports process-level Nomad directives in two forms:
   - `constraints`
   - `secret`
   - `spread`
-  - `priority`
 - Preferred map-based directive:
   - `nomadOptions`
 

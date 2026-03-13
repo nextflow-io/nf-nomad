@@ -87,7 +87,7 @@ nomad {
 
 ## Process-level Nomad options
 
-Process directives support both legacy keys (`datacenters`, `constraints`, `secret`, `spread`, `priority`) and the preferred map-based `nomadOptions` directive:
+Process directives support both legacy keys (`datacenters`, `constraints`, `secret`, `spread`) and the preferred map-based `nomadOptions` directive:
 
 ```groovy
 process {
@@ -122,8 +122,9 @@ Global `nomad.jobs.cleanup` supports `always`, `never`, and `onSuccess` policies
 When Nomad reports memory-limit/OOM task events, nf-nomad surfaces an explicit out-of-memory error message to reduce generic exit-code ambiguity.
 When `nomad.debug.json`/`nomad.debug.path` is enabled, Nomad metadata fields are persisted in dumped job JSON files: `nomad_job_id`, `nomad_alloc_id`, `nomad_node_id`, `nomad_node_name`, and `nomad_datacenter`.
 Task failure messages include Nomad inspection hints (job/allocation/node identifiers and allocation API URL when available).
-Global `nomad.jobs.pollInterval` controls task-state polling frequency (default `1s`) and can reduce Nomad API pressure for large workloads.
-Global `nomad.jobs.submitThrottle` enforces a minimum delay between Nomad job submissions (default `0s`) to smooth API load during large bursts.
+Global `nomad.client.pollInterval` controls task-state polling frequency (default `1s`) and can reduce Nomad API pressure for large workloads.
+Global `nomad.client.submitThrottle` enforces a minimum delay between Nomad job submissions (default `0s`) to smooth API load during large bursts.
+`nomad.client.retryConfig` and `nomad.client.submitThrottle` are complementary: retries/backoff handle failed requests, while submit throttling proactively spaces out new submissions.
 Process-level `nomadOptions.volumes` can add additional safe volume mounts without exposing arbitrary driver config.
 When global and process volume specs are merged, only one `workDir` volume is allowed and `readOnly` is preserved on generated task mounts.
 Process-level `nomadOptions.secretsPath` overrides `nomad.jobs.secrets.path` for that process only.

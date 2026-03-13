@@ -56,6 +56,7 @@ class NomadConfig {
 
     NomadDebug debug() { debug }
 
+
     static class NomadDebug {
 
         @Delegate

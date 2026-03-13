@@ -67,8 +67,6 @@ class NomadJobOpts{
     String acceleratorDeviceName
     Boolean failOnPlacementFailure
     Duration placementFailureTimeout
-    Duration pollInterval
-    Duration submitThrottle
 
     NomadSecretOpts secretOpts
 
@@ -137,23 +135,6 @@ class NomadJobOpts{
             placementFailureTimeout = Duration.of('60s')
         }
 
-        def pollValue = nomadJobOpts.get('pollInterval') ?: sysEnv.get('NF_NOMAD_POLL_INTERVAL')
-        if( pollValue ) {
-            pollInterval = pollValue instanceof Duration
-                    ? (pollValue as Duration)
-                    : Duration.of(pollValue.toString())
-        } else {
-            pollInterval = Duration.of('1s')
-        }
-
-        def submitThrottleValue = nomadJobOpts.get('submitThrottle') ?: sysEnv.get('NF_NOMAD_SUBMIT_THROTTLE')
-        if( submitThrottleValue ) {
-            submitThrottle = submitThrottleValue instanceof Duration
-                    ? (submitThrottleValue as Duration)
-                    : Duration.of(submitThrottleValue.toString())
-        } else {
-            submitThrottle = Duration.of('0s')
-        }
 
         dockerVolume = nomadJobOpts.dockerVolume ?: null
         if( dockerVolume ){

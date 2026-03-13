@@ -248,7 +248,7 @@ class NomadTaskHandler extends TaskHandler implements FusionAwareTask {
     protected TaskState taskState0() {
         final now = System.currentTimeMillis()
         final delta = now - timestamp
-        final long pollMillis = config?.jobOpts()?.pollInterval?.millis ?: 1_000L
+        final long pollMillis = config?.clientOpts()?.pollInterval?.millis ?: 1_000L
         if (!status || delta >= pollMillis) {
 
             def newState = nomadService.getTaskState(jobName)

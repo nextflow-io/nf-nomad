@@ -150,7 +150,7 @@ class NomadTaskOptionsResolver {
     }
 
     static Object priority(TaskRun task) {
-        return getOption(task, PRIORITY, TaskDirectives.PRIORITY)
+        return getNomadOptions(task).get(PRIORITY)
     }
     static Object namespace(TaskRun task) {
         return getNomadOptions(task).get(NAMESPACE)

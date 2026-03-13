@@ -18,6 +18,7 @@ class NomadTaskOptionsResolverSpec extends Specification {
                         secrets    : ['NEW_ONE', 'NEW_TWO'],
                         secretsPath: 'secret/process-path',
                         spread     : [name: 'node.class', weight: 10],
+                        priority   : 'low',
                         affinity   : [attribute: '${meta.workload}', operator: '=', value: 'batch', weight: 10],
                         volumes    : [[type: 'host', name: 'ref', path: '/ref', readOnly: true]],
                         resources  : [memoryMax: '4 GB'],
@@ -32,8 +33,7 @@ class NomadTaskOptionsResolverSpec extends Specification {
                 (TaskDirectives.DATACENTERS)  : ['dc-legacy'],
                 (TaskDirectives.CONSTRAINTS)  : legacyConstraints,
                 (TaskDirectives.SECRETS)      : ['LEGACY_SECRET'],
-                (TaskDirectives.SPREAD)       : [name: 'legacy.attr', weight: 50],
-                (TaskDirectives.PRIORITY)     : 'low'
+                (TaskDirectives.SPREAD)       : [name: 'legacy.attr', weight: 50]
         ])
 
         expect:
@@ -53,11 +53,11 @@ class NomadTaskOptionsResolverSpec extends Specification {
         NomadTaskOptionsResolver.shutdownDelay(task) == '15s'
     }
 
-    void "should prefer nomadOptions priority over legacy priority"() {
+    void "should resolve priority from nomadOptions only"() {
         given:
         def task = taskWithConfig([
                 (TaskDirectives.NOMAD_OPTIONS): [priority: 'critical'],
-                (TaskDirectives.PRIORITY)     : 'low'
+                'priority'                    : 'low'
         ])
 
         expect:
@@ -72,7 +72,7 @@ class NomadTaskOptionsResolverSpec extends Specification {
                 (TaskDirectives.CONSTRAINTS)  : legacyConstraints,
                 (TaskDirectives.SECRETS)      : ['LEGACY_SECRET'],
                 (TaskDirectives.SPREAD)       : [name: 'legacy.attr', weight: 50],
-                (TaskDirectives.PRIORITY)     : 'high'
+                'priority'                    : 'high'
         ])
 
         expect:
@@ -80,7 +80,7 @@ class NomadTaskOptionsResolverSpec extends Specification {
         NomadTaskOptionsResolver.constraints(task) == legacyConstraints
         NomadTaskOptionsResolver.secrets(task) == ['LEGACY_SECRET']
         NomadTaskOptionsResolver.spread(task) == [name: 'legacy.attr', weight: 50]
-        NomadTaskOptionsResolver.priority(task) == 'high'
+        NomadTaskOptionsResolver.priority(task) == null
     }
 
     void "should fail on non-map nomadOptions"() {

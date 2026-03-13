@@ -165,7 +165,7 @@ class NomadService implements Closeable{
     }
 
     protected synchronized void applySubmitThrottle() {
-        final long throttle = config.jobOpts().submitThrottle?.millis ?: 0L
+        final long throttle = config.clientOpts().submitThrottle?.millis ?: 0L
         if( throttle <= 0L ) {
             return
         }

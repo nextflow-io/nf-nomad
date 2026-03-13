@@ -22,6 +22,7 @@ import nextflow.exception.ProcessException
 import nextflow.exception.ProcessSubmitException
 import nextflow.exception.ProcessUnrecoverableException
 import nextflow.executor.Executor
+import nextflow.nomad.config.NomadClientOpts
 import nextflow.nomad.config.NomadConfig
 import nextflow.nomad.config.NomadJobOpts
 import nextflow.processor.*
@@ -249,13 +250,11 @@ class NomadTaskHandlerSpec extends Specification{
 
     void "should respect configured poll interval when fetching task state"() {
         given:
-        def opts = Stub(NomadJobOpts) {
-            getCleanup() >> NomadJobOpts.CLEANUP_ALWAYS
-            getDeleteOnCompletion() >> true
+        def opts = Stub(NomadClientOpts) {
             getPollInterval() >> Duration.of('10s')
         }
         def config = Mock(NomadConfig) {
-            jobOpts() >> opts
+            clientOpts() >> opts
         }
         def service = Mock(NomadService) {
             1 * getTaskState('job-123') >> new TaskState(state: 'running', failed: false)

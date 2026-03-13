@@ -18,6 +18,7 @@ package nextflow.nomad.config
 
 import groovy.transform.CompileStatic
 import groovy.util.logging.Slf4j
+import nextflow.util.Duration
 
 
 /**
@@ -39,6 +40,8 @@ class NomadClientOpts{
 
     final int readTimeout
     final int writeTimeout
+    final Duration pollInterval
+    final Duration submitThrottle
 
     final RetryConfig retryConfig
 
@@ -60,6 +63,23 @@ class NomadClientOpts{
         this.connectionTimeout = (nomadClientOpts.connectionTimeout ?: 6000 ) as Integer
         this.readTimeout = (nomadClientOpts.readTimeout ?: 6000 ) as Integer
         this.writeTimeout = (nomadClientOpts.writeTimeout ?: 6000 ) as Integer
+        def pollValue = nomadClientOpts.get('pollInterval') ?: sysEnv.get('NF_NOMAD_POLL_INTERVAL')
+        if( pollValue ) {
+            this.pollInterval = pollValue instanceof Duration
+                    ? (pollValue as Duration)
+                    : Duration.of(pollValue.toString())
+        } else {
+            this.pollInterval = Duration.of('1s')
+        }
+
+        def submitThrottleValue = nomadClientOpts.get('submitThrottle') ?: sysEnv.get('NF_NOMAD_SUBMIT_THROTTLE')
+        if( submitThrottleValue ) {
+            this.submitThrottle = submitThrottleValue instanceof Duration
+                    ? (submitThrottleValue as Duration)
+                    : Duration.of(submitThrottleValue.toString())
+        } else {
+            this.submitThrottle = Duration.of('0s')
+        }
 
         this.retryConfig = new RetryConfig(nomadClientOpts.retryConfig as Map ?: Collections.emptyMap())
 

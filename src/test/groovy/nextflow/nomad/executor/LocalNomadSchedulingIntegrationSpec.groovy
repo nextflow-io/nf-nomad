@@ -448,7 +448,7 @@ class LocalNomadSchedulingIntegrationSpec extends Specification {
         noExceptionThrown()
     }
 
-    void "should submit a job with process priority directive"() {
+    void "should submit a job with nomadOptions priority"() {
         given:
         def jobId = "directive-priority-${System.currentTimeMillis()}"
         submittedJobIds.add(jobId)
@@ -464,8 +464,7 @@ class LocalNomadSchedulingIntegrationSpec extends Specification {
                     isFusionEnabled() >> false
                 }
                 getConfig() >> Mock(ProcessConfig) {
-                    get(TaskDirectives.PRIORITY) >> "high"
-                    get(TaskDirectives.NOMAD_OPTIONS) >> null
+                    get(TaskDirectives.NOMAD_OPTIONS) >> [priority: "high"]
                 }
             }
             toTaskBean()   >> Mock(TaskBean) {
@@ -491,7 +490,7 @@ class LocalNomadSchedulingIntegrationSpec extends Specification {
         submittedJob.getPriority() == 80
     }
 
-    void "should prefer nomadOptions priority over process priority directive"() {
+    void "should submit a job with nomadOptions low priority"() {
         given:
         def jobId = "nomad-options-priority-${System.currentTimeMillis()}"
         submittedJobIds.add(jobId)
@@ -507,7 +506,6 @@ class LocalNomadSchedulingIntegrationSpec extends Specification {
                     isFusionEnabled() >> false
                 }
                 getConfig() >> Mock(ProcessConfig) {
-                    get(TaskDirectives.PRIORITY) >> "critical"
                     get(TaskDirectives.NOMAD_OPTIONS) >> [priority: "low"]
                 }
             }
@@ -534,7 +532,7 @@ class LocalNomadSchedulingIntegrationSpec extends Specification {
         submittedJob.getPriority() == 30
     }
 
-    void "should submit a job with custom numeric process priority directive"() {
+    void "should submit a job with custom numeric nomadOptions priority"() {
         given:
         def jobId = "custom-directive-priority-${System.currentTimeMillis()}"
         submittedJobIds.add(jobId)
@@ -550,8 +548,7 @@ class LocalNomadSchedulingIntegrationSpec extends Specification {
                     isFusionEnabled() >> false
                 }
                 getConfig() >> Mock(ProcessConfig) {
-                    get(TaskDirectives.PRIORITY) >> "67"
-                    get(TaskDirectives.NOMAD_OPTIONS) >> null
+                    get(TaskDirectives.NOMAD_OPTIONS) >> [priority: "67"]
                 }
             }
             toTaskBean()   >> Mock(TaskBean) {
@@ -593,7 +590,6 @@ class LocalNomadSchedulingIntegrationSpec extends Specification {
                     isFusionEnabled() >> false
                 }
                 getConfig() >> Mock(ProcessConfig) {
-                    get(TaskDirectives.PRIORITY) >> "high"
                     get(TaskDirectives.NOMAD_OPTIONS) >> [priority: "73"]
                 }
             }
