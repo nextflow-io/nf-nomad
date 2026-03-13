@@ -20,3 +20,4 @@ oracle-nomad-cluster
 /src/e2e/.nf-test.log
 /.CLAUDE.md
 /results
+/validation/local-nomadlab/runs

@@ -7,6 +7,12 @@ else
 mm =
 endif
 
+NOMAD_ADDR ?= http://localhost:4646
+NF_NOMAD_LOCAL_NOMAD_ADDR ?= http://localhost:4646
+NF_NOMAD_LOCAL_STACK_DIR ?= ${CURDIR}/../../infrastructure/03_automation/035_terraform/local-nomad-minio
+NF_NOMAD_LOCAL_WORK_DIR ?= ${NF_NOMAD_LOCAL_STACK_DIR}/work
+INTEGRATION_ARGS ?=
+
 #
 # Clean, compile, package and install targets
 #
@@ -99,6 +105,12 @@ test-local:
 
 test-oci:
 	./gradlew ${mm}test -PtestEnv=oci
+test-integration:
+	NOMAD_ADDR=${NF_NOMAD_LOCAL_NOMAD_ADDR} \
+	NF_NOMAD_LOCAL_NOMAD_ADDR=${NF_NOMAD_LOCAL_NOMAD_ADDR} \
+	NF_NOMAD_LOCAL_STACK_DIR=${NF_NOMAD_LOCAL_STACK_DIR} \
+	NF_NOMAD_LOCAL_WORK_DIR=${NF_NOMAD_LOCAL_WORK_DIR} \
+	./validation/run-integration.sh --build ${INTEGRATION_ARGS}
 
 
 
@@ -160,6 +172,7 @@ help:
 	@echo "  make test-mock          - Run unit + mock tests"
 	@echo "  make test-local         - Run unit + local integration tests"
 	@echo "  make test-oci           - Run unit + OCI integration tests"
+	@echo "  make test-integration   - Run local real-pipeline integration suite (hello + demo + rnaseq)"
 	@echo ""
 	@echo "Other Targets:"
 	@echo "  make check              - Run all checks (compile + tests)"
@@ -174,6 +187,8 @@ help:
 	@echo "Examples:"
 	@echo "  make install-dev                  # Install development version"
 	@echo "  make test-local                   # Run local integration tests"
+	@echo "  make test-integration             # Run real pipeline integration suite"
+	@echo "  make test-integration INTEGRATION_ARGS='--skip-rnaseq'   # Faster local smoke run"
 	@echo "  make dev-setup                    # Setup dev environment with instructions"
 	@echo "  make test class=MyTestClass       # Run specific test class"
 	@echo ""
