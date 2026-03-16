@@ -438,4 +438,35 @@ class NomadTaskHandlerSpec extends Specification{
         }
         throw new NoSuchFieldException(field)
     }
+
+    void "should fallback to task event exit code when exit file is empty"() {
+        given:
+        def workDir = Files.createTempDirectory("nf")
+        def exitFile = workDir.resolve(TaskRun.CMD_EXIT)
+        exitFile.text = "   " // empty/blank exit file
+
+        def task = Mock(TaskRun) {
+            getWorkDir() >> workDir
+            getConfig() >> [tag: null]
+            getProcessor() >> Mock(TaskProcessor)
+            getName() >> "test_task"
+        }
+        def config = configWithCleanup(NomadJobOpts.CLEANUP_NEVER, false)
+        def handler = new NomadTaskHandler(task, config, Mock(NomadService))
+
+        // create state with exitCode in events
+        def state = new TaskState(
+            state: 'dead',
+            events: [
+                [type: 'Terminated', exitCode: 143, displayMessage: 'OOM Killed']
+            ]
+        )
+        setPrivateField(handler, 'state', state)
+
+        when:
+        int exitStatus = handler.defineExitCode()
+
+        then:
+        exitStatus == 143
+    }
 }
