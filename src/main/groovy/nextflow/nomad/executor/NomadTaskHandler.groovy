@@ -145,7 +145,7 @@ class NomadTaskHandler extends TaskHandler implements FusionAwareTask {
         // if a state exists, include an array of states to determine task status
         if( state?.state && ( ["dead","complete","failed","lost"].contains(state.state))){
             // finalize the task
-            task.exitStatus = readExitFile()
+            task.exitStatus = defineExitCode()
             task.stdout = outputFile
             task.stderr = errorFile
             status = TaskStatus.COMPLETED
@@ -264,14 +264,36 @@ class NomadTaskHandler extends TaskHandler implements FusionAwareTask {
         return state
     }
 
-    protected int readExitFile() {
+    protected int defineExitCode() {
         try {
-            exitFile.text as Integer
+            def text = exitFile?.text?.trim()
+            if (text) {
+                return text as Integer
+            }
         }
         catch (Exception e) {
-            log.warn "[NOMAD] Cannot read exit status for task: `$task.name` | ${e.message}"
-            return Integer.MAX_VALUE
+            log.debug "[NOMAD] Cannot read exit status from file for task: `$task.name` | ${e.message}"
         }
+
+        try {
+            if (state) {
+                List events = readListProperty(state, 'events')
+                if (events) {
+                    for (Object event : events) {
+                        def exitCode = readStringProperty(event, 'exitCode')
+                        if (exitCode != null && exitCode.isInteger()) {
+                            return exitCode as Integer
+                        }
+                    }
+                }
+            }
+        }
+        catch (Exception e) {
+            log.debug "[NOMAD] Cannot read exit status from task events for task: `$task.name` | ${e.message}"
+        }
+
+        log.warn "[NOMAD] Cannot determine exit status for task: `$task.name`"
+        return Integer.MAX_VALUE
     }
 
     protected Boolean shouldDelete(TaskState state) {
