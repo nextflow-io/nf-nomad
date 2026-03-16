@@ -35,6 +35,76 @@ class NomadJobOptsSpec extends Specification {
         nomadJobOpts.rescheduleAttempts == 1
         nomadJobOpts.restartAttempts == 1
         nomadJobOpts.dockerVolume == null
+        nomadJobOpts.cpuMode == NomadJobOpts.CPU_MODE_CORES
+        nomadJobOpts.acceleratorAutoDevice == true
+        nomadJobOpts.acceleratorDeviceName == 'nvidia/gpu'
+    }
+
+    def "test cpuMode can be set to cpu"() {
+        given:
+        def nomadJobOpts = new NomadJobOpts([cpuMode: 'cpu'])
+
+        expect:
+        nomadJobOpts.cpuMode == NomadJobOpts.CPU_MODE_CPU
+    }
+
+    def "test cpuMode can be set from environment variable"() {
+        given:
+        def env = ['NF_NOMAD_CPU_MODE': 'cpu']
+        def nomadJobOpts = new NomadJobOpts([:], env)
+
+        expect:
+        nomadJobOpts.cpuMode == NomadJobOpts.CPU_MODE_CPU
+    }
+
+    def "test invalid cpuMode should fail"() {
+        when:
+        new NomadJobOpts([cpuMode: 'invalid'])
+
+        then:
+        thrown(IllegalArgumentException)
+    }
+
+    def "test accelerator auto-device options can be customized"() {
+        given:
+        def nomadJobOpts = new NomadJobOpts([
+                acceleratorAutoDevice: false,
+                acceleratorDeviceName: 'custom/gpu'
+        ])
+
+        expect:
+        nomadJobOpts.acceleratorAutoDevice == false
+        nomadJobOpts.acceleratorDeviceName == 'custom/gpu'
+    }
+
+    def "test cleanup policy defaults from deleteOnCompletion"() {
+        expect:
+        new NomadJobOpts([:]).cleanup == NomadJobOpts.CLEANUP_ALWAYS
+        new NomadJobOpts([deleteOnCompletion: false]).cleanup == NomadJobOpts.CLEANUP_NEVER
+    }
+
+    def "test cleanup policy can be configured explicitly"() {
+        expect:
+        new NomadJobOpts([cleanup: 'always']).cleanup == NomadJobOpts.CLEANUP_ALWAYS
+        new NomadJobOpts([cleanup: 'never']).cleanup == NomadJobOpts.CLEANUP_NEVER
+        new NomadJobOpts([cleanup: 'onSuccess']).cleanup == NomadJobOpts.CLEANUP_ON_SUCCESS
+    }
+
+    def "test cleanup policy from environment variable"() {
+        given:
+        def env = ['NF_NOMAD_CLEANUP': 'onSuccess']
+        def nomadJobOpts = new NomadJobOpts([:], env)
+
+        expect:
+        nomadJobOpts.cleanup == NomadJobOpts.CLEANUP_ON_SUCCESS
+    }
+
+    def "test invalid cleanup policy should fail"() {
+        when:
+        new NomadJobOpts([cleanup: 'sometimes'])
+
+        then:
+        thrown(IllegalArgumentException)
     }
 
     def "test rescheduleAttempts and restartAttempts"() {
@@ -192,4 +262,5 @@ class NomadJobOptsSpec extends Specification {
         nomadJobOpts2.placementFailureTimeout.millis == 300_000L
         nomadJobOpts3.placementFailureTimeout.millis == 3_600_000L
     }
+
 }

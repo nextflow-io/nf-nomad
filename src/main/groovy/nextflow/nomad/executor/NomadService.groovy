@@ -19,6 +19,8 @@ package nextflow.nomad.executor
 
 import groovy.transform.CompileStatic
 import groovy.util.logging.Slf4j
+import groovy.json.JsonOutput
+import groovy.json.JsonSlurper
 import io.nomadproject.client.ApiClient
 import io.nomadproject.client.ApiException
 import io.nomadproject.client.api.JobsApi
@@ -29,9 +31,12 @@ import nextflow.nomad.config.NomadConfig
 import nextflow.nomad.util.NomadLogging
 import nextflow.processor.TaskRun
 import nextflow.exception.ProcessSubmitException
+import org.codehaus.groovy.runtime.InvokerHelper
 import org.threeten.bp.OffsetDateTime
+import java.nio.file.Files
 
 import java.nio.file.Path
+import java.util.concurrent.TimeoutException
 
 /**
  * Nomad Service
@@ -48,6 +53,7 @@ class NomadService implements Closeable{
     JobsApi jobsApi
     VariablesApi variablesApi
     FailsafeExecutor safeExecutor
+    private long lastSubmitAt = 0L
 
     NomadService(NomadConfig config) {
         this.config = config
@@ -85,6 +91,7 @@ class NomadService implements Closeable{
 
     String submitTask(String id, TaskRun task, List<String> args, Map<String, String> env, Path saveJsonPath = null) {
         long startTime = System.currentTimeMillis()
+        NomadTaskOptionsResolver.validate(task)
 
         Job job = new JobBuilder()
                 .withId(id)
@@ -97,20 +104,47 @@ class NomadService implements Closeable{
 
         JobBuilder.assignDatacenters(task, job)
         JobBuilder.spreads(task, job, this.config.jobOpts())
+        applyNamespace(task, job)
+        applyMeta(task, job)
+
+        // Apply priority if specified in env parameter
+        if (env && env.containsKey('PRIORITY')) {
+            Integer priority = JobBuilder.resolvePriority(env.get('PRIORITY'))
+            if (priority != null) {
+                job.priority(priority)
+            }
+        }
+
+        // Apply priority if specified in task configuration
+        def priorityFromConfig = NomadTaskOptionsResolver.priority(task)
+        if (priorityFromConfig && !job.priority) {
+            Integer priority = JobBuilder.resolvePriority(priorityFromConfig.toString())
+            if (priority != null) {
+                job.priority(priority)
+            }
+        }
 
         JobRegisterRequest jobRegisterRequest = new JobRegisterRequest()
         jobRegisterRequest.setJob(job)
 
-        if (saveJsonPath) try {
-            saveJsonPath.text = job.toString()
-        } catch (Exception e) {
-            log.debug "WARN: unable to save request json -- cause: ${e.message ?: e}"
+        if (saveJsonPath) {
+            writeDebugDump(saveJsonPath, [
+                    nomad_job_id    : id,
+                    nomad_alloc_id  : null,
+                    nomad_node_id   : null,
+                    nomad_node_name : null,
+                    nomad_datacenter: null,
+                    task_name       : task.name,
+                    generated_at    : OffsetDateTime.now().toString(),
+                    job_spec        : job.toString()
+            ])
         }
 
         try {
+            applySubmitThrottle()
             String evalId = safeExecutor.apply {
                 JobRegisterResponse jobRegisterResponse = jobsApi.registerJob(jobRegisterRequest,
-                        config.jobOpts().region, config.jobOpts().namespace,
+                        config.jobOpts().region, job.namespace ?: config.jobOpts().namespace,
                         null, null)
                 jobRegisterResponse.evalID
             }
@@ -130,6 +164,139 @@ class NomadService implements Closeable{
         }
     }
 
+    protected synchronized void applySubmitThrottle() {
+        final long throttle = config.clientOpts().submitThrottle?.millis ?: 0L
+        if( throttle <= 0L ) {
+            return
+        }
+        final long now = System.currentTimeMillis()
+        final long elapsed = now - lastSubmitAt
+        final long waitMillis = throttle - elapsed
+        if( waitMillis > 0L ) {
+            try {
+                Thread.sleep(waitMillis)
+            }
+            catch( InterruptedException e ) {
+                Thread.currentThread().interrupt()
+                throw new ProcessSubmitException("[NOMAD] Submit throttling interrupted", e)
+            }
+        }
+        lastSubmitAt = System.currentTimeMillis()
+    }
+
+    void writeDebugMetadata(Path saveJsonPath, Map<String, ?> metadata) {
+        if( saveJsonPath == null || metadata == null || metadata.isEmpty() ) {
+            return
+        }
+        Map<String, Object> payload = readDebugDump(saveJsonPath)
+        payload.putAll(metadata.collectEntries { k, v -> [(k?.toString()): v] } as Map<String, Object>)
+        writeDebugDump(saveJsonPath, payload)
+    }
+
+    protected Map<String, Object> readDebugDump(Path saveJsonPath) {
+        if( saveJsonPath == null || !Files.exists(saveJsonPath) ) {
+            return new LinkedHashMap<>()
+        }
+        String content = saveJsonPath.text
+        if( !content?.trim() ) {
+            return new LinkedHashMap<>()
+        }
+        try {
+            def parsed = new JsonSlurper().parseText(content)
+            if( parsed instanceof Map ) {
+                return new LinkedHashMap<>((Map<String, Object>)parsed)
+            }
+        }
+        catch (Exception ignored) {
+            // fallback to preserving previous content as raw spec text
+        }
+        return new LinkedHashMap<>([job_spec: content])
+    }
+
+    protected void writeDebugDump(Path saveJsonPath, Map<String, Object> payload) {
+        if( saveJsonPath == null ) {
+            return
+        }
+        try {
+            if( saveJsonPath.parent ) {
+                Files.createDirectories(saveJsonPath.parent)
+            }
+            saveJsonPath.text = JsonOutput.prettyPrint(JsonOutput.toJson(payload ?: Collections.emptyMap()))
+        }
+        catch (Exception e) {
+            log.debug "WARN: unable to save request json -- cause: ${e.message ?: e}"
+        }
+    }
+
+    private static TaskState stateFromAllocation(AllocationListStub allocation) {
+        String status = allocation?.clientStatus?.toLowerCase()
+        if( !status ) {
+            return null
+        }
+        boolean failed = status in ['failed', 'lost']
+        boolean finished = status in ['complete', 'dead', 'failed', 'lost']
+        return new TaskState(
+                state: status,
+                failed: failed,
+                finishedAt: finished ? OffsetDateTime.now() : null
+        )
+    }
+
+    private static TaskState pendingState() {
+        new TaskState(state: 'pending', failed: false)
+    }
+
+    private static TaskState unknownState() {
+        new TaskState(state: 'unknown', failed: false, finishedAt: OffsetDateTime.now())
+    }
+
+    private static boolean isTransientStateError(Throwable error) {
+        ApiException apiException = findApiException(error)
+        if( apiException != null ) {
+            int code = apiException.code
+            return code == 0 || code in [408, 429, 500, 502, 503, 504]
+        }
+        if( error instanceof IOException || error.cause instanceof IOException ) {
+            return true
+        }
+        if( error instanceof TimeoutException || error.cause instanceof TimeoutException ) {
+            return true
+        }
+        return false
+    }
+
+    private TaskState emptyAllocationState(String jobId) {
+        if( !jobExists(jobId) ) {
+            return unknownState()
+        }
+        return pendingState()
+    }
+
+    private boolean jobExists(String jobId) {
+        try {
+            Job job = safeExecutor.apply {
+                jobsApi.getJob(jobId, config.jobOpts().region, config.jobOpts().namespace,
+                        null, null, null, null, null, null, null)
+            }
+            return job != null
+        }
+        catch (ApiException e) {
+            if( e.code == 404 ) {
+                return false
+            }
+            if( isTransientStateError(e) ) {
+                return true
+            }
+            throw e
+        }
+        catch (Exception e) {
+            if( isTransientStateError(e) ) {
+                return true
+            }
+            throw e
+        }
+    }
+
 
     TaskState getTaskState(String jobId){
         try {
@@ -138,15 +305,27 @@ class NomadService implements Closeable{
                         null, null, null, null, null, null,
                         null, null)
             }
+            if( !allocations ) {
+                return emptyAllocationState(jobId)
+            }
             AllocationListStub last = allocations ? allocations.sort {
                 it.modifyIndex
             }?.last() : null
-            TaskState currentState = last?.taskStates?.values()?.last()
+            TaskState currentState = last?.taskStates?.values()?.last() ?: stateFromAllocation(last)
             NomadLogging.logJobState(log, jobId, currentState?.state)
-            currentState ?: new TaskState(state: "unknown", failed: true, finishedAt: OffsetDateTime.now())
+            currentState ?: pendingState()
+        }catch(ApiException e){
+            NomadLogging.logError(log, "getTaskState", jobId, e, [statusCode: e.code])
+            if( isTransientStateError(e) ) {
+                return pendingState()
+            }
+            unknownState()
         }catch(Exception e){
             NomadLogging.logError(log, "getTaskState", jobId, e)
-            new TaskState(state: "unknown", failed: true, finishedAt: OffsetDateTime.now())
+            if( isTransientStateError(e) ) {
+                return pendingState()
+            }
+            unknownState()
         }
     }
 
@@ -175,6 +354,11 @@ class NomadService implements Closeable{
     }
 
     String getClientOfJob(String jobId) {
+        Map<String, String> metadata = getAllocationMetadata(jobId)
+        return metadata.get('nodeName')
+    }
+
+    Map<String, String> getAllocationMetadata(String jobId) {
         try{
             List<AllocationListStub> allocations = safeExecutor.apply {
                 jobsApi.getJobAllocations(jobId, config.jobOpts().region, config.jobOpts().namespace,
@@ -182,19 +366,47 @@ class NomadService implements Closeable{
                         null, null)
             }
             if( !allocations ){
-                return null
+                return Collections.emptyMap()
             }
-            AllocationListStub jobAllocation = allocations.first()
+            AllocationListStub jobAllocation = allocations.sort {
+                it.modifyIndex
+            }?.last()
+            if( !jobAllocation ) {
+                return Collections.emptyMap()
+            }
+
+            String allocationId = readStringProperty(jobAllocation, 'id') ?: readStringProperty(jobAllocation, 'ID')
+            String nodeId = readStringProperty(jobAllocation, 'nodeID') ?: readStringProperty(jobAllocation, 'NodeID')
+            String nodeName = jobAllocation.nodeName
+            String datacenter = readStringProperty(jobAllocation, 'datacenter') ?: readStringProperty(jobAllocation, 'Datacenter')
             NomadLogging.logAllocationDetails(log, jobId, [
+                allocationId: allocationId,
+                nodeId: nodeId,
                 nodeName: jobAllocation.nodeName,
+                datacenter: datacenter,
                 clientStatus: jobAllocation.clientStatus,
                 desiredStatus: jobAllocation.desiredStatus,
                 modifyIndex: jobAllocation.modifyIndex
             ])
-            return jobAllocation.nodeName
+
+            Map<String, String> result = new LinkedHashMap<>()
+            if( allocationId ) result.put('allocationId', allocationId)
+            if( nodeId ) result.put('nodeId', nodeId)
+            if( nodeName ) result.put('nodeName', nodeName)
+            if( datacenter ) result.put('datacenter', datacenter)
+            return result
         }catch (Exception e){
             NomadLogging.logError(log, "getClientOfJob", jobId, e)
             throw new ProcessSubmitException("[NOMAD] Failed to get alloactions ${jobId} -- Cause: ${e.message ?: e}", e)
+        }
+    }
+
+    private static String readStringProperty(Object target, String property) {
+        try {
+            String value = InvokerHelper.getProperty(target, property)?.toString()?.trim()
+            return value ?: null
+        } catch (Throwable ignored) {
+            return null
         }
     }
 
@@ -336,6 +548,27 @@ class NomadService implements Closeable{
         } catch (Exception e) {
             NomadLogging.logError(log, "isPlacementFailure", jobId, e)
             return false
+        }
+    }
+
+    protected void applyNamespace(TaskRun task, Job job) {
+        def namespace = NomadTaskOptionsResolver.namespace(task)
+        if( namespace ) {
+            job.namespace(namespace.toString())
+        }
+    }
+
+    protected void applyMeta(TaskRun task, Job job) {
+        Map<String, String> effectiveMeta = [:]
+        if( config.jobOpts().meta ) {
+            effectiveMeta.putAll(config.jobOpts().meta)
+        }
+        Map<String, String> processMeta = NomadTaskOptionsResolver.meta(task) as Map<String, String>
+        if( processMeta ) {
+            effectiveMeta.putAll(processMeta)
+        }
+        if( effectiveMeta ) {
+            job.meta(effectiveMeta)
         }
     }
 }

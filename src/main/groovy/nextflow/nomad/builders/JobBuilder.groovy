@@ -26,17 +26,22 @@ import io.nomadproject.client.model.Task
 import io.nomadproject.client.model.ReschedulePolicy
 import io.nomadproject.client.model.RestartPolicy
 import io.nomadproject.client.model.Resources
+import io.nomadproject.client.model.RequestedDevice
 import io.nomadproject.client.model.Template
 import io.nomadproject.client.model.VolumeMount
 import io.nomadproject.client.model.VolumeRequest
 import nextflow.nomad.config.NomadJobOpts
+import nextflow.nomad.executor.NomadTaskOptionsResolver
 import nextflow.nomad.executor.TaskDirectives
 import nextflow.nomad.models.ConstraintsBuilder
 import nextflow.nomad.models.JobConstraints
 import nextflow.nomad.models.JobSpreads
 import nextflow.nomad.models.JobVolume
 import nextflow.nomad.models.SpreadsBuilder
+import nextflow.executor.res.AcceleratorResource
+import nextflow.processor.TaskConfig
 import nextflow.processor.TaskRun
+import nextflow.util.Duration
 import nextflow.util.MemoryUnit
 
 
@@ -74,21 +79,38 @@ class JobBuilder {
     }
 
     static Job assignDatacenters(TaskRun task, Job job){
-        def datacenters = task.processor?.config?.get(TaskDirectives.DATACENTERS)
-        if( datacenters ){
-            if( datacenters instanceof List<String>) {
-                job.datacenters( datacenters as List<String>)
-                return job;
-            }
-            if( datacenters instanceof Closure) {
-                String str = datacenters.call().toString()
-                job.datacenters( [str])
-                return job;
-            }
-            job.datacenters( [datacenters.toString()] as List<String>)
-            return job
+        final merged = [] as List<String>
+        if( job.datacenters ) {
+            merged.addAll(normalizeDatacenters(job.datacenters))
         }
-        job
+
+        final processDatacenters = NomadTaskOptionsResolver.datacenters(task)
+        if( processDatacenters != null ) {
+            merged.addAll(normalizeDatacenters(processDatacenters))
+        }
+
+        if( merged ) {
+            job.datacenters(new ArrayList<String>(new LinkedHashSet<String>(merged)))
+        }
+        return job
+    }
+
+    static protected List<String> normalizeDatacenters(Object value) {
+        if( value == null ) {
+            return Collections.emptyList()
+        }
+        if( value instanceof Closure ) {
+            return normalizeDatacenters((value as Closure).call())
+        }
+        if( value instanceof Collection ) {
+            return (value as Collection)
+                    .collect { it?.toString()?.trim() }
+                    .findAll { it } as List<String>
+        }
+        return value.toString()
+                .split(',')
+                .collect { it?.toString()?.trim() }
+                .findAll { it } as List<String>
     }
 
     JobBuilder withNamespace(String namespace) {
@@ -106,25 +128,86 @@ class JobBuilder {
     }
 
     static protected Resources getResources(TaskRun task) {
+        return getResources(task, null)
+    }
+
+    static protected Resources getResources(TaskRun task, NomadJobOpts jobOpts) {
         final DEFAULT_CPUS = 1
         final DEFAULT_MEMORY = "1.GB"
 
         final taskCfg = task.getConfig()
-        final taskCores =  !taskCfg.get("cpus") ? DEFAULT_CPUS :  taskCfg.get("cpus") as Integer
+        final resourceOptions = NomadTaskOptionsResolver.resources(task)
+        final taskCores = parseInteger(taskCfg.get("cpus"), DEFAULT_CPUS)
+        final optionCpu = parseIntegerOption(task, "${TaskDirectives.NOMAD_OPTIONS}.resources.cpu", resourceOptions.get("cpu"))
+        final optionCores = parseIntegerOption(task, "${TaskDirectives.NOMAD_OPTIONS}.resources.cores", resourceOptions.get("cores"))
         final taskMemory = new MemoryUnit( taskCfg.get("memory")?.toString() ?:  DEFAULT_MEMORY)
+        final taskMemoryMb = taskMemory.toMega() as Integer
 
         final res = new Resources()
-                .cores(taskCores)
-                .memoryMB(taskMemory.toMega() as Integer)
+                .memoryMB(taskMemoryMb)
+                .memoryMaxMB(resolveMemoryMaxMb(task, taskMemoryMb))
+        if( optionCpu != null ) {
+            res.CPU(optionCpu)
+        }
+        else if( optionCores != null ) {
+            res.cores(optionCores)
+        }
+        else if( (jobOpts?.cpuMode ?: NomadJobOpts.CPU_MODE_CORES) == NomadJobOpts.CPU_MODE_CPU ) {
+            res.CPU(taskCores * 1_000)
+        }
+        else {
+            res.cores(taskCores)
+        }
+        final devices = resolveRequestedDevices(resourceOptions.get("device"))
+        if( devices ) {
+            res.devices(devices)
+        }
+        else if( jobOpts?.acceleratorAutoDevice ) {
+            final accelerator = resolveAccelerator(taskCfg)
+            final acceleratorDevice = resolveAcceleratorDevice(accelerator, jobOpts?.acceleratorDeviceName)
+            if( acceleratorDevice ) {
+                res.devices([acceleratorDevice])
+            }
+        }
 
         return res
     }
 
-    static TaskGroup createTaskGroup(TaskRun taskRun, List<String> args, Map<String, String>env, NomadJobOpts jobOpts){
-        final ReschedulePolicy taskReschedulePolicy  = new ReschedulePolicy().attempts(jobOpts.rescheduleAttempts)
-        final RestartPolicy taskRestartPolicy  = new RestartPolicy().attempts(jobOpts.restartAttempts)
+    static protected Integer resolveMemoryMaxMb(TaskRun task, Integer defaultMemoryMb) {
+        Map resources = NomadTaskOptionsResolver.resources(task)
+        if( !resources || !resources.containsKey("memoryMax") ) {
+            return defaultMemoryMb
+        }
 
-        def task = createTask(taskRun, args, env, jobOpts)
+        Integer parsed = parseMemoryToMega(resources.get("memoryMax"))
+        if( parsed != null ) {
+            return parsed
+        }
+        invalidOption(task, "${TaskDirectives.NOMAD_OPTIONS}.resources.memoryMax", resources.get("memoryMax"),
+                "must be a valid memory value")
+        return null
+    }
+
+    static protected Integer parseMemoryToMega(Object value) {
+        if( value == null ) {
+            return null
+        }
+        try {
+            if( value instanceof Number ) {
+                return ((Number)value).intValue()
+            }
+            return new MemoryUnit(value.toString()).toMega() as Integer
+        } catch(Exception ignored) {
+            return null
+        }
+    }
+
+    static TaskGroup createTaskGroup(TaskRun taskRun, List<String> args, Map<String, String>env, NomadJobOpts jobOpts){
+        final ReschedulePolicy taskReschedulePolicy  = resolveReschedulePolicy(taskRun, jobOpts)
+        final RestartPolicy taskRestartPolicy  = resolveRestartPolicy(taskRun, jobOpts)
+        final List<JobVolume> volumeSpecs = resolveVolumeSpecs(taskRun, jobOpts)
+
+        def task = createTask(taskRun, args, env, jobOpts, volumeSpecs)
         def taskGroup = new TaskGroup(
                 name: "nf-taskgroup",
                 tasks: [ task ],
@@ -132,10 +215,9 @@ class JobBuilder {
                 restartPolicy: taskRestartPolicy
         )
 
-
-        if( jobOpts.volumeSpec ) {
+        if( volumeSpecs ) {
             taskGroup.volumes = [:]
-            jobOpts.volumeSpec.eachWithIndex { volumeSpec , idx->
+            volumeSpecs.eachWithIndex { volumeSpec , idx->
                 if (volumeSpec && volumeSpec.type == JobVolume.VOLUME_CSI_TYPE) {
                     taskGroup.volumes["vol_${idx}".toString()] = new VolumeRequest(
                             type: volumeSpec.type,
@@ -159,11 +241,15 @@ class JobBuilder {
     }
 
     static Task createTask(TaskRun task, List<String> args, Map<String, String>env, NomadJobOpts jobOpts) {
+        return createTask(task, args, env, jobOpts, resolveVolumeSpecs(task, jobOpts))
+    }
+
+    static Task createTask(TaskRun task, List<String> args, Map<String, String>env, NomadJobOpts jobOpts, List<JobVolume> volumeSpecs) {
         final DRIVER = "docker"
 
         final imageName = task.container
         final workingDir = task.workDir.toAbsolutePath().toString()
-        final taskResources = getResources(task)
+        final taskResources = getResources(task, jobOpts)
 
 
         def taskDef = new Task(
@@ -180,7 +266,12 @@ class JobBuilder {
                 env: env,
         )
 
-        volumes(task, taskDef, workingDir, jobOpts)
+        Long shutdownDelay = resolveShutdownDelayMillis(task, jobOpts)
+        if( shutdownDelay != null ) {
+            taskDef.shutdownDelay(shutdownDelay)
+        }
+
+        volumes(task, taskDef, workingDir, jobOpts, volumeSpecs)
         affinity(task, taskDef, jobOpts)
         constraint(task, taskDef, jobOpts)
         constraints(task, taskDef, jobOpts)
@@ -188,7 +279,7 @@ class JobBuilder {
         return taskDef
     }
 
-    static protected Task volumes(TaskRun task, Task taskDef, String workingDir, NomadJobOpts jobOpts){
+    static protected Task volumes(TaskRun task, Task taskDef, String workingDir, NomadJobOpts jobOpts, List<JobVolume> volumeSpecs){
         if( jobOpts.dockerVolume){
             String destinationDir = workingDir.split(File.separator).dropRight(2).join(File.separator)
             taskDef.config.mount = [
@@ -199,14 +290,15 @@ class JobBuilder {
             ]
         }
 
-        if( jobOpts.volumeSpec){
+        if( volumeSpecs ){
             taskDef.volumeMounts = []
-            jobOpts.volumeSpec.eachWithIndex { volumeSpec, idx ->
+            volumeSpecs.eachWithIndex { volumeSpec, idx ->
                 String destinationDir = volumeSpec.workDir && !volumeSpec.path ?
                         workingDir.split(File.separator).dropRight(2).join(File.separator) : volumeSpec.path
                 taskDef.volumeMounts.add new VolumeMount(
                         destination: destinationDir,
-                        volume: "vol_${idx}".toString()
+                        volume: "vol_${idx}".toString(),
+                        readOnly: volumeSpec.readOnly
                 )
             }
         }
@@ -214,7 +306,66 @@ class JobBuilder {
         taskDef
     }
 
+    static protected List<JobVolume> resolveVolumeSpecs(TaskRun task, NomadJobOpts jobOpts) {
+        List<JobVolume> result = []
+        if( jobOpts?.volumeSpec ) {
+            result.addAll(jobOpts.volumeSpec as List<JobVolume>)
+        }
+        List<Map<String, Object>> processVolumes = NomadTaskOptionsResolver.volumes(task)
+        processVolumes.eachWithIndex { Map<String, Object> spec, int idx ->
+            result.add(parseProcessVolumeSpec(task, spec, idx))
+        }
+        validateMergedVolumeSpecs(task, result)
+        return result
+    }
+
+    static protected void validateMergedVolumeSpecs(TaskRun task, List<JobVolume> volumeSpecs) {
+        if( !volumeSpecs ) {
+            return
+        }
+        int workDirCount = 0
+        volumeSpecs.each { JobVolume volume ->
+            if( volume?.workDir ) {
+                workDirCount++
+            }
+        }
+        if( workDirCount > 1 ) {
+            invalidOption(task, "${TaskDirectives.NOMAD_OPTIONS}.volumes", volumeSpecs,
+                    "defines multiple `workDir` volumes across global and process scopes; only one is allowed")
+        }
+    }
+
+    static protected JobVolume parseProcessVolumeSpec(TaskRun task, Map<String, Object> spec, int idx) {
+        JobVolume volume = new JobVolume()
+        if( spec.containsKey('type') ) {
+            volume.type(spec.get('type')?.toString())
+        }
+        if( spec.containsKey('name') ) {
+            volume.name(spec.get('name')?.toString())
+        }
+        if( spec.containsKey('path') ) {
+            volume.path(spec.get('path')?.toString())
+        }
+        if( spec.containsKey('workDir') ) {
+            Boolean workDir = parseBoolean(spec.get('workDir'))
+            volume.workDir(workDir ?: false)
+        }
+        if( spec.containsKey('readOnly') ) {
+            Boolean readOnly = parseBoolean(spec.get('readOnly'))
+            volume.readOnly(readOnly ?: false)
+        }
+
+        try {
+            volume.validate()
+        }
+        catch (IllegalArgumentException e) {
+            invalidOption(task, "${TaskDirectives.NOMAD_OPTIONS}.volumes[${idx}]", spec, e.message)
+        }
+        return volume
+    }
+
     static protected Task affinity(TaskRun task, Task taskDef, NomadJobOpts jobOpts) {
+        final affinities = [] as List<Affinity>
         if (jobOpts.affinitySpec) {
             def affinity = new Affinity()
             if (jobOpts.affinitySpec.attribute) {
@@ -229,7 +380,39 @@ class JobBuilder {
             if (jobOpts.affinitySpec.weight != null) {
                 affinity.weight(jobOpts.affinitySpec.weight)
             }
-            taskDef.affinities([affinity])
+            affinities.add(affinity)
+        }
+
+        Map affinityOption = NomadTaskOptionsResolver.affinity(task)
+        if( affinityOption ) {
+            String attribute = affinityOption.get("attribute")?.toString()
+            if( !attribute ) {
+                invalidOption(task, "${TaskDirectives.NOMAD_OPTIONS}.affinity.attribute", affinityOption.get("attribute"),
+                        "must be a non-empty string")
+            }
+
+            String value = affinityOption.get("value")?.toString()
+            if( !value ) {
+                invalidOption(task, "${TaskDirectives.NOMAD_OPTIONS}.affinity.value", affinityOption.get("value"),
+                        "must be a non-empty string")
+            }
+
+            String operator = affinityOption.get("operator")?.toString() ?: "="
+            Integer weight = parseIntegerOption(task, "${TaskDirectives.NOMAD_OPTIONS}.affinity.weight", affinityOption.get("weight"))
+
+            def affinity = new Affinity()
+                    .ltarget(attribute)
+                    .operand(operator)
+                    .rtarget(value)
+
+            if( weight != null ) {
+                affinity.weight(weight)
+            }
+            affinities.add(affinity)
+        }
+
+        if( affinities ) {
+            taskDef.affinities(affinities)
         }
         taskDef
     }
@@ -260,9 +443,8 @@ class JobBuilder {
             constraints.addAll(list)
         }
 
-        if( task.processor?.config?.get(TaskDirectives.CONSTRAINTS) &&
-                task.processor?.config?.get(TaskDirectives.CONSTRAINTS) instanceof Closure) {
-            Closure closure = task.processor?.config?.get(TaskDirectives.CONSTRAINTS) as Closure
+        Closure closure = NomadTaskOptionsResolver.constraints(task)
+        if( closure ) {
             JobConstraints constraintsSpec = JobConstraints.parse(closure)
             def list = ConstraintsBuilder.constraintsSpecToList(constraintsSpec)
             constraints.addAll(list)
@@ -276,10 +458,10 @@ class JobBuilder {
 
     protected static Task secrets(TaskRun task, Task taskDef, NomadJobOpts jobOpts){
         if( jobOpts?.secretOpts?.enabled) {
-            def secrets = task.processor?.config?.get(TaskDirectives.SECRETS)
+            def secrets = NomadTaskOptionsResolver.secrets(task)
             if (secrets) {
                 Template template = new Template(envvars: true, destPath: "/secrets/nf-nomad")
-                String secretPath = jobOpts?.secretOpts?.path
+                String secretPath = NomadTaskOptionsResolver.secretsPath(task) ?: jobOpts?.secretOpts?.path
                 String tmpl = secrets.collect { String name ->
                     "${name}={{ with nomadVar \"$secretPath/${name}\" }}{{ .${name} }}{{ end }}"
                 }.join('\n').stripIndent()
@@ -296,9 +478,8 @@ class JobBuilder {
             def list = SpreadsBuilder.spreadsSpecToList(jobOpts.spreadsSpec)
             spreads.addAll(list)
         }
-        if( task.processor?.config?.get(TaskDirectives.SPREAD) &&
-                task.processor?.config?.get(TaskDirectives.SPREAD) instanceof Map) {
-            Map map = task.processor?.config?.get(TaskDirectives.SPREAD) as Map
+        Map map = NomadTaskOptionsResolver.spread(task)
+        if( map ) {
             JobSpreads spreadSpec = new JobSpreads()
             spreadSpec.spread(map)
             def list = SpreadsBuilder.spreadsSpecToList(spreadSpec)
@@ -311,5 +492,227 @@ class JobBuilder {
         jobDef
     }
 
+    /**
+     * Resolves priority string to Nomad priority integer
+     * Nomad supports priorities from 0-100, default is 50
+     *
+     * Supports:
+     * - Numeric strings (0-100)
+     * - Predefined aliases: critical, high, normal, low, min
+     *
+     * @param priorityValue string value (numeric or alias) or null
+     * @return Integer priority value or null if invalid
+     */
+    static Integer resolvePriority(String priorityValue) {
+        if (!priorityValue) {
+            return null
+        }
 
+        try {
+            // Try parsing as integer first
+            Integer intValue = priorityValue as Integer
+            if (intValue >= 0 && intValue <= 100) {
+                return intValue
+            }
+            log.warn("Priority value ${intValue} is outside valid range 0-100, ignoring")
+            return null
+        } catch (NumberFormatException ignored) {
+            // Handle string aliases for priority levels
+            switch (priorityValue.toLowerCase()) {
+                case 'critical':
+                    return 100
+                case 'high':
+                    return 80
+                case 'normal':
+                    return 50
+                case 'low':
+                    return 30
+                case 'min':
+                    return 10
+                default:
+                    log.warn("Unknown priority value: ${priorityValue}, ignoring")
+                    return null
+            }
+        }
+    }
+
+    static protected List<RequestedDevice> resolveRequestedDevices(Object value) {
+        if( value == null ) {
+            return Collections.emptyList()
+        }
+        if( !(value instanceof Collection) ) {
+            log.warn("Ignoring `${TaskDirectives.NOMAD_OPTIONS}.resources.device` because it is not a list -- value: ${value}")
+            return Collections.emptyList()
+        }
+
+        List<RequestedDevice> devices = []
+        (value as Collection).each { item ->
+            if( item instanceof Map ) {
+                String name = (item as Map).get("name")?.toString()
+                Integer count = parseInteger((item as Map).get("count")) ?: 1
+                if( name ) {
+                    devices.add(new RequestedDevice().name(name).count(count))
+                } else {
+                    log.warn("Ignoring `${TaskDirectives.NOMAD_OPTIONS}.resources.device` entry without `name` -- value: ${item}")
+                }
+            } else {
+                log.warn("Ignoring `${TaskDirectives.NOMAD_OPTIONS}.resources.device` entry because it is not a map -- value: ${item}")
+            }
+        }
+        return devices
+    }
+
+    static protected AcceleratorResource resolveAccelerator(Object taskConfig) {
+        if( taskConfig instanceof TaskConfig ) {
+            return (taskConfig as TaskConfig).getAccelerator()
+        }
+        return null
+    }
+
+    static protected RequestedDevice resolveAcceleratorDevice(AcceleratorResource accelerator, String defaultDeviceName) {
+        if( accelerator == null ) {
+            return null
+        }
+
+        Integer count = accelerator.request ?: accelerator.limit ?: 1
+        if( count <= 0 ) {
+            return null
+        }
+
+        String deviceName = defaultDeviceName ?: 'nvidia/gpu'
+        return new RequestedDevice()
+                .name(deviceName)
+                .count(count)
+    }
+
+    static protected RestartPolicy resolveRestartPolicy(TaskRun task, NomadJobOpts jobOpts) {
+        Map<String, Object> effective = [:]
+        if( jobOpts?.restartPolicy ) {
+            effective.putAll(jobOpts.restartPolicy)
+        }
+        Map<String, Object> override = NomadTaskOptionsResolver.restart(task) as Map<String, Object>
+        if( override ) {
+            effective.putAll(override)
+        }
+
+        RestartPolicy policy = new RestartPolicy().attempts(parseInteger(effective.get("attempts"), jobOpts?.restartAttempts ?: 1))
+        Long delay = parseDurationToMillis(effective.get("delay"))
+        if( delay != null ) {
+            policy.delay(delay)
+        }
+        Long interval = parseDurationToMillis(effective.get("interval"))
+        if( interval != null ) {
+            policy.interval(interval)
+        }
+        String mode = effective.get("mode")?.toString()
+        if( mode ) {
+            policy.mode(mode)
+        }
+        Boolean renderTemplates = parseBoolean(effective.get("renderTemplates"))
+        if( renderTemplates != null ) {
+            policy.renderTemplates(renderTemplates)
+        }
+        return policy
+    }
+
+    static protected ReschedulePolicy resolveReschedulePolicy(TaskRun task, NomadJobOpts jobOpts) {
+        Map<String, Object> effective = [:]
+        if( jobOpts?.reschedulePolicy ) {
+            effective.putAll(jobOpts.reschedulePolicy)
+        }
+        Map<String, Object> override = NomadTaskOptionsResolver.reschedule(task) as Map<String, Object>
+        if( override ) {
+            effective.putAll(override)
+        }
+
+        ReschedulePolicy policy = new ReschedulePolicy().attempts(parseInteger(effective.get("attempts"), jobOpts?.rescheduleAttempts ?: 1))
+        Long delay = parseDurationToMillis(effective.get("delay"))
+        if( delay != null ) {
+            policy.delay(delay)
+        }
+        String delayFunction = effective.get("delayFunction")?.toString()
+        if( delayFunction ) {
+            policy.delayFunction(delayFunction)
+        }
+        Long interval = parseDurationToMillis(effective.get("interval"))
+        if( interval != null ) {
+            policy.interval(interval)
+        }
+        Long maxDelay = parseDurationToMillis(effective.get("maxDelay"))
+        if( maxDelay != null ) {
+            policy.maxDelay(maxDelay)
+        }
+        Boolean unlimited = parseBoolean(effective.get("unlimited"))
+        if( unlimited != null ) {
+            policy.unlimited(unlimited)
+        }
+        return policy
+    }
+
+    static protected Long resolveShutdownDelayMillis(TaskRun task, NomadJobOpts jobOpts) {
+        Object processValue = NomadTaskOptionsResolver.shutdownDelay(task)
+        Long processDelay = parseDurationToMillis(processValue)
+        if( processValue != null && processDelay == null ) {
+            invalidOption(task, "${TaskDirectives.NOMAD_OPTIONS}.shutdownDelay", processValue,
+                    "must be a valid duration")
+        }
+        if( processDelay != null ) {
+            return processDelay
+        }
+        return jobOpts?.shutdownDelay?.millis as Long
+    }
+    static protected Integer parseIntegerOption(TaskRun task, String optionPath, Object value) {
+        if( value == null ) {
+            return null
+        }
+        Integer parsed = parseInteger(value)
+        if( parsed != null ) {
+            return parsed
+        }
+        invalidOption(task, optionPath, value, "must be an integer")
+        return null
+    }
+
+    static protected Integer parseInteger(Object value, Integer defaultValue = null) {
+        if( value == null ) {
+            return defaultValue
+        }
+        try {
+            if( value instanceof Number ) {
+                return ((Number)value).intValue()
+            }
+            return value.toString() as Integer
+        } catch(Exception ignored) {
+            return defaultValue
+        }
+    }
+
+    static protected Boolean parseBoolean(Object value) {
+        if( value == null ) {
+            return null
+        }
+        return Boolean.valueOf(value.toString())
+    }
+
+    static protected Long parseDurationToMillis(Object value) {
+        if( value == null ) {
+            return null
+        }
+        try {
+            if( value instanceof Number ) {
+                return ((Number)value).longValue()
+            }
+            if( value instanceof Duration ) {
+                return ((Duration)value).millis
+            }
+            return Duration.of(value.toString()).millis
+        } catch(Exception ignored) {
+            return null
+        }
+    }
+
+    static protected void invalidOption(TaskRun task, String optionPath, Object value, String reason) {
+        String process = task?.processor?.name?.toString() ?: task?.name?.toString() ?: "<unknown>"
+        throw new IllegalArgumentException("Invalid Nomad option for process `${process}`: `${optionPath}` ${reason} -- value: ${value}")
+    }
 }

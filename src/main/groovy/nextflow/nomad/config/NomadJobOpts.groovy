@@ -36,13 +36,23 @@ import nextflow.util.Duration
 @Slf4j
 @CompileStatic
 class NomadJobOpts{
+    static final String CPU_MODE_CORES = 'cores'
+    static final String CPU_MODE_CPU = 'cpu'
+    static final String CLEANUP_ALWAYS = 'always'
+    static final String CLEANUP_NEVER = 'never'
+    static final String CLEANUP_ON_SUCCESS = 'onSuccess'
     private Map<String,String> sysEnv
 
     boolean deleteOnCompletion
+    String cleanup
     List<String> datacenters
     String region
     String namespace
     String dockerVolume
+    Map<String, String> meta
+    Duration shutdownDelay
+    Map<String, Object> restartPolicy
+    Map<String, Object> reschedulePolicy
     JobVolume[] volumeSpec
     JobAffinity affinitySpec
     JobConstraint constraintSpec
@@ -52,6 +62,9 @@ class NomadJobOpts{
     Integer rescheduleAttempts
     Integer restartAttempts
     Boolean privileged
+    String cpuMode
+    Boolean acceleratorAutoDevice
+    String acceleratorDeviceName
     Boolean failOnPlacementFailure
     Duration placementFailureTimeout
 
@@ -67,6 +80,7 @@ class NomadJobOpts{
 
         deleteOnCompletion = nomadJobOpts.containsKey("deleteOnCompletion") ?
                 nomadJobOpts.deleteOnCompletion : true
+        cleanup = parseCleanup(nomadJobOpts.get('cleanup') ?: sysEnv.get('NF_NOMAD_CLEANUP'), deleteOnCompletion)
         if( nomadJobOpts.containsKey("datacenters") ) {
             datacenters = ((nomadJobOpts.datacenters instanceof List<String> ?
                     nomadJobOpts.datacenters : nomadJobOpts.datacenters.toString().split(","))
@@ -83,6 +97,12 @@ class NomadJobOpts{
 
         region = sanitizeOptionalString(nomadJobOpts.region) ?: sanitizeOptionalString(sysEnv.get('NOMAD_REGION'))
         namespace = sanitizeOptionalString(nomadJobOpts.namespace) ?: sanitizeOptionalString(sysEnv.get('NOMAD_NAMESPACE'))
+        meta = parseStringMap(nomadJobOpts.meta)
+        shutdownDelay = parseOptionalDuration(nomadJobOpts.shutdownDelay)
+
+        Map<String, Object> failures = nomadJobOpts.failures instanceof Map ? (nomadJobOpts.failures as Map<String, Object>) : Collections.emptyMap()
+        restartPolicy = failures.restart instanceof Map ? (failures.restart as Map<String, Object>) : Collections.emptyMap()
+        reschedulePolicy = failures.reschedule instanceof Map ? (failures.reschedule as Map<String, Object>) : Collections.emptyMap()
 
         //NOTE: Default to a single attempt per nomad job definition
         rescheduleAttempts = nomadJobOpts.rescheduleAttempts as Integer ?: 1
@@ -90,6 +110,13 @@ class NomadJobOpts{
         privileged = nomadJobOpts.containsKey("privileged")
                 ? Boolean.valueOf(nomadJobOpts.privileged.toString())
                 : true
+        cpuMode = parseCpuMode(nomadJobOpts.get('cpuMode') ?: sysEnv.get('NF_NOMAD_CPU_MODE'))
+        acceleratorAutoDevice = nomadJobOpts.containsKey('acceleratorAutoDevice')
+                ? Boolean.valueOf(nomadJobOpts.get('acceleratorAutoDevice')?.toString())
+                : Boolean.valueOf(sysEnv.get('NF_NOMAD_ACCELERATOR_AUTO_DEVICE') ?: 'true')
+        acceleratorDeviceName = sanitizeOptionalString(nomadJobOpts.get('acceleratorDeviceName'))
+                ?: sanitizeOptionalString(sysEnv.get('NF_NOMAD_ACCELERATOR_DEVICE_NAME'))
+                ?: 'nvidia/gpu'
 
         // Placement failure handling
         failOnPlacementFailure = nomadJobOpts.containsKey("failOnPlacementFailure") ?
@@ -107,6 +134,7 @@ class NomadJobOpts{
         } else {
             placementFailureTimeout = Duration.of('60s')
         }
+
 
         dockerVolume = nomadJobOpts.dockerVolume ?: null
         if( dockerVolume ){
@@ -226,5 +254,46 @@ class NomadJobOpts{
     private static String sanitizeOptionalString(Object value) {
         final str = value?.toString()?.trim()
         str ? str : null
+    }
+
+    private static Map<String, String> parseStringMap(Object value) {
+        if( !(value instanceof Map) ) {
+            return Collections.emptyMap()
+        }
+        return ((Map)value).collectEntries { k, v -> [(k?.toString()): v?.toString()] } as Map<String, String>
+    }
+
+    private static Duration parseOptionalDuration(Object value) {
+        if( value == null ) {
+            return null
+        }
+        if( value instanceof Duration ) {
+            return (Duration)value
+        }
+        return Duration.of(value.toString())
+    }
+
+    private static String parseCpuMode(Object value) {
+        String mode = sanitizeOptionalString(value)?.toLowerCase()
+        if( !mode ) {
+            return CPU_MODE_CORES
+        }
+        if( mode == CPU_MODE_CORES || mode == CPU_MODE_CPU ) {
+            return mode
+        }
+        throw new IllegalArgumentException("Invalid nomad.jobs.cpuMode value `${value}` -- expected `${CPU_MODE_CORES}` or `${CPU_MODE_CPU}`")
+    }
+
+    private static String parseCleanup(Object value, boolean deleteOnCompletion) {
+        String mode = sanitizeOptionalString(value)
+        if( !mode ) {
+            return deleteOnCompletion ? CLEANUP_ALWAYS : CLEANUP_NEVER
+        }
+
+        String normalized = mode.equalsIgnoreCase('onSuccess') ? CLEANUP_ON_SUCCESS : mode.toLowerCase()
+        if( normalized == CLEANUP_ALWAYS || normalized == CLEANUP_NEVER || normalized == CLEANUP_ON_SUCCESS ) {
+            return normalized
+        }
+        throw new IllegalArgumentException("Invalid nomad.jobs.cleanup value `${value}` -- expected `${CLEANUP_ALWAYS}`, `${CLEANUP_NEVER}` or `${CLEANUP_ON_SUCCESS}`")
     }
 }

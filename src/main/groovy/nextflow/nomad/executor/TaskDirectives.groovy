@@ -9,11 +9,13 @@ class TaskDirectives {
     public static final String SECRETS = "secret"
 
     public static final String SPREAD = "spread"
+    public static final String NOMAD_OPTIONS = "nomadOptions"
 
     public static final List<String> ALL = [
             DATACENTERS,
             CONSTRAINTS,
             SECRETS,
-            SPREAD
+            SPREAD,
+            NOMAD_OPTIONS
     ]
 }

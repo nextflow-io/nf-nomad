@@ -1,9 +1,24 @@
 #!/bin/bash
 
-./wait-nomad.sh
+set -euo pipefail
 
-./nomad system gc
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "$SCRIPT_DIR"
 
-NXF_ASSETS=$(pwd)/nomad_temp/scratchdir/assets \
-  NXF_CACHE_DIR=$(pwd)/nomad_temp/scratchdir/cache \
-    nextflow ${REMOTE_DEBUG} run -w $(pwd)/nomad_temp/scratchdir/ "$@"
+LOCAL_STACK_DIR="${NF_NOMAD_LOCAL_STACK_DIR:-$SCRIPT_DIR/../../../infrastructure/03_automation/035_terraform/local-nomad-minio}"
+LOCAL_WORK_DIR="${NF_NOMAD_LOCAL_WORK_DIR:-$LOCAL_STACK_DIR/work}"
+LOCAL_NOMAD_ADDR="${NF_NOMAD_LOCAL_NOMAD_ADDR:-${NOMAD_ADDR:-http://localhost:4646}}"
+LOCAL_ASSETS_DIR="${NXF_ASSETS:-$LOCAL_WORK_DIR/assets}"
+LOCAL_CACHE_DIR="${NXF_CACHE_DIR:-$LOCAL_WORK_DIR/cache}"
+
+mkdir -p "$LOCAL_WORK_DIR" "$LOCAL_ASSETS_DIR" "$LOCAL_CACHE_DIR"
+
+NOMAD_ADDR="$LOCAL_NOMAD_ADDR" ./wait-nomad.sh
+NOMAD_ADDR="$LOCAL_NOMAD_ADDR" ./nomad system gc
+
+NOMAD_ADDR="$LOCAL_NOMAD_ADDR" \
+  NXF_ASSETS="$LOCAL_ASSETS_DIR" \
+  NXF_CACHE_DIR="$LOCAL_CACHE_DIR" \
+  NF_NOMAD_LOCAL_STACK_DIR="$LOCAL_STACK_DIR" \
+  NF_NOMAD_LOCAL_WORK_DIR="$LOCAL_WORK_DIR" \
+  nextflow ${REMOTE_DEBUG:-} run -w "$LOCAL_WORK_DIR" "$@"

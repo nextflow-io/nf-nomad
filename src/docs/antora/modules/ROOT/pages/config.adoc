@@ -12,6 +12,8 @@ nomad{
         connectionTimeout = 6000
         readTimeout = 6000
         writeTimeout = 6000
+        pollInterval = '1s'
+        submitThrottle = '100ms'
         retryConfig = {
             delay = 500
             maxDelay = 90
@@ -24,7 +26,11 @@ nomad{
 
         namespace = 'nf-nomad'
         deleteOnCompletion = false
+        cleanup = 'onSuccess'             // always | never | onSuccess
         privileged = true
+        cpuMode = 'cores'                 // or 'cpu'
+        acceleratorAutoDevice = true      // map Nextflow accelerator directive to Nomad resources.device
+        acceleratorDeviceName = 'nvidia/gpu'
 
         volumes = [
               { type "host" name "scratchdir" },
@@ -60,19 +66,27 @@ nomad{
 - `connectionTimeout`: The maximum time to wait before giving up on establishing a connection with the cluster (default `6000` ms).
 - `readTimeout`: The maximum time to wait before indicating inability to read from the connection (default `6000` ms).
 - `writeTimeout`: The maximum time to wait before indicating inability to write to the connection (default `6000` ms).
+- `pollInterval`: Frequency for polling Nomad task state updates (default `1s`). Can also be set via `NF_NOMAD_POLL_INTERVAL`.
+- `submitThrottle`: Minimum delay between Nomad job submissions (default `0s`). Can be set via `NF_NOMAD_SUBMIT_THROTTLE` to reduce API bursts.
 - `retryConfig.delay`:  Delay when retrying failed API requests (default: 500ms).
 - `retryConfig.jitter`: Jitter value when retrying failed API requests (default: 0.25)
 - `retryConfig.maxAttempts`: Max attempts when retrying failed API requests (default: 10)
 - `retryConfig.maxDelay`: Max delay when retrying failed API requests (default: 90s)
+- Retries apply to transient failures (`408`, `429`, `5xx`, IO errors, and timeouts).
+- `retryConfig` and `submitThrottle` are complementary: `retryConfig` applies after request failures, while `submitThrottle` proactively spaces out new submissions.
 
 
 === Jobs configuration
 
 - `deleteOnCompletion`: A boolean indicating if the job will be removed once completed
+- `cleanup`: Cleanup policy for completed jobs. Allowed values are `always`, `never`, and `onSuccess`. If omitted, it derives from `deleteOnCompletion` for backward compatibility.
 - `datacenters`: A list of datacenters for the job submission.
 - `region`: The region for job submission.
 - `namespace`: The namespace to be used for all Nextflow jobs.
 - `privileged`: Run Docker tasks in privileged mode (default `true`).
+- `cpuMode`: How task `cpus` maps to Nomad resources when process-level overrides are not set. Use `cores` (default) or `cpu`.
+- `acceleratorAutoDevice`: When `true` (default), map Nextflow `accelerator` requests to Nomad `resources.device` automatically.
+- `acceleratorDeviceName`: Device name to use for automatic accelerator mapping (default `nvidia/gpu`).
 - `volumeSpec`: The volumes which should be accessible to the jobs.
 - `affinitiesSpec`: The affinities which should be attached to the job spec.
 - `constraintsSpec`: The constraints which should be attached to the job spec.
@@ -81,15 +95,88 @@ nomad{
 - `restartAttempts`: Number of restart (on the same node) attempts for the generated jobs.
 - `failOnPlacementFailure`: A boolean flag to automatically fail jobs that cannot be placed on any node due to insufficient resources (default `false`). When enabled, jobs that remain unscheduled (have no node assignment) beyond the `placementFailureTimeout` threshold will be marked as failed instead of indefinitely waiting.
 - `placementFailureTimeout`: The time to wait before considering a job as failed due to placement failure (default `60s`). Supports Nextflow duration format: `20s`, `2m`, `5m`, `1h`, `2d`, etc. Can also be set via the `NF_NOMAD_PLACEMENT_FAILURE_TIMEOUT` environment variable.
+- Failed tasks include enriched Nomad state messages; memory/OOM signals from Nomad task events are surfaced explicitly when available.
+- When debug JSON dumping is enabled (`nomad.debug.json` or `nomad.debug.path`), dumped job JSON files include Nomad metadata fields: `nomad_job_id`, `nomad_alloc_id`, `nomad_node_id`, `nomad_node_name`, and `nomad_datacenter`.
+- Failure messages include Nomad inspection hints (job/allocation/node identifiers and allocation API URL when available).
 - `secretOpts`: The configuration for Nomad Secret Store.
 - `dockerVolume`, DEPRECATED
 - `affinitySpec`, DEPRECATED
 - `constraintSpec`, DEPRECATED
+=== Process directives
+
+The plugin supports process-level Nomad directives in two forms:
+
+- Legacy directives:
+  - `datacenters`
+  - `constraints`
+  - `secret`
+  - `spread`
+- Preferred map-based directive:
+  - `nomadOptions`
+
+`nomadOptions` accepts a map and currently supports:
+
+- `datacenters`: list of strings
+- `namespace`: string namespace override for the process
+- `constraints`: closure using the existing constraints DSL
+- `secrets`: list of secret names
+- `secretsPath`: per-process Nomad secret path override (string)
+- `spread`: spread map (`name`, `weight`, optional `targets`)
+- `affinity`: affinity map (`attribute`, optional `operator`, `value`, optional `weight`)
+- `volumes`: list of safe volume maps (`type`, `name`, optional `path`, optional `workDir`, optional `readOnly`)
+- `priority`: priority alias or number (`critical`, `high`, `normal`, `low`, `min`, or `0..100`)
+- `meta`: map of metadata merged with global `nomad.jobs.meta` (process keys override)
+- `shutdownDelay`: duration string (e.g. `15s`, `2m`)
+- `failures`: map with optional `restart` and `reschedule` maps
+- `resources`: map of resource options
+  - `memoryMax`: memory limit for Nomad `memory_max` (defaults to task `memory` when not set)
+  - `cpu`: Nomad CPU shares (MHz) override
+  - `cores`: Nomad CPU cores override
+  - `device`: list of Nomad requested devices (e.g. GPUs)
+  - when `resources.device` is not set and `acceleratorAutoDevice` is enabled, Nextflow `accelerator` is mapped automatically
+
+[source,groovy]
+----
+process {
+    withName: sayHello {
+        nomadOptions = [
+            datacenters: ['dc1', 'dc2'],
+            namespace: 'bio',
+            constraints: {
+                node {
+                    unique = [name: params.RUN_IN_NODE]
+                }
+            },
+            affinity: [attribute: '${meta.workload}', operator: '=', value: 'batch', weight: 25],
+            meta: [owner: 'team-x', step: 'align'],
+            shutdownDelay: '15s',
+            failures: [
+                restart: [attempts: 1, delay: '5s', mode: 'fail'],
+                reschedule: [attempts: 2, delay: '10s']
+            ],
+            secretsPath: 'secret/projects/team-x',
+            secrets: ['MY_ACCESS_KEY', 'MY_SECRET_KEY'],
+            spread: [name: 'node.datacenter', weight: 50, targets: ['us-east1': 70, 'us-east2': 30]],
+            priority: 'high',
+            volumes: [[type: 'host', name: 'ref-data', path: '/ref', readOnly: true]],
+            resources: [memoryMax: '64 GB', cores: 4, device: [[name: 'nvidia/gpu', count: 1]]]
+        ]
+    }
+}
+----
+
+When both `nomadOptions.<key>` and a legacy directive are set for the same process, `nomadOptions.<key>` takes precedence for that key only.
+For list-valued options such as datacenters, global and process values are concatenated in order (global first, then process) and deduplicated.
+`nomadOptions` values are validated strictly before submission; invalid shapes or conflicting options (for example, setting both `resources.cpu` and `resources.cores`) fail fast.
+When `nomadOptions.secretsPath` is set, it overrides `nomad.jobs.secrets.path` for that process only.
+When global and process volume specs are merged, only one `workDir` volume is allowed and `readOnly` flags are preserved on generated task mounts.
+Nomad task failures are surfaced as recoverable process errors so Nextflow `errorStrategy` and `maxRetries` policies remain in control.
 
 
 
 === Debug configuration
-- `debug`: Enabling this flag will dump the job definitions for troubleshooting.
+- `debug.json`: Enable rendered job-spec dumps for troubleshooting.
+- `debug.path`: Optional output path for rendered job specs. Relative paths resolve under each task work directory; absolute paths are used as provided.
 
 === Secrets configuration
 

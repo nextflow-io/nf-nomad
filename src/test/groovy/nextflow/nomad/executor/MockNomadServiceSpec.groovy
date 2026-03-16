@@ -66,17 +66,24 @@ class MockNomadServiceSpec extends Specification{
 
         when:
         mockWebServer.enqueue(new MockResponse()
+                .setBody("[]")
+                .addHeader("Content-Type", "application/json"));
+        mockWebServer.enqueue(new MockResponse()
+                .setBody("{}")
                 .addHeader("Content-Type", "application/json"));
 
         def state = service.getTaskState("theId")
         def recordedRequest = mockWebServer.takeRequest();
+        def recordedJobRequest = mockWebServer.takeRequest();
 
         then:
         recordedRequest.method == "GET"
         recordedRequest.path == "/v1/job/theId/allocations"
+        recordedJobRequest.method == "GET"
+        recordedJobRequest.path == "/v1/job/theId"
 
         and:
-        state.state == "unknown"
+        state.state == "pending"
 
         when:
         mockWebServer.enqueue(new MockResponse()
@@ -93,6 +100,129 @@ class MockNomadServiceSpec extends Specification{
         and:
         state.state == "running"
 
+    }
+
+    void "should return pending state when allocations list is empty"() {
+        given:
+        def config = new NomadConfig(
+                client:[
+                        address : "http://${mockWebServer.hostName}:${mockWebServer.port}"
+                ]
+        )
+        def service = new NomadService(config)
+
+        mockWebServer.enqueue(new MockResponse()
+                .setBody("[]")
+                .addHeader("Content-Type", "application/json"))
+        mockWebServer.enqueue(new MockResponse()
+                .setBody("{}")
+                .addHeader("Content-Type", "application/json"))
+
+        when:
+        def state = service.getTaskState("theId")
+        def recordedRequest = mockWebServer.takeRequest()
+        def recordedJobRequest = mockWebServer.takeRequest()
+
+        then:
+        recordedRequest.method == "GET"
+        recordedRequest.path == "/v1/job/theId/allocations"
+        recordedJobRequest.method == "GET"
+        recordedJobRequest.path == "/v1/job/theId"
+        state.state == "pending"
+        !state.failed
+    }
+
+    void "should return pending state for transient api errors"() {
+        given:
+        def config = new NomadConfig(
+                client:[
+                        address : "http://${mockWebServer.hostName}:${mockWebServer.port}",
+                        retryConfig: [maxAttempts: 1]
+                ]
+        )
+        def service = new NomadService(config)
+
+        mockWebServer.enqueue(new MockResponse()
+                .setResponseCode(503)
+                .setBody("service unavailable")
+                .addHeader("Content-Type", "text/plain"))
+
+        when:
+        def state = service.getTaskState("theId")
+
+        then:
+        state.state == "pending"
+        !state.failed
+    }
+
+    void "should throttle consecutive submissions when submitThrottle is configured"() {
+        given:
+        def config = new NomadConfig(
+                client:[
+                        address : "http://${mockWebServer.hostName}:${mockWebServer.port}",
+                        submitThrottle: '200ms'
+                ]
+        )
+        def service = new NomadService(config)
+
+        when:
+        long start = System.currentTimeMillis()
+        service.applySubmitThrottle()
+        service.applySubmitThrottle()
+        long elapsed = System.currentTimeMillis() - start
+
+        then:
+        elapsed >= 180L
+    }
+
+    void "should retrieve allocation metadata for latest allocation"() {
+        given:
+        def config = new NomadConfig(
+                client:[
+                        address : "http://${mockWebServer.hostName}:${mockWebServer.port}"
+                ]
+        )
+        def service = new NomadService(config)
+
+        def allocations = [
+                [
+                        ID: 'alloc-1',
+                        NodeID: 'node-1',
+                        NodeName: 'worker-a',
+                        Datacenter: 'dc-a',
+                        ClientStatus: 'pending',
+                        DesiredStatus: 'run',
+                        ModifyIndex: 2,
+                        TaskStates: [:]
+                ],
+                [
+                        ID: 'alloc-2',
+                        NodeID: 'node-2',
+                        NodeName: 'worker-b',
+                        Datacenter: 'dc-b',
+                        ClientStatus: 'running',
+                        DesiredStatus: 'run',
+                        ModifyIndex: 7,
+                        TaskStates: [:]
+                ]
+        ]
+
+        mockWebServer.enqueue(new MockResponse()
+                .setBody(JsonOutput.toJson(allocations).toString())
+                .addHeader("Content-Type", "application/json"));
+
+        when:
+        def metadata = service.getAllocationMetadata("theId")
+        def recordedRequest = mockWebServer.takeRequest()
+
+        then:
+        recordedRequest.method == "GET"
+        recordedRequest.path == "/v1/job/theId/allocations"
+        metadata == [
+                allocationId: 'alloc-2',
+                nodeId: 'node-2',
+                nodeName: 'worker-b'
+        ]
     }
 
     void "submit a task"(){
@@ -157,6 +287,7 @@ class MockNomadServiceSpec extends Specification{
         body.Job.TaskGroups[0].Tasks[0].Name == "nf-task"
         body.Job.TaskGroups[0].Tasks[0].Resources.Cores == 1
         body.Job.TaskGroups[0].Tasks[0].Resources.MemoryMB == 1024
+        body.Job.TaskGroups[0].Tasks[0].Resources.MemoryMaxMB == 1024
 
         body.Job.TaskGroups[0].Tasks[0].Driver == "docker"
         body.Job.TaskGroups[0].Tasks[0].Config.image == image
@@ -233,6 +364,7 @@ class MockNomadServiceSpec extends Specification{
         body.Job.TaskGroups[0].Tasks[0].Name == "nf-task"
         body.Job.TaskGroups[0].Tasks[0].Resources.Cores == 1
         body.Job.TaskGroups[0].Tasks[0].Resources.MemoryMB == 1024
+        body.Job.TaskGroups[0].Tasks[0].Resources.MemoryMaxMB == 1024
         body.Job.TaskGroups[0].Tasks[0].Driver == "docker"
         body.Job.TaskGroups[0].Tasks[0].Config.image == image
         body.Job.TaskGroups[0].Tasks[0].Config.work_dir == workingDir
@@ -242,8 +374,62 @@ class MockNomadServiceSpec extends Specification{
         body.Job.TaskGroups[0].Volumes.size() == 1
         body.Job.TaskGroups[0].Volumes['vol_0'] == [AccessMode:"multi-node-multi-writer", AttachmentMode:"file-system", Source:"test", Type:"csi", ReadOnly:false]
         body.Job.TaskGroups[0].Tasks[0].VolumeMounts.size() == 1
-        body.Job.TaskGroups[0].Tasks[0].VolumeMounts[0] == [Destination:"/a", Volume:"vol_0"]
+        body.Job.TaskGroups[0].Tasks[0].VolumeMounts[0] == [Destination:"/a", ReadOnly:false, Volume:"vol_0"]
 
+    }
+
+    void "submit a task with nomadOptions resources memoryMax override"(){
+        given:
+        def config = new NomadConfig(
+                client:[
+                        address : "http://${mockWebServer.hostName}:${mockWebServer.port}"
+                ],
+        )
+        def service = new NomadService(config)
+
+        String id = "theId"
+        String name = "theName"
+        String image = "theImage"
+        List<String> args = ["theCommand", "theArgs"]
+        Map<String, String>env = [test:"test"]
+
+        def mockTask = Mock(TaskRun){
+            getName() >> name
+            getContainer() >> image
+            getConfig() >> [memory: '1 GB', cpus: 1]
+            getWorkDirStr() >> "theWorkingDir"
+            getContainer() >> "ubuntu"
+            getProcessor() >> Mock(TaskProcessor){
+                getExecutor() >> Mock(Executor){
+                    isFusionEnabled() >> false
+                }
+                getConfig() >> Mock(ProcessConfig){
+                    get(TaskDirectives.NOMAD_OPTIONS) >> [resources: [memoryMax: '3 GB']]
+                }
+            }
+            getWorkDir() >> Path.of("/tmp")
+            toTaskBean() >> Mock(TaskBean){
+                getWorkDir() >> Path.of("/tmp")
+                getScript() >> "theScript"
+                getShell() >> ["bash"]
+                getInputFiles() >> [:]
+            }
+        }
+
+        mockWebServer.enqueue(new MockResponse()
+                .setBody(JsonOutput.toJson(["EvalID":"test"]).toString())
+                .addHeader("Content-Type", "application/json"));
+        when:
+        def idJob = service.submitTask(id, mockTask, args, env)
+        def recordedRequest = mockWebServer.takeRequest();
+        def body = new JsonSlurper().parseText(recordedRequest.body.readUtf8())
+
+        then:
+        idJob
+        recordedRequest.method == "POST"
+        recordedRequest.path == "/v1/jobs"
+        body.Job.TaskGroups[0].Tasks[0].Resources.MemoryMB == 1024
+        body.Job.TaskGroups[0].Tasks[0].Resources.MemoryMaxMB == 3072
     }
 
     void "submit a task with an affinity"(){
@@ -433,6 +619,9 @@ class MockNomadServiceSpec extends Specification{
                 client:[
                         address : "http://${mockWebServer.hostName}:${mockWebServer.port}"
                 ],
+                jobs: [
+                        datacenters: []
+                ]
         )
         def service = new NomadService(config)
 
@@ -610,6 +799,311 @@ class MockNomadServiceSpec extends Specification{
         body.Job.Spreads[0].Weight == 50
         body.Job.Spreads[0].SpreadTarget.first().Value == 'a'
         body.Job.Spreads[0].SpreadTarget.first().Percent == 30
+    }
+
+    void "submit a task with priority from nomadOptions"(){
+        given:
+        def config = new NomadConfig(
+                client:[
+                        address : "http://${mockWebServer.hostName}:${mockWebServer.port}"
+                ],
+        )
+        def service = new NomadService(config)
+
+        String id = "theId"
+        String name = "theName"
+        String image = "theImage"
+        List<String> args = ["theCommand", "theArgs"]
+        String workingDir = "/a/b/c"
+        Map<String, String>env = [test:"test"]
+
+        def mockTask = Mock(TaskRun){
+            getName() >> name
+            getContainer() >> image
+            getConfig() >> Mock(TaskConfig)
+            getWorkDirStr() >> workingDir
+            getContainer() >> "ubuntu"
+            getProcessor() >> Mock(TaskProcessor){
+                getExecutor() >> Mock(Executor){
+                    isFusionEnabled() >> false
+                }
+                getConfig() >> Mock(ProcessConfig){
+                    get(TaskDirectives.NOMAD_OPTIONS) >> [priority: "high"]
+                }
+            }
+            getWorkDir() >> Path.of(workingDir)
+            toTaskBean() >> Mock(TaskBean){
+                getWorkDir() >> Path.of(workingDir)
+                getScript() >> "theScript"
+                getShell() >> ["bash"]
+                getInputFiles() >> [:]
+            }
+        }
+
+        mockWebServer.enqueue(new MockResponse()
+                .setBody(JsonOutput.toJson(["EvalID":"test"]).toString())
+                .addHeader("Content-Type", "application/json"));
+        when:
+        def idJob = service.submitTask(id, mockTask, args, env)
+        def recordedRequest = mockWebServer.takeRequest();
+        def body = new JsonSlurper().parseText(recordedRequest.body.readUtf8())
+
+        then:
+        idJob
+        recordedRequest.method == "POST"
+        recordedRequest.path == "/v1/jobs"
+        body.Job.Priority == 80
+    }
+
+    void "submit a task with nomadOptions low priority"(){
+        given:
+        def config = new NomadConfig(
+                client:[
+                        address : "http://${mockWebServer.hostName}:${mockWebServer.port}"
+                ],
+        )
+        def service = new NomadService(config)
+
+        String id = "theId"
+        String name = "theName"
+        String image = "theImage"
+        List<String> args = ["theCommand", "theArgs"]
+        String workingDir = "/a/b/c"
+        Map<String, String>env = [test:"test"]
+
+        def mockTask = Mock(TaskRun){
+            getName() >> name
+            getContainer() >> image
+            getConfig() >> Mock(TaskConfig)
+            getWorkDirStr() >> workingDir
+            getContainer() >> "ubuntu"
+            getProcessor() >> Mock(TaskProcessor){
+                getExecutor() >> Mock(Executor){
+                    isFusionEnabled() >> false
+                }
+                getConfig() >> Mock(ProcessConfig){
+                    get(TaskDirectives.NOMAD_OPTIONS) >> [priority: "low"]
+                }
+            }
+            getWorkDir() >> Path.of(workingDir)
+            toTaskBean() >> Mock(TaskBean){
+                getWorkDir() >> Path.of(workingDir)
+                getScript() >> "theScript"
+                getShell() >> ["bash"]
+                getInputFiles() >> [:]
+            }
+        }
+
+        mockWebServer.enqueue(new MockResponse()
+                .setBody(JsonOutput.toJson(["EvalID":"test"]).toString())
+                .addHeader("Content-Type", "application/json"));
+        when:
+        def idJob = service.submitTask(id, mockTask, args, env)
+        def recordedRequest = mockWebServer.takeRequest();
+        def body = new JsonSlurper().parseText(recordedRequest.body.readUtf8())
+
+        then:
+        idJob
+        recordedRequest.method == "POST"
+        recordedRequest.path == "/v1/jobs"
+        body.Job.Priority == 30
+    }
+
+    void "submit a task with custom numeric priority from nomadOptions"(){
+        given:
+        def config = new NomadConfig(
+                client:[
+                        address : "http://${mockWebServer.hostName}:${mockWebServer.port}"
+                ],
+        )
+        def service = new NomadService(config)
+
+        String id = "theId"
+        String name = "theName"
+        String image = "theImage"
+        List<String> args = ["theCommand", "theArgs"]
+        String workingDir = "/a/b/c"
+        Map<String, String>env = [test:"test"]
+
+        def mockTask = Mock(TaskRun){
+            getName() >> name
+            getContainer() >> image
+            getConfig() >> Mock(TaskConfig)
+            getWorkDirStr() >> workingDir
+            getContainer() >> "ubuntu"
+            getProcessor() >> Mock(TaskProcessor){
+                getExecutor() >> Mock(Executor){
+                    isFusionEnabled() >> false
+                }
+                getConfig() >> Mock(ProcessConfig){
+                    get(TaskDirectives.NOMAD_OPTIONS) >> [priority: "67"]
+                }
+            }
+            getWorkDir() >> Path.of(workingDir)
+            toTaskBean() >> Mock(TaskBean){
+                getWorkDir() >> Path.of(workingDir)
+                getScript() >> "theScript"
+                getShell() >> ["bash"]
+                getInputFiles() >> [:]
+            }
+        }
+
+        mockWebServer.enqueue(new MockResponse()
+                .setBody(JsonOutput.toJson(["EvalID":"test"]).toString())
+                .addHeader("Content-Type", "application/json"));
+        when:
+        def idJob = service.submitTask(id, mockTask, args, env)
+        def recordedRequest = mockWebServer.takeRequest();
+        def body = new JsonSlurper().parseText(recordedRequest.body.readUtf8())
+
+        then:
+        idJob
+        recordedRequest.method == "POST"
+        recordedRequest.path == "/v1/jobs"
+        body.Job.Priority == 67
+    }
+
+    void "submit a task with custom numeric nomadOptions priority override"(){
+        given:
+        def config = new NomadConfig(
+                client:[
+                        address : "http://${mockWebServer.hostName}:${mockWebServer.port}"
+                ],
+        )
+        def service = new NomadService(config)
+
+        String id = "theId"
+        String name = "theName"
+        String image = "theImage"
+        List<String> args = ["theCommand", "theArgs"]
+        String workingDir = "/a/b/c"
+        Map<String, String>env = [test:"test"]
+
+        def mockTask = Mock(TaskRun){
+            getName() >> name
+            getContainer() >> image
+            getConfig() >> Mock(TaskConfig)
+            getWorkDirStr() >> workingDir
+            getContainer() >> "ubuntu"
+            getProcessor() >> Mock(TaskProcessor){
+                getExecutor() >> Mock(Executor){
+                    isFusionEnabled() >> false
+                }
+                getConfig() >> Mock(ProcessConfig){
+                    get(TaskDirectives.NOMAD_OPTIONS) >> [priority: "73"]
+                }
+            }
+            getWorkDir() >> Path.of(workingDir)
+            toTaskBean() >> Mock(TaskBean){
+                getWorkDir() >> Path.of(workingDir)
+                getScript() >> "theScript"
+                getShell() >> ["bash"]
+                getInputFiles() >> [:]
+            }
+        }
+
+        mockWebServer.enqueue(new MockResponse()
+                .setBody(JsonOutput.toJson(["EvalID":"test"]).toString())
+                .addHeader("Content-Type", "application/json"));
+        when:
+        def idJob = service.submitTask(id, mockTask, args, env)
+        def recordedRequest = mockWebServer.takeRequest();
+        def body = new JsonSlurper().parseText(recordedRequest.body.readUtf8())
+
+        then:
+        idJob
+        recordedRequest.method == "POST"
+        recordedRequest.path == "/v1/jobs"
+        body.Job.Priority == 73
+    }
+
+    void "submit a task with extended nomadOptions overrides"(){
+        given:
+        def config = new NomadConfig(
+                client:[
+                        address : "http://${mockWebServer.hostName}:${mockWebServer.port}"
+                ],
+                jobs:[
+                        namespace: 'global-ns',
+                        meta: [pipeline: 'p1', owner: 'team-a'],
+                        failures: [
+                                restart: [attempts: 3],
+                                reschedule: [attempts: 4]
+                        ],
+                        shutdownDelay: '30s'
+                ]
+        )
+        def service = new NomadService(config)
+
+        String id = "theId"
+        String name = "theName"
+        String image = "theImage"
+        List<String> args = ["theCommand", "theArgs"]
+        String workingDir = "/a/b/c"
+        Map<String, String>env = [test:"test"]
+
+        def mockTask = Mock(TaskRun){
+            getName() >> name
+            getContainer() >> image
+            getConfig() >> [memory: '1 GB']
+            getWorkDirStr() >> workingDir
+            getContainer() >> "ubuntu"
+            getProcessor() >> Mock(TaskProcessor){
+                getExecutor() >> Mock(Executor){
+                    isFusionEnabled() >> false
+                }
+                getConfig() >> Mock(ProcessConfig){
+                    get(TaskDirectives.NOMAD_OPTIONS) >> [
+                            namespace: 'process-ns',
+                            meta: [owner: 'team-b', step: 'align'],
+                            shutdownDelay: '15s',
+                            failures: [
+                                    restart: [attempts: 1, delay: '5s', mode: 'fail'],
+                                    reschedule: [attempts: 2, delay: '10s']
+                            ],
+                            resources: [
+                                    memoryMax: '2 GB',
+                                    device: [[name: 'nvidia/gpu', count: 1]]
+                            ]
+                    ]
+                }
+            }
+            getWorkDir() >> Path.of(workingDir)
+            toTaskBean() >> Mock(TaskBean){
+                getWorkDir() >> Path.of(workingDir)
+                getScript() >> "theScript"
+                getShell() >> ["bash"]
+                getInputFiles() >> [:]
+            }
+        }
+
+        mockWebServer.enqueue(new MockResponse()
+                .setBody(JsonOutput.toJson(["EvalID":"test"]).toString())
+                .addHeader("Content-Type", "application/json"));
+        when:
+        def idJob = service.submitTask(id, mockTask, args, env)
+        def recordedRequest = mockWebServer.takeRequest();
+        def body = new JsonSlurper().parseText(recordedRequest.body.readUtf8())
+
+        then:
+        idJob
+        recordedRequest.method == "POST"
+        recordedRequest.path == "/v1/jobs?namespace=process-ns"
+        body.Job.Namespace == 'process-ns'
+        body.Job.Meta == [pipeline: 'p1', owner: 'team-b', step: 'align']
+
+        body.Job.TaskGroups[0].RestartPolicy.Attempts == 1
+        body.Job.TaskGroups[0].RestartPolicy.Delay == 5000
+        body.Job.TaskGroups[0].RestartPolicy.Mode == 'fail'
+        body.Job.TaskGroups[0].ReschedulePolicy.Attempts == 2
+        body.Job.TaskGroups[0].ReschedulePolicy.Delay == 10000
+
+        body.Job.TaskGroups[0].Tasks[0].ShutdownDelay == 15000
+        body.Job.TaskGroups[0].Tasks[0].Resources.Cores == 1
+        body.Job.TaskGroups[0].Tasks[0].Resources.MemoryMB == 1024
+        body.Job.TaskGroups[0].Tasks[0].Resources.MemoryMaxMB == 2048
+        body.Job.TaskGroups[0].Tasks[0].Resources.Devices[0].Name == 'nvidia/gpu'
+        body.Job.TaskGroups[0].Tasks[0].Resources.Devices[0].Count == 1
     }
 
     void "placement failure detection should be disabled by default"() {

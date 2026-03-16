@@ -1,0 +1,25 @@
+nextflow_pipeline {
+
+    name "Test nextflow-io/hello"
+    script "nextflow-io/hello"
+    config "../../../validation/local-nomadlab/nextflow.local.config"
+    test("Should run without failures on local Nomad cluster") {
+        expect {
+            assert workflow.success
+            assert !workflow.failed
+            assert workflow.exitStatus == 0
+            assert workflow.trace.tasksCount == 4
+            assert workflow.trace.tasksSucceeded == 4
+            assert workflow.trace.tasksFailed == 0
+            assert workflow.trace.succeeded()*.name.every { it.startsWith('sayHello') }
+            assert (workflow.stderr ?: []).isEmpty()
+
+            def out = (workflow.stdout ?: []).join('\n')
+            assert out.contains('Bonjour world!')
+            assert out.contains('Ciao world!')
+            assert out.contains('Hello world!')
+            assert out.contains('Hola world!')
+        }
+    }
+
+}

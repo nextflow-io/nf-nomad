@@ -7,6 +7,14 @@ else
 mm =
 endif
 
+NOMAD_ADDR ?= http://localhost:4646
+NF_NOMAD_LOCAL_NOMAD_ADDR ?= http://localhost:4646
+NF_NOMAD_LOCAL_STACK_DIR ?= ${CURDIR}/../../infrastructure/03_automation/035_terraform/local-nomad-minio
+NF_NOMAD_LOCAL_WORK_DIR ?= ${NF_NOMAD_LOCAL_STACK_DIR}/work
+INTEGRATION_ARGS ?=
+NF_TEST_DIR ?= src/e2e
+NF_TEST_ARGS ?= tests/hello-remote.nf.test
+
 #
 # Clean, compile, package and install targets
 #
@@ -99,6 +107,25 @@ test-local:
 
 test-oci:
 	./gradlew ${mm}test -PtestEnv=oci
+test-integration:
+	NOMAD_ADDR=${NF_NOMAD_LOCAL_NOMAD_ADDR} \
+	NF_NOMAD_LOCAL_NOMAD_ADDR=${NF_NOMAD_LOCAL_NOMAD_ADDR} \
+	NF_NOMAD_LOCAL_STACK_DIR=${NF_NOMAD_LOCAL_STACK_DIR} \
+	NF_NOMAD_LOCAL_WORK_DIR=${NF_NOMAD_LOCAL_WORK_DIR} \
+	./validation/run-integration.sh --build ${INTEGRATION_ARGS}
+# nf-test E2E targets (local Nomad cluster)
+nf-test-update:
+	cd ${NF_TEST_DIR} && ./nf-test update
+
+test-nf-test:
+	@mkdir -p ${NF_NOMAD_LOCAL_WORK_DIR}/assets ${NF_NOMAD_LOCAL_WORK_DIR}/cache
+	NOMAD_ADDR=${NF_NOMAD_LOCAL_NOMAD_ADDR} \
+	NF_NOMAD_LOCAL_NOMAD_ADDR=${NF_NOMAD_LOCAL_NOMAD_ADDR} \
+	NF_NOMAD_LOCAL_STACK_DIR=${NF_NOMAD_LOCAL_STACK_DIR} \
+	NF_NOMAD_LOCAL_WORK_DIR=${NF_NOMAD_LOCAL_WORK_DIR} \
+	NXF_ASSETS=${NF_NOMAD_LOCAL_WORK_DIR}/assets \
+	NXF_CACHE_DIR=${NF_NOMAD_LOCAL_WORK_DIR}/cache \
+	cd ${NF_TEST_DIR} && ./nf-test test ${NF_TEST_ARGS} --verbose
 
 
 
@@ -160,6 +187,9 @@ help:
 	@echo "  make test-mock          - Run unit + mock tests"
 	@echo "  make test-local         - Run unit + local integration tests"
 	@echo "  make test-oci           - Run unit + OCI integration tests"
+	@echo "  make test-integration   - Run local real-pipeline integration suite (hello + demo + rnaseq)"
+	@echo "  make nf-test-update     - Install/update nf-test runtime under ~/.nf-test"
+	@echo "  make test-nf-test       - Run nf-test E2E tests (default: tests/hello-remote.nf.test)"
 	@echo ""
 	@echo "Other Targets:"
 	@echo "  make check              - Run all checks (compile + tests)"
@@ -174,6 +204,10 @@ help:
 	@echo "Examples:"
 	@echo "  make install-dev                  # Install development version"
 	@echo "  make test-local                   # Run local integration tests"
+	@echo "  make test-integration             # Run real pipeline integration suite"
+	@echo "  make test-integration INTEGRATION_ARGS='--skip-rnaseq'   # Faster local smoke run"
+	@echo "  make test-nf-test                                   # Run default nf-test hello E2E"
+	@echo "  make test-nf-test NF_TEST_ARGS='tests/*.nf.test'   # Run all nf-test specs"
 	@echo "  make dev-setup                    # Setup dev environment with instructions"
 	@echo "  make test class=MyTestClass       # Run specific test class"
 	@echo ""

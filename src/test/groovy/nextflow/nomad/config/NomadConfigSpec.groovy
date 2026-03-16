@@ -83,6 +83,46 @@ class NomadConfigSpec extends Specification {
         config.clientOpts.token == "theToken"
     }
 
+    void "should use client pollInterval and submitThrottle if provided"() {
+        given:
+        def config = new NomadConfig([
+                client: [
+                        address: "http://nomad",
+                        pollInterval: '2500ms',
+                        submitThrottle: '750ms'
+                ]
+        ])
+
+        expect:
+        config.clientOpts.pollInterval.millis == 2_500L
+        config.clientOpts.submitThrottle.millis == 750L
+    }
+
+    void "should derive client pollInterval and submitThrottle from environment variables"() {
+        given:
+        def config = new NomadConfig([
+                client: [address: "http://nomad"]
+        ], [
+                NF_NOMAD_POLL_INTERVAL: '3s',
+                NF_NOMAD_SUBMIT_THROTTLE: '2s'
+        ])
+
+        expect:
+        config.clientOpts.pollInterval.millis == 3_000L
+        config.clientOpts.submitThrottle.millis == 2_000L
+    }
+
+    void "should default client pollInterval and submitThrottle when absent"() {
+        given:
+        def config = new NomadConfig([
+                client: [address: "http://nomad"]
+        ])
+
+        expect:
+        config.clientOpts.pollInterval.millis == 1_000L
+        config.clientOpts.submitThrottle.millis == 0L
+    }
+
     void "should use the NOMAD_DC variable if no datacenters are provided"() {
         given:
         def config = new NomadConfig([
@@ -348,5 +388,29 @@ class NomadConfigSpec extends Specification {
         config2.jobOpts.spreadsSpec.getRaws().first().right.size() == 2
         config2.jobOpts.spreadsSpec.getRaws().first().right.first().left == 'a'
         config2.jobOpts.spreadsSpec.getRaws().first().right.first().right == 50
+    }
+
+    void "should enable debug output when debug json is true"() {
+        given:
+        def config = new NomadConfig([
+                debug: [json: true]
+        ])
+
+        expect:
+        config.debug.getJson()
+        config.debug.getEnabled()
+        config.debug.getPath() == null
+    }
+
+    void "should enable debug output when debug path is configured"() {
+        given:
+        def config = new NomadConfig([
+                debug: [path: 'debug/job-spec.json']
+        ])
+
+        expect:
+        !config.debug.getJson()
+        config.debug.getEnabled()
+        config.debug.getPath() == 'debug/job-spec.json'
     }
 }
