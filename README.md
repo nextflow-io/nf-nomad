@@ -114,22 +114,23 @@ process {
 }
 ```
 
-If both `nomadOptions.<key>` and a legacy directive are present for the same process, `nomadOptions.<key>` wins for that key.
-If `nomadOptions.resources.memoryMax` is not set, it defaults to the task `memory` value.
-Global `nomad.jobs.cpuMode` controls default CPU mapping (`cores` or `cpu`) when process-level `resources.cpu/cores` is not set.
-When `nomad.jobs.acceleratorAutoDevice=true` (default), Nextflow `accelerator` requests are translated into Nomad `resources.device` using `nomad.jobs.acceleratorDeviceName`.
-Global `nomad.jobs.cleanup` supports `always`, `never`, and `onSuccess` policies and supersedes `deleteOnCompletion` when set.
-When Nomad reports memory-limit/OOM task events, nf-nomad surfaces an explicit out-of-memory error message to reduce generic exit-code ambiguity.
-When `nomad.debug.json`/`nomad.debug.path` is enabled, Nomad metadata fields are persisted in dumped job JSON files: `nomad_job_id`, `nomad_alloc_id`, `nomad_node_id`, `nomad_node_name`, and `nomad_datacenter`.
-Task failure messages include Nomad inspection hints (job/allocation/node identifiers and allocation API URL when available).
-Global `nomad.client.pollInterval` controls task-state polling frequency (default `1s`) and can reduce Nomad API pressure for large workloads.
-Global `nomad.client.submitThrottle` enforces a minimum delay between Nomad job submissions (default `0s`) to smooth API load during large bursts.
-`nomad.client.retryConfig` and `nomad.client.submitThrottle` are complementary: retries/backoff handle failed requests, while submit throttling proactively spaces out new submissions.
-Process-level `nomadOptions.volumes` can add additional safe volume mounts without exposing arbitrary driver config.
-When global and process volume specs are merged, only one `workDir` volume is allowed and `readOnly` is preserved on generated task mounts.
-Process-level `nomadOptions.secretsPath` overrides `nomad.jobs.secrets.path` for that process only.
-Nomad task failures are reported as recoverable process errors so Nextflow `process.errorStrategy` / `maxRetries` remain authoritative.
-`nomad.debug.path` can be used to dump rendered Nomad job specs to a custom file path (relative paths resolve under task work directories).
+Some important considerations 
+- If both `nomadOptions.<key>` and a legacy directive are present for the same process, `nomadOptions.<key>` wins for that key.
+- If `nomadOptions.resources.memoryMax` is not set, it defaults to the task `memory` value.
+- Global `nomad.jobs.cpuMode` controls default CPU mapping (`cores` or `cpu`) when process-level `resources.cpu/cores` is not set.
+- When `nomad.jobs.acceleratorAutoDevice=true` (default), Nextflow `accelerator` requests are translated into Nomad `resources.device` using `nomad.jobs.acceleratorDeviceName`.
+- Global `nomad.jobs.cleanup` supports `always`, `never`, and `onSuccess` policies and supersedes `deleteOnCompletion` when set.
+- When Nomad reports memory-limit/OOM task events, nf-nomad surfaces an explicit out-of-memory error message to reduce generic exit-code ambiguity.
+- When `nomad.debug.json`/`nomad.debug.path` is enabled, Nomad metadata fields are persisted in dumped job JSON files: `nomad_job_id`, `nomad_alloc_id`, `nomad_node_id`, `nomad_node_name`, and `nomad_datacenter`.
+- Task failure messages include Nomad inspection hints (job/allocation/node identifiers and allocation API URL when available).
+- Global `nomad.client.pollInterval` controls task-state polling frequency (default `1s`) and can reduce Nomad API pressure for large workloads.
+- Global `nomad.client.submitThrottle` enforces a minimum delay between Nomad job submissions (default `0s`) to smooth API load during large bursts.
+- `nomad.client.retryConfig` and `nomad.client.submitThrottle` are complementary: retries/backoff handle failed requests, while submit throttling proactively spaces out new submissions.
+- Process-level `nomadOptions.volumes` can add additional safe volume mounts without exposing arbitrary driver config.
+- When global and process volume specs are merged, only one `workDir` volume is allowed and `readOnly` is preserved on generated task mounts.
+- Process-level `nomadOptions.secretsPath` overrides `nomad.jobs.secrets.path` for that process only.
+- Nomad task failures are reported as recoverable process errors so Nextflow `process.errorStrategy` / `maxRetries` remain authoritative.
+-`nomad.debug.path` can be used to dump rendered Nomad job specs to a custom file path (relative paths resolve under task work directories).
 
 ## Testing and debugging
 
