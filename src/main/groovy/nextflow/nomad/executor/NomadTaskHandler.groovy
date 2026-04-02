@@ -373,7 +373,10 @@ class NomadTaskHandler extends TaskHandler implements FusionAwareTask {
     protected boolean isCsiVolumeFailure(TaskState state) {
         final summary = taskEventSummary(state)?.toLowerCase()
         if (!summary) return false
-        return summary.contains('csi_hook') && summary.contains('an operation with the given volume id references already exists')
+        return summary.contains('csi_hook') || 
+               summary.contains('mounting volumes') || 
+               summary.contains('rpc error') ||
+               summary.contains('volume is already attached')
     }
 
     protected String taskEventSummary(TaskState state) {
