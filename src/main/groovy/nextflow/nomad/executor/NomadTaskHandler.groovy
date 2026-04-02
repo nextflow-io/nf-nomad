@@ -66,6 +66,10 @@ class NomadTaskHandler extends TaskHandler implements FusionAwareTask {
 
     private long submissionTime = 0L
 
+    private int csiRetries = 0
+
+    private static final int MAX_CSI_RETRIES = 5
+
     private final Path outputFile
 
     private final Path errorFile
@@ -144,6 +148,27 @@ class NomadTaskHandler extends TaskHandler implements FusionAwareTask {
 
         // if a state exists, include an array of states to determine task status
         if( state?.state && ( ["dead","complete","failed","lost"].contains(state.state))){
+            if (isCsiVolumeFailure(state)) {
+                if (csiRetries < MAX_CSI_RETRIES) {
+                    csiRetries++
+                    log.info "[NOMAD] Transient CSI volume error detected for task ${task.name}. Retrying submission (attempt ${csiRetries}/${MAX_CSI_RETRIES})..."
+                    try {
+                        nomadService.jobPurge(this.jobName)
+                    } catch (Exception e) {
+                        log.debug "[NOMAD] Failed to purge job before retry: ${e.message}"
+                    }
+                    this.state = null
+                    this.allocationId = null
+                    this.nodeId = null
+                    this.clientName = null
+                    this.datacenter = null
+                    submitTask()
+                    return false
+                } else {
+                    log.error "[NOMAD] Task ${task.name} failed due to CSI volume errors after ${MAX_CSI_RETRIES} attempts."
+                }
+            }
+
             // finalize the task
             task.exitStatus = defineExitCode()
             task.stdout = outputFile
@@ -343,6 +368,12 @@ class NomadTaskHandler extends TaskHandler implements FusionAwareTask {
             return true
         }
         return (exitStatus == 137 || exitStatus == 247) && summary?.contains('memory')
+    }
+
+    protected boolean isCsiVolumeFailure(TaskState state) {
+        final summary = taskEventSummary(state)?.toLowerCase()
+        if (!summary) return false
+        return summary.contains('csi_hook') && summary.contains('an operation with the given volume id references already exists')
     }
 
     protected String taskEventSummary(TaskState state) {
