@@ -218,17 +218,27 @@ class NomadJobOpts{
     }
 
     JobConstraints parseConstraints(Map nomadJobOpts){
-        if (nomadJobOpts.constraints && nomadJobOpts.constraints instanceof Closure) {
+        def value = nomadJobOpts.constraints
+        if( !value ) return null
+        // Closure shape: written as `constraints { node { ... } }` AND assigned
+        // via property-assignment (`= { ... }`) — Nextflow preserves it as a Closure.
+        if( value instanceof Closure ) {
             def constraintsSpec = new JobConstraints()
-            def closure = (nomadJobOpts.constraints as Closure)
+            def closure = (value as Closure)
             def clone = closure.rehydrate(constraintsSpec, closure.owner, closure.thisObject)
             clone.resolveStrategy = Closure.DELEGATE_FIRST
             clone()
             constraintsSpec.validate()
-            constraintsSpec
-        }else{
-            null
+            return constraintsSpec
         }
+        // Map shape: produced by Nextflow's config-file parser when the user writes
+        // `constraints { node { unique = [name: 'host'] } }` as a block (not `=` form).
+        // Without this branch the constraint is silently dropped.
+        if( value instanceof Map ) {
+            return JobConstraints.fromMap(value as Map)
+        }
+        log.warn "Ignoring nomad.jobs.constraints: expected a closure or map, got ${value.getClass().name}"
+        return null
     }
 
     NomadSecretOpts parseSecrets(Map nomadJobOpts){

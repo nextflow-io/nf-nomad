@@ -444,10 +444,17 @@ class JobBuilder {
             constraints.addAll(list)
         }
 
-        Closure closure = NomadTaskOptionsResolver.constraints(task)
-        if( closure ) {
-            JobConstraints constraintsSpec = JobConstraints.parse(closure)
-            def list = ConstraintsBuilder.constraintsSpecToList(constraintsSpec)
+        // Per-process directive may be a Closure (DSL form) or a Map (config-file
+        // parser form). Both must produce equivalent JobConstraints specs.
+        def directive = NomadTaskOptionsResolver.constraints(task)
+        JobConstraints perTaskSpec = null
+        if( directive instanceof Closure ) {
+            perTaskSpec = JobConstraints.parse(directive as Closure)
+        } else if( directive instanceof Map ) {
+            perTaskSpec = JobConstraints.fromMap(directive as Map)
+        }
+        if( perTaskSpec ) {
+            def list = ConstraintsBuilder.constraintsSpecToList(perTaskSpec)
             constraints.addAll(list)
         }
 

@@ -18,13 +18,18 @@
 
 package nextflow.nomad.models
 
+import groovy.util.logging.Slf4j
+
 /**
  * Nomad Job Constraint Spec
  *
  * @author Jorge Aguilera <jagedn@gmail.com>
  */
 
+@Slf4j
 class JobConstraints {
+
+    private static final Set<String> KNOWN_KEYS = ['node', 'attr'] as Set
 
     List<JobConstraintsNode> nodeSpecs = []
     List<JobConstraintsAttr> attrSpecs = []
@@ -58,5 +63,74 @@ class JobConstraints {
         clone()
         constraintsSpec.validate()
         constraintsSpec
+    }
+
+    /**
+     * Build a {@link JobConstraints} from a Map. This handles the shape produced
+     * by Nextflow's config-file parser when users write
+     *
+     * <pre>
+     * nomad {{ jobs {{ constraints {{ node {{ unique = [name: 'host'] }} }} }} }}
+     * </pre>
+     *
+     * which is parsed as a Map of Maps, not a Closure. Both single-block and
+     * list-of-blocks shapes are accepted for {@code node} / {@code attr} so users
+     * can express multiple specs even via Map config.
+     *
+     * Returns {@code null} when the supplied map is {@code null} or empty.
+     */
+    static JobConstraints fromMap(Map map){
+        if( !map ) return null
+
+        // Surface typos like `nodes:` (plural) or `attribute:` that would otherwise
+        // be silently ignored by the addNodeSpecs / addAttrSpecs lookups.
+        def unknown = map.keySet().findAll { !(KNOWN_KEYS.contains(it as String)) }
+        if( unknown ) {
+            log.warn "Unknown nomad constraints key(s) ${unknown} — supported: ${KNOWN_KEYS}"
+        }
+
+        JobConstraints spec = new JobConstraints()
+        addNodeSpecs(spec, map.node)
+        addAttrSpecs(spec, map.attr)
+        spec.validate()
+
+        if( spec.nodeSpecs.isEmpty() && spec.attrSpecs.isEmpty() ) {
+            log.warn "nomad constraints block produced no specs — input keys: ${map.keySet()}"
+        }
+        spec
+    }
+
+    private static void addNodeSpecs(JobConstraints spec, Object value){
+        if( value == null ) return
+        if( value instanceof Map ) {
+            spec.nodeSpecs << JobConstraintsNode.fromMap(value as Map)
+        } else if( value instanceof Iterable ) {
+            for( Object item : (value as Iterable) ) {
+                if( item instanceof Map ) {
+                    spec.nodeSpecs << JobConstraintsNode.fromMap(item as Map)
+                } else {
+                    log.warn "nomad constraints.node list entry must be a Map, got ${item?.getClass()?.name}"
+                }
+            }
+        } else {
+            log.warn "nomad constraints.node must be a Map or List<Map>, got ${value.getClass().name}"
+        }
+    }
+
+    private static void addAttrSpecs(JobConstraints spec, Object value){
+        if( value == null ) return
+        if( value instanceof Map ) {
+            spec.attrSpecs << JobConstraintsAttr.fromMap(value as Map)
+        } else if( value instanceof Iterable ) {
+            for( Object item : (value as Iterable) ) {
+                if( item instanceof Map ) {
+                    spec.attrSpecs << JobConstraintsAttr.fromMap(item as Map)
+                } else {
+                    log.warn "nomad constraints.attr list entry must be a Map, got ${item?.getClass()?.name}"
+                }
+            }
+        } else {
+            log.warn "nomad constraints.attr must be a Map or List<Map>, got ${value.getClass().name}"
+        }
     }
 }

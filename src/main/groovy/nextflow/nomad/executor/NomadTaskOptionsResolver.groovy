@@ -93,15 +93,25 @@ class NomadTaskOptionsResolver {
         return getOption(task, DATACENTERS, TaskDirectives.DATACENTERS)
     }
 
-    static Closure constraints(TaskRun task) {
+    /**
+     * Returns the per-process {@code constraints} directive value. Either a
+     * Closure (DSL form: {@code constraints {{ ... }}} or
+     * {@code constraints = {{ ... }}}) or a Map (the shape produced by
+     * Nextflow's config-file parser when users write a block-form value
+     * inside a {@code process {{ ... }}} scope).
+     *
+     * Returning {@code Object} keeps the call site type-aware so each shape
+     * is handled correctly without an artificial Map-to-Closure conversion.
+     */
+    static Object constraints(TaskRun task) {
         def value = getOption(task, CONSTRAINTS, TaskDirectives.CONSTRAINTS)
         if( value == null ) {
             return null
         }
-        if( value instanceof Closure ) {
-            return (Closure)value
+        if( value instanceof Closure || value instanceof Map ) {
+            return value
         }
-        invalidOption(task, "${TaskDirectives.NOMAD_OPTIONS}.${CONSTRAINTS}", value, "must be a closure")
+        invalidOption(task, "${TaskDirectives.NOMAD_OPTIONS}.${CONSTRAINTS}", value, "must be a closure or map")
         return null
     }
 

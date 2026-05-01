@@ -64,6 +64,27 @@ class JobBuilderNomadOptionsSpec extends Specification {
         taskDef.constraints[0].getRtarget() == 'linux'
     }
 
+    void "constraints should accept a Map directive (config-file shape)"() {
+        // Reproduces the shape that Nextflow's config-file parser produces
+        // for `process { constraints { node { unique = [name: 'host'] } } }`.
+        // Previously this raised "must be a closure"; now it should be parsed
+        // identically to the Closure form.
+        given:
+        Map mapConstraints = [node: [unique: [name: 'pinned-host']]]
+        def task = taskWithConfig([
+                (TaskDirectives.CONSTRAINTS): mapConstraints
+        ])
+        def taskDef = new Task()
+
+        when:
+        JobBuilder.constraints(task, taskDef, Stub(NomadJobOpts))
+
+        then:
+        taskDef.constraints.size() == 1
+        taskDef.constraints[0].getLtarget() == '${node.unique.name}'
+        taskDef.constraints[0].getRtarget() == 'pinned-host'
+    }
+
     void "secrets should prefer nomadOptions secrets list"() {
         given:
         def task = taskWithConfig([
