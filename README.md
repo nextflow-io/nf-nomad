@@ -5,9 +5,9 @@ This plugin implements a Nextflow executor for [Hashicorp Nomad](https://www.nom
 
 # Maintainers
 
-Please note that this is a **community contributed** plugin and is a collaboration between 
+Please note that this is a **community contributed** plugin and is a collaboration between
 
-1. Abhinav Sharma (@abhi18av) as part of his PhD work at the Stellenbosch University and Jorge Aguilera (@jagedn) as a contributor from  Evaluacion y desarrollo de negocios, Spain. 
+1. Abhinav Sharma (@abhi18av) as part of his PhD work at the Stellenbosch University and Jorge Aguilera (@jagedn) as a contributor from  Evaluacion y desarrollo de negocios, Spain.
 2. Tomas (@tomiles) and his team from Center For Medical Genetics Ghent, Belgium.
 
 The contribution roles during the development of initial plugin and testing along with the long term commitments have been discussed in [development and infrastructure group](https://github.com/nextflow-io/nf-nomad/issues/2#issue-1703543034).
@@ -195,5 +195,5 @@ Follow these steps to package, upload and publish the plugin:
     Once the action is finished a new release is created and all related artifacts attached to it
 
 3. Create a pull request against [nextflow-io/plugins](https://github.com/nextflow-io/plugins/blob/main/plugins.json) to make the plugin accessible to Nextflow.
-    
+
     Use the `json` file created in previous steps

@@ -24,9 +24,15 @@ import io.nomadproject.client.model.TaskState
 import nextflow.exception.ProcessException
 import nextflow.exception.ProcessSubmitException
 import nextflow.executor.BashWrapperBuilder
+import nextflow.executor.ScriptFileCopyStrategy
 import nextflow.fusion.FusionAwareTask
+import nextflow.nomad.builders.JobBuilder
 import nextflow.nomad.config.NomadConfig
 import nextflow.nomad.NomadHelper
+import nextflow.nomad.executor.spi.DistributedWorkdirProvider
+import nextflow.nomad.executor.spi.DistributedWorkdirProviderFactory
+import nextflow.nomad.executor.spi.NoopDistributedWorkdirProvider
+import nextflow.plugin.Plugins
 import nextflow.nomad.util.NomadLogging
 import nextflow.processor.TaskHandler
 import nextflow.processor.TaskRun
@@ -72,14 +78,63 @@ class NomadTaskHandler extends TaskHandler implements FusionAwareTask {
     private final Path errorFile
 
     private final Path exitFile
+    private final DistributedWorkdirProvider workdirProvider
+    private List<String> preparedSubmitCommand
+    private Map<String, String> preparedSubmitEnv
+    private List<NomadLifecycleTaskSpec> preparedLifecycleTasks
 
     NomadTaskHandler(TaskRun task, NomadConfig config, NomadService nomadService) {
+        this(task, config, nomadService, Collections.emptyMap(), null)
+    }
+
+    NomadTaskHandler(TaskRun task, NomadConfig config, NomadService nomadService, Map sessionConfig, Path sessionWorkDir) {
         super(task)
         this.config = config
         this.nomadService = nomadService
         this.outputFile = task.workDir.resolve(TaskRun.CMD_OUTFILE)
         this.errorFile = task.workDir.resolve(TaskRun.CMD_ERRFILE)
         this.exitFile = task.workDir.resolve(TaskRun.CMD_EXIT)
+        this.workdirProvider = selectWorkdirProvider(task, sessionConfig, sessionWorkDir)
+        this.preparedSubmitCommand = null
+        this.preparedSubmitEnv = Collections.emptyMap()
+        this.preparedLifecycleTasks = Collections.emptyList()
+    }
+
+    /**
+     * Pick the active distributed-workdir provider for a task. Transfer-tool
+     * plugins register a
+     * {@link DistributedWorkdirProviderFactory} via PF4J's
+     * {@code @Extension}, and we discover them through Nextflow's
+     * {@code Plugins.getExtensions} — which is classloader-aware (unlike
+     * a raw {@code Class.forName}) and works across PF4J's per-plugin
+     * classloader isolation.
+     *
+     * <p>Selection rule: take the first registered factory whose
+     * {@link DistributedWorkdirProviderFactory#isEnabled} returns true.
+     * Order is determined by PF4J — typically plugin load order. If none
+     * is active, fall back to {@link NoopDistributedWorkdirProvider} and
+     * let the executor assume a shared filesystem.</p>
+     */
+    protected static DistributedWorkdirProvider selectWorkdirProvider(TaskRun task, Map sessionConfig, Path sessionWorkDir) {
+        try {
+            List<DistributedWorkdirProviderFactory> factories =
+                    Plugins.getExtensions(DistributedWorkdirProviderFactory) ?: Collections.emptyList()
+            for( DistributedWorkdirProviderFactory factory : factories ) {
+                try {
+                    if( factory.isEnabled(sessionConfig) ) {
+                        log.debug "[NOMAD] selectWorkdirProvider: picking `${factory.name()}` for task `${task?.name}`"
+                        return factory.create(task, sessionConfig, sessionWorkDir)
+                    }
+                }
+                catch (Throwable t) {
+                    log.warn "[NOMAD] DistributedWorkdirProviderFactory `${factory?.name()}` failed isEnabled/create — skipping: ${t.message ?: t}"
+                }
+            }
+        }
+        catch (Throwable t) {
+            log.debug "[NOMAD] selectWorkdirProvider: extension lookup failed (Plugins subsystem unavailable?), falling back to noop: ${t.message ?: t}"
+        }
+        return new NoopDistributedWorkdirProvider()
     }
 
 
@@ -145,13 +200,67 @@ class NomadTaskHandler extends TaskHandler implements FusionAwareTask {
 
         // if a state exists, include an array of states to determine task status
         if( state?.state && ( ["dead","complete","failed","lost"].contains(state.state))){
+            Integer remoteExit = null
+            if( isWorkdirProviderActive() && !fusionEnabled() ) {
+                try {
+                    remoteExit = synchronizeWorkdirCompletion()
+                }
+                catch (Exception e) {
+                    task.exitStatus = Integer.MAX_VALUE
+                    task.stdout = outputFile
+                    task.stderr = errorFile
+                    status = TaskStatus.COMPLETED
+                    task.error = new ProcessException("[NOMAD] Failed to synchronize ${workdirProvider.name()} remote artifacts: ${e.message ?: e}")
+                    determineClientNode()
+                    return true
+                }
+            }
             // finalize the task
-            task.exitStatus = defineExitCode()
+            task.exitStatus = remoteExit != null ? remoteExit : defineExitCode()
             task.stdout = outputFile
             task.stderr = errorFile
             status = TaskStatus.COMPLETED
+
+            // Reconciliation: Nomad's alloc state and the worker's `.exitcode`
+            // file are two independent signals that occasionally disagree.
+            // The most common cases:
+            //   - SPI path: a transient Docker first-attempt fails
+            //     (image-pull race, exit 127), then a retry succeeds and pushes
+            //     back `.exitcode = 0` plus all expected outputs. Nomad's events
+            //     still show the historical 127.
+            //   - Vanilla shared-FS path: the worker writes `.exitcode = 0` but
+            //     the alloc lifecycle still ends with a non-zero docker exit
+            //     (post-success cleanup, idle timeout, sigterm during reaping).
+            //
+            // Rule: when the worker reported success via *either* signal — the
+            // SPI provider's remote `.exitcode` (remoteExit) OR the local
+            // exit-file read by defineExitCode (task.exitStatus, populated
+            // above) — trust the worker over Nomad's alloc-state failure flag.
+            // Log a warning so the discrepancy stays visible for ops, but
+            // don't kill the workflow.
+            //
+            // Only suppress when exitStatus is exactly 0. Any non-zero — from
+            // either source — means the user task genuinely failed; surface
+            // that as the error. defineExitCode returns Integer.MAX_VALUE when
+            // it couldn't read any signal, which trivially fails the `== 0`
+            // check, so a missing exit-file does NOT spuriously suppress.
+            final boolean trustWorkerSuccess =
+                    (remoteExit != null && remoteExit == 0) ||
+                    (remoteExit == null && task.exitStatus == 0)
             if ( !state || state.failed ) {
-                task.error = new ProcessException(failureMessage(state, task.exitStatus as Integer))
+                if( trustWorkerSuccess ) {
+                    final String src = remoteExit != null
+                            ? "${workdirProvider.name()} remote .exitcode"
+                            : 'local .exitcode'
+                    log.warn "[NOMAD] task `${task.name}` reported Nomad alloc-state failure but ${src} = 0; trusting the worker exit code"
+                } else {
+                    task.error = new ProcessException(failureMessage(state, task.exitStatus as Integer))
+                }
+            }
+            if( isWorkdirProviderActive() && remoteExit == null && task.exitStatus == Integer.MAX_VALUE && task.error == null ) {
+                task.error = new ProcessException(
+                        "[NOMAD] ${workdirProvider.name()} did not produce a readable remote .exitcode at `${workdirRemoteExitHint()}` for task `${task.name}`"
+                )
             }
             if (shouldDelete(state)) {
                 nomadService.jobPurge(this.jobName)
@@ -182,18 +291,29 @@ class NomadTaskHandler extends TaskHandler implements FusionAwareTask {
     }
 
     String submitTask() {
-        if (!task.container)
+        final driver = JobBuilder.resolveDriver(task, config.jobOpts())
+        if (NomadExecutor.isTaskDriverContainerNative(driver) && !task.container)
             throw new ProcessSubmitException("[NOMAD] Missing container image for process `$task.processor.name`")
 
         def builder = createBashWrapper(task)
         builder.build()
 
+        if( isWorkdirProviderActive() && !fusionEnabled() ) {
+            prepareWorkdirProvider()
+        }
+
         def hash = task.hash?.toString() ?: UUID.randomUUID().toString()
-        this.jobName = NomadHelper.sanitizeName(hash + "-" + task.name)
+        // New naming scheme: nf-<short-session>-<short-task>-<process>
+        // (See NomadHelper.childJobName for rationale; replaces legacy
+        // sanitizeName(hash + "-" + task.name) which collided across
+        // concurrent sessions running the same pipeline.)
+        def sessionId = task.processor?.session?.uniqueId?.toString() ?: ''
+        def processName = task.processor?.name ?: task.name
+        this.jobName = NomadHelper.childJobName(sessionId, hash, processName)
 
         final taskLauncher = getSubmitCommand(task)
         final taskEnv = getEnv(task)
-        nomadService.submitTask(this.jobName, task, taskLauncher, taskEnv, debugPath())
+        nomadService.submitTask(this.jobName, task, taskLauncher, taskEnv, preparedLifecycleTasks, debugPath())
         writeDebugMetadataSnapshot()
 
         // Record submission time for placement failure detection
@@ -216,21 +336,43 @@ class NomadTaskHandler extends TaskHandler implements FusionAwareTask {
     }
 
     protected List<String> getSubmitCommand(TaskRun task) {
+        if( preparedSubmitCommand ) {
+            return preparedSubmitCommand
+        }
         return fusionEnabled()
                 ? fusionSubmitCli()
                 : classicSubmitCli(task)
     }
 
     protected List<String> classicSubmitCli(TaskRun task) {
+        final driver = JobBuilder.resolveDriver(task, config.jobOpts())
         final result = new ArrayList(BashWrapperBuilder.BASH)
-        result.add("${Escape.path(task.workDir)}/${TaskRun.CMD_RUN}".toString())
+        if (NomadExecutor.isTaskDriverContainerNative(driver)) {
+            // Container-native drivers (docker, podman): absolute path inside container
+            result.add("${Escape.path(task.workDir)}/${TaskRun.CMD_RUN}".toString())
+        } else {
+            // Non-container-native drivers (pbs, slurm, raw_exec, exec):
+            // use relative path — abc-hpc-bridge cd's to work_dir first
+            result.add(TaskRun.CMD_RUN)
+        }
         return result
     }
 
     protected BashWrapperBuilder createBashWrapper(TaskRun task) {
-        fusionEnabled()
-                ? fusionLauncher()
-                : new NomadScriptLauncher(task.toTaskBean())
+        if( fusionEnabled() ) {
+            return fusionLauncher()
+        }
+        if( isWorkdirProviderActive() ) {
+            // When the provider stages externally (e.g. sidecar mode),
+            // skip stage-in/out in .command.run; otherwise keep staging enabled
+            // (the provider's bootstrap script runs .command.run as-is).
+            final boolean stagingDisabled = workdirProvider.isExternallyStaged()
+            def strategy = workdirProvider.createCopyStrategy(stagingDisabled)
+            if( strategy != null ) {
+                return new BashWrapperBuilder(task.toTaskBean(), (ScriptFileCopyStrategy)strategy)
+            }
+        }
+        return new NomadScriptLauncher(task.toTaskBean())
     }
 
     protected Map<String, String> getEnv(TaskRun task) {
@@ -242,8 +384,47 @@ class NomadTaskHandler extends TaskHandler implements FusionAwareTask {
         // Add Nomad-specific debug env variable
         if( SysEnv.containsKey('NF_NOMAD_DEBUG') )
             ret.put('NF_NOMAD_DEBUG', SysEnv.get('NF_NOMAD_DEBUG') )
+        if( preparedSubmitEnv ) {
+            ret += preparedSubmitEnv
+        }
+
+        // Identity correlation envs — Nextflow + Nomad-native signals plus
+        // any harness-supplied env vars (via nomad.jobs.identityEnvPassthrough).
+        // Mirrors NomadService.buildIdentityMeta so worker bootstrap log lines
+        // and child Job.Meta carry the same correlation fields.
+        ret += buildIdentityEnv(task, config?.jobOpts()?.identityEnvPassthrough ?: Collections.<String>emptyList())
 
         return ret
+    }
+
+    /** Identity envs to propagate to worker tasks (mirrors NomadService.buildIdentityMeta). */
+    protected static Map<String, String> buildIdentityEnv(TaskRun task, List<String> passthroughVars) {
+        Map<String, String> e = new LinkedHashMap<>()
+        // Harness-supplied passthrough — pure pass-through of the head's value
+        // under the same name on the worker.
+        for( String key : (passthroughVars ?: Collections.<String>emptyList()) ) {
+            String v = SysEnv.get(key)
+            if( v != null && !v.isEmpty() ) e.put(key, v)
+        }
+        // Nextflow session-level signals + per-task coordinates so the worker
+        // can emit a structured log line ([nf-task] start session=… task=…).
+        try {
+            def sess = task?.processor?.session
+            if( sess != null ) {
+                def sid = sess.uniqueId?.toString()
+                if( sid ) e.put('NF_SESSION_ID', sid)
+                def name = sess.runName?.toString()
+                if( name ) e.put('NF_SESSION_NAME', name)
+            }
+        } catch (Throwable ignored) { /* skip */ }
+        if( task?.processor?.name ) e.put('NF_PROCESS_NAME', task.processor.name)
+        if( task?.hash ) e.put('NF_TASK_HASH', task.hash.toString())
+        // Head's own Nomad ID/alloc — useful for child→head joins in logs
+        for( String key : ['NOMAD_JOB_ID','NOMAD_ALLOC_ID'] ) {
+            String v = SysEnv.get(key)
+            if( v != null && !v.isEmpty() ) e.put('NF_HEAD_' + (key == 'NOMAD_JOB_ID' ? 'JOB_ID' : 'ALLOC_ID'), v)
+        }
+        return e
     }
 
     protected TaskState taskState0() {
@@ -485,5 +666,24 @@ class NomadTaskHandler extends TaskHandler implements FusionAwareTask {
                 completeTimeMillis = System.currentTimeMillis()
             }
         }
+    }
+
+    protected boolean isWorkdirProviderActive() {
+        return workdirProvider.isEnabled()
+    }
+
+    protected void prepareWorkdirProvider() {
+        workdirProvider.prepare()
+        preparedSubmitCommand = workdirProvider.submitCommand
+        preparedSubmitEnv = workdirProvider.submitEnv
+        preparedLifecycleTasks = workdirProvider.lifecycleTasks
+    }
+
+    protected Integer synchronizeWorkdirCompletion() {
+        return workdirProvider.synchronizeCompletion()
+    }
+
+    protected String workdirRemoteExitHint() {
+        return workdirProvider.remoteExitHint
     }
 }

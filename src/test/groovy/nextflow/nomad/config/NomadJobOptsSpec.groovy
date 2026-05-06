@@ -36,6 +36,7 @@ class NomadJobOptsSpec extends Specification {
         nomadJobOpts.rescheduleAttempts == 1
         nomadJobOpts.restartAttempts == 1
         nomadJobOpts.dockerVolume == null
+        nomadJobOpts.driver == "docker"
         nomadJobOpts.cpuMode == NomadJobOpts.CPU_MODE_CORES
         nomadJobOpts.acceleratorAutoDevice == true
         nomadJobOpts.acceleratorDeviceName == 'nvidia/gpu'
@@ -262,6 +263,21 @@ class NomadJobOptsSpec extends Specification {
         nomadJobOpts1.placementFailureTimeout.millis == 20_000L
         nomadJobOpts2.placementFailureTimeout.millis == 300_000L
         nomadJobOpts3.placementFailureTimeout.millis == 3_600_000L
+    }
+
+    def "test driver defaults to docker"() {
+        expect:
+        new NomadJobOpts([:]).driver == "docker"
+    }
+
+    def "test driver can be set to pbs"() {
+        expect:
+        new NomadJobOpts([driver: 'pbs']).driver == "pbs"
+    }
+
+    def "test driver can be set to slurm"() {
+        expect:
+        new NomadJobOpts([driver: 'slurm']).driver == "slurm"
     }
 
 }

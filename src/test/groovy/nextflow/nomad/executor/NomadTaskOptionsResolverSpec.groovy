@@ -228,6 +228,52 @@ class NomadTaskOptionsResolverSpec extends Specification {
         thrown(IllegalArgumentException)
     }
 
+    void "should resolve per-process driver from nomadOptions"() {
+        given:
+        def task = taskWithConfig([
+                (TaskDirectives.NOMAD_OPTIONS): [driver: 'pbs']
+        ])
+
+        expect:
+        NomadTaskOptionsResolver.driver(task) == 'pbs'
+    }
+
+    void "should return null driver when nomadOptions has no driver"() {
+        given:
+        def task = taskWithConfig([
+                (TaskDirectives.NOMAD_OPTIONS): [datacenters: ['dc1']]
+        ])
+
+        expect:
+        NomadTaskOptionsResolver.driver(task) == null
+    }
+
+    void "should accept all supported driver values"() {
+        given:
+        def task = taskWithConfig([
+                (TaskDirectives.NOMAD_OPTIONS): [driver: driverValue]
+        ])
+
+        expect:
+        NomadTaskOptionsResolver.driver(task) == driverValue
+
+        where:
+        driverValue << ['docker', 'pbs', 'slurm', 'raw_exec', 'exec']
+    }
+
+    void "should fail on unsupported driver value"() {
+        given:
+        def task = taskWithConfig([
+                (TaskDirectives.NOMAD_OPTIONS): [driver: 'invalid_driver']
+        ])
+
+        when:
+        NomadTaskOptionsResolver.driver(task)
+
+        then:
+        thrown(IllegalArgumentException)
+    }
+
     private TaskRun taskWithConfig(Map<String, Object> configValues) {
         def processConfig = Mock(ProcessConfig)
         processConfig.get(_ as String) >> { String key -> configValues.get(key) }

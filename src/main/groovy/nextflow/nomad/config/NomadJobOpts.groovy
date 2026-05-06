@@ -50,7 +50,27 @@ class NomadJobOpts{
     String region
     String namespace
     String dockerVolume
+    /**
+     * Nomad task driver used for the per-process child task.
+     * Defaults to 'docker' (preserves existing behaviour). Set to
+     * 'containerd-driver' (or any other registered driver) to run on
+     * nodes that don't have docker — e.g. aither, which only has
+     * nomad-driver-containerd registered. Reads from
+     * `nomad.jobs.taskDriver` in nextflow.config or NF_NOMAD_TASK_DRIVER env.
+     */
+    String taskDriver
     Map<String, String> meta
+    /**
+     * Names of head-task environment variables whose values are mirrored
+     * onto every spawned child task — both as Job.Meta entries (lowercased
+     * key) and as task env. Lets an enclosing harness inject correlation
+     * fields (user / workspace / pipeline) without nf-nomad having to know
+     * which fields exist. Defaults to empty (legacy behaviour).
+     *
+     * Configure as: {@code nomad.jobs.identityEnvPassthrough = ['MY_VAR_A', 'MY_VAR_B']}
+     * or via NF_NOMAD_IDENTITY_ENV_PASSTHROUGH=COMMA,SEPARATED.
+     */
+    List<String> identityEnvPassthrough
     Duration shutdownDelay
     Map<String, Object> restartPolicy
     Map<String, Object> reschedulePolicy
@@ -72,6 +92,8 @@ class NomadJobOpts{
 
     NomadSecretOpts secretOpts
 
+    String driver
+
     NomadJobOpts(Map nomadJobOpts, Map<String,String> env=null){
         assert nomadJobOpts!=null
 
@@ -79,6 +101,8 @@ class NomadJobOpts{
         if( env ) {
             sysEnv.putAll(env)
         }
+
+        driver = nomadJobOpts.driver?.toString() ?: "docker"
 
         deleteOnCompletion = nomadJobOpts.containsKey("deleteOnCompletion") ?
                 nomadJobOpts.deleteOnCompletion : true
@@ -100,6 +124,9 @@ class NomadJobOpts{
         region = sanitizeOptionalString(nomadJobOpts.region) ?: sanitizeOptionalString(sysEnv.get('NOMAD_REGION'))
         namespace = sanitizeOptionalString(nomadJobOpts.namespace) ?: sanitizeOptionalString(sysEnv.get('NOMAD_NAMESPACE'))
         meta = parseStringMap(nomadJobOpts.meta)
+        identityEnvPassthrough = parseStringList(
+                nomadJobOpts.get('identityEnvPassthrough'),
+                sysEnv.get('NF_NOMAD_IDENTITY_ENV_PASSTHROUGH'))
         shutdownDelay = parseOptionalDuration(nomadJobOpts.shutdownDelay)
 
         Map<String, Object> failures = nomadJobOpts.failures instanceof Map ? (nomadJobOpts.failures as Map<String, Object>) : Collections.emptyMap()
@@ -143,6 +170,10 @@ class NomadJobOpts{
         if( dockerVolume ){
             log.info "dockerVolume config will be deprecated, use volume type:'docker' name:'name' instead"
         }
+
+        taskDriver = sanitizeOptionalString(nomadJobOpts.get('taskDriver'))
+                ?: sanitizeOptionalString(sysEnv.get('NF_NOMAD_TASK_DRIVER'))
+                ?: 'docker'
 
         this.volumeSpec = parseVolumes(nomadJobOpts)
         this.affinitySpec = parseAffinity(nomadJobOpts)
@@ -276,6 +307,23 @@ class NomadJobOpts{
     private static String sanitizeOptionalString(Object value) {
         final str = value?.toString()?.trim()
         str ? str : null
+    }
+
+    /**
+     * Parse a list-of-strings config value. Accepts either a {@link List}
+     * (config form) or a comma-separated {@link String} (env-var form).
+     * Whitespace trimmed; empty entries dropped; duplicates preserved.
+     */
+    private static List<String> parseStringList(Object configValue, Object envValue) {
+        Object raw = configValue ?: envValue
+        if( raw == null ) return Collections.<String>emptyList()
+        List<String> items
+        if( raw instanceof List ) {
+            items = ((List)raw).collect { it?.toString()?.trim() }
+        } else {
+            items = raw.toString().split(',').collect { it?.trim() }
+        }
+        return items.findAll { it } as List<String>
     }
 
     private static Map<String, String> parseStringMap(Object value) {
