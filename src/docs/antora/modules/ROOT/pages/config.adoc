@@ -89,7 +89,7 @@ nomad{
 - `acceleratorDeviceName`: Device name to use for automatic accelerator mapping (default `nvidia/gpu`).
 - `volumeSpec`: The volumes which should be accessible to the jobs.
 - `affinitiesSpec`: The affinities which should be attached to the job spec.
-- `constraintsSpec`: The constraints which should be attached to the job spec.
+- `constraintsSpec`: The constraints which should be attached to the job spec. Accepts either Closure (inline) or Map (config-file block) syntax — see <<constraints-syntax,Constraints syntax>> below.
 - `spreadsSpec`: The spreads spec which should be used with all generated jobs.
 - `rescheduleAttempts`: Number of rescheduling (to a different node) attempts for the generated jobs.
 - `restartAttempts`: Number of restart (on the same node) attempts for the generated jobs.
@@ -102,6 +102,190 @@ nomad{
 - `dockerVolume`, DEPRECATED
 - `affinitySpec`, DEPRECATED
 - `constraintSpec`, DEPRECATED
+
+[[constraints-syntax]]
+=== Constraints syntax
+
+There are two independent scopes for constraints, and they work differently.
+
+==== Global constraints (`nomad.jobs.constraints`)
+
+Applies to every task in the pipeline. Set in `nextflow.config` using assignment form
+(`= { ... }`), which Nextflow preserves as a Closure:
+
+[source,groovy]
+----
+nomad {
+    jobs {
+        // All jobs must land on a node in the cape-town datacenter
+        constraints = {
+            node {
+                dataCenter = 'cape-town'
+            }
+        }
+    }
+}
+----
+
+NOTE: Writing `constraints { ... }` without `=` at this scope is also accepted — Nextflow's
+config parser converts the block to a Map, and the plugin handles both shapes. Prefer the
+`= { ... }` form to make the intent explicit.
+
+==== Per-process constraints (`nomadOptions.constraints`)
+
+Set per process (or process selector) inside `nomadOptions = [ ... ]`. The value must be
+a Closure. Per-process constraints are _additive_ — they are appended to any global
+constraints already set.
+
+[source,groovy]
+----
+process {
+    withName: 'BWA_MEM' {
+        nomadOptions = [
+            constraints: {
+                node {
+                    pool = 'highmem'          // only schedule on high-memory node pool
+                }
+            }
+        ]
+    }
+}
+----
+
+NOTE: The legacy `constraints` process directive (used outside `nomadOptions`) is
+deprecated and will be removed in the next release. Migrate to `nomadOptions.constraints`.
+
+==== Node constraint keys
+
+Node constraints match against Nomad's built-in node attributes and metadata:
+
+|===
+| Key | Value type | Nomad constraint generated
+
+| `unique = [name: '...']`
+| Map with key `name` and/or `id`
+| `${node.unique.name} = <name>` and/or `${node.unique.id} = <id>`
+
+| `clazz = '...'`
+| string
+| `${node.class} = <value>` (use `clazz` — `class` is a Groovy reserved word)
+
+| `pool = '...'`
+| string
+| `${node.pool} = <value>`
+
+| `dataCenter = '...'`
+| string
+| `${node.datacenter} = <value>`
+
+| `region = '...'`
+| string
+| `${node.region} = <value>`
+|===
+
+==== Attr constraint keys
+
+Attr constraints match against Nomad's `attr.*` intrinsic attributes:
+
+|===
+| Key | Sub-keys | Nomad constraint generated
+
+| `cpu = [...]`
+| `arch`: string, `numcores`: int, `reservablecores`: int, `totalcompute`: string
+| `${attr.cpu.arch} = <arch>`, `${attr.cpu.numcores} >= <n>`, etc.
+
+| `unique = [...]`
+| `hostname`: string, `ip-address`: string
+| `${attr.unique.hostname} = <hostname>`, `${attr.unique.network.ip-address} = <ip>`
+
+| `kernel = [...]`
+| `name`: string, `arch`: string, `version`: string
+| `${attr.kernel.name} = <name>`, etc.
+|===
+
+==== Examples
+
+**Pin all jobs to a specific datacenter and all alignment jobs to high-core nodes:**
+
+[source,groovy]
+----
+nomad {
+    jobs {
+        constraints = {
+            node { dataCenter = 'dc-nairobi' }   // global: every job stays in this DC
+        }
+    }
+}
+
+process {
+    withName: 'BWA_MEM' {
+        nomadOptions = [
+            constraints: {
+                attr { cpu = [numcores: 16] }     // additionally: at least 16 cores
+            }
+        ]
+    }
+}
+----
+
+**Route GPU-accelerated inference to a dedicated node class:**
+
+[source,groovy]
+----
+process {
+    withName: 'DEEPVARIANT' {
+        nomadOptions = [
+            constraints: {
+                node { clazz = 'gpu' }
+            }
+        ]
+    }
+}
+----
+
+**Route different pipeline stages to separate named nodes:**
+
+[source,groovy]
+----
+process {
+    withName: 'FASTQC' {
+        nomadOptions = [
+            constraints: {
+                node { unique = [name: 'compute-01'] }
+            }
+        ]
+    }
+    withName: 'MULTIQC' {
+        nomadOptions = [
+            constraints: {
+                node { unique = [name: 'compute-02'] }
+            }
+        ]
+    }
+}
+----
+
+**Restrict all jobs to Linux nodes with at least 8 reservable CPU cores:**
+
+[source,groovy]
+----
+nomad {
+    jobs {
+        constraints = {
+            attr { kernel = [name: 'linux'] }
+            attr { cpu    = [reservablecores: 8] }
+        }
+    }
+}
+----
+
+**Validation warnings:**
+
+The plugin validates constraint blocks before submission and logs a `WARN` for unknown keys,
+type mismatches, or blocks that produce no usable constraint. The job is still submitted so
+that misconfigured constraints surface as a Nomad scheduler placement error rather than
+being silently dropped.
+
 === Process directives
 
 The plugin supports process-level Nomad directives in two forms:

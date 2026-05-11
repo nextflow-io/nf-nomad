@@ -19,6 +19,7 @@
 
 package nextflow.nomad.models
 
+import groovy.util.logging.Slf4j
 import org.apache.commons.lang3.tuple.Triple
 
 /**
@@ -27,7 +28,14 @@ import org.apache.commons.lang3.tuple.Triple
  * @author Jorge Aguilera <jagedn@gmail.com>
  */
 
+@Slf4j
 class JobConstraintsAttr {
+
+    private static final Set<String> KNOWN_KEYS = ['cpu', 'unique', 'kernel'] as Set
+    private static final Set<String> KNOWN_CPU_KEYS =
+            ['arch', 'numcores', 'reservablecores', 'totalcompute'] as Set
+    private static final Set<String> KNOWN_UNIQUE_KEYS = ['hostname', 'ip-address'] as Set
+    private static final Set<String> KNOWN_KERNEL_KEYS = ['arch', 'name', 'version'] as Set
 
     private List<Triple<String, String, String>> raws= []
 
@@ -80,5 +88,52 @@ class JobConstraintsAttr {
     JobConstraintsAttr raw(String attr, String operator, String value){
         raws.add Triple.of("attr."+attr, operator, value)
         this
+    }
+
+    /**
+     * Build a {@link JobConstraintsAttr} from a plain Map (the form produced by
+     * Nextflow's config-file parser when {@code attr {{ ... }}} appears inside a
+     * {@code constraints {{ ... }}} block).
+     */
+    static JobConstraintsAttr fromMap(Map map){
+        def spec = new JobConstraintsAttr()
+        if( map == null ) {
+            log.warn "Ignoring null nomad attr constraint Map"
+            return spec
+        }
+
+        def unknown = map.keySet().findAll { !(KNOWN_KEYS.contains(it as String)) }
+        if( unknown ) {
+            log.warn "Unknown nomad attr constraint key(s) ${unknown} — supported: ${KNOWN_KEYS}"
+        }
+
+        applySubMap(spec, map, 'cpu',    KNOWN_CPU_KEYS,    { Map m -> spec.cpu(m) })
+        applySubMap(spec, map, 'unique', KNOWN_UNIQUE_KEYS, { Map m -> spec.unique(m) })
+        applySubMap(spec, map, 'kernel', KNOWN_KERNEL_KEYS, { Map m -> spec.kernel(m) })
+
+        if( spec.raws.isEmpty() ) {
+            log.warn "nomad attr constraint produced no raw entries — block has no effect (input keys: ${map.keySet()})"
+        }
+        spec
+    }
+
+    private static void applySubMap(JobConstraintsAttr spec, Map parent, String key,
+                                    Set<String> known, Closure apply){
+        if( !parent.containsKey(key) ) return
+        def value = parent.get(key)
+        if( !(value instanceof Map) ) {
+            log.warn "nomad attr.${key} must be a Map, got ${value?.getClass()?.name}"
+            return
+        }
+        Map m = value as Map
+        def unknown = m.keySet().findAll { !(known.contains(it as String)) }
+        if( unknown ) {
+            log.warn "Unknown nomad attr.${key} key(s) ${unknown} — supported: ${known}"
+        }
+        if( !known.any { m.containsKey(it) } ) {
+            log.warn "nomad attr.${key} map must contain at least one of ${known}"
+            return
+        }
+        apply(m)
     }
 }

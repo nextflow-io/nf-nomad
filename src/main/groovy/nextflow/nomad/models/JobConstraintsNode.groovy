@@ -19,6 +19,7 @@
 
 package nextflow.nomad.models
 
+import groovy.util.logging.Slf4j
 import org.apache.commons.lang3.tuple.Triple
 
 /**
@@ -27,7 +28,15 @@ import org.apache.commons.lang3.tuple.Triple
  * @author Jorge Aguilera <jagedn@gmail.com>
  */
 
+@Slf4j
 class JobConstraintsNode {
+
+    /** Valid top-level keys when constructing from a Map. */
+    private static final Set<String> KNOWN_KEYS =
+            ['unique', 'clazz', 'class', 'pool', 'dataCenter', 'datacenter', 'region'] as Set
+
+    /** Valid keys inside the {@code unique} sub-map. */
+    private static final Set<String> KNOWN_UNIQUE_KEYS = ['id', 'name'] as Set
 
     private List<Triple<String, String, String>> raws= []
 
@@ -86,5 +95,56 @@ class JobConstraintsNode {
     JobConstraintsNode raw(String attr, String operator, String value){
         raws.add Triple.of("node."+attr, operator, value)
         this
+    }
+
+    /**
+     * Build a {@link JobConstraintsNode} from a plain Map. This is the form Nextflow's
+     * config-file DSL produces when users write {@code node {{ ... }}} inside a
+     * {@code constraints {{ ... }}} block — the closure is flattened into a Map,
+     * which previously failed the Closure-only parser silently.
+     *
+     * Accepts {@code class} as well as {@code clazz}, and {@code datacenter} as well
+     * as {@code dataCenter}, to match both Groovy DSL and YAML/JSON style configs.
+     */
+    static JobConstraintsNode fromMap(Map map){
+        def spec = new JobConstraintsNode()
+        if( map == null ) {
+            log.warn "Ignoring null nomad node constraint Map"
+            return spec
+        }
+
+        // Warn on typos / unsupported keys so silent drops surface to the user.
+        def unknown = map.keySet().findAll { !(KNOWN_KEYS.contains(it as String)) }
+        if( unknown ) {
+            log.warn "Unknown nomad node constraint key(s) ${unknown} — supported: ${KNOWN_KEYS - ['clazz', 'datacenter']}"
+        }
+
+        if( map.containsKey('unique') ) {
+            if( map.unique instanceof Map ) {
+                Map u = map.unique as Map
+                def unknownUnique = u.keySet().findAll { !(KNOWN_UNIQUE_KEYS.contains(it as String)) }
+                if( unknownUnique ) {
+                    log.warn "Unknown nomad node.unique key(s) ${unknownUnique} — supported: ${KNOWN_UNIQUE_KEYS}"
+                }
+                if( !KNOWN_UNIQUE_KEYS.any { u.containsKey(it) } ) {
+                    log.warn "nomad node.unique map must contain at least one of ${KNOWN_UNIQUE_KEYS}"
+                }
+                spec.unique(u)
+            } else {
+                log.warn "nomad node.unique must be a Map, got ${map.unique?.getClass()?.name}"
+            }
+        }
+
+        if( map.containsKey('clazz') )            spec.clazz(map.clazz)
+        else if( map.containsKey('class') )       spec.clazz(map['class'])
+        if( map.containsKey('pool') )             spec.pool(map.pool)
+        if( map.containsKey('dataCenter') )       spec.dataCenter(map.dataCenter)
+        else if( map.containsKey('datacenter') )  spec.dataCenter(map.datacenter)
+        if( map.containsKey('region') )           spec.region(map.region)
+
+        if( spec.raws.isEmpty() ) {
+            log.warn "nomad node constraint produced no raw entries — block has no effect (input keys: ${map.keySet()})"
+        }
+        spec
     }
 }

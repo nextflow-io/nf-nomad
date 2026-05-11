@@ -114,7 +114,11 @@ process {
 }
 ```
 
-Some important considerations 
+Some important considerations
+- **Two constraint scopes**: `nomad.jobs.constraints = { ... }` sets a global constraint applied to every task; `nomadOptions.constraints: { ... }` (inside a process selector) sets a per-process constraint that is _additive_ to the global one. The two scopes are independent — per-process constraints do not replace the global ones, they append to them.
+- **`nomadOptions.constraints` takes a Closure**: because `nomadOptions` is a Map literal (`= [...]`), the constraints value is always a Closure. The legacy `constraints` process directive (used outside `nomadOptions`) is deprecated and will be removed in the next release — migrate to `nomadOptions.constraints`.
+- **Constraint validation warnings**: the plugin validates constraint blocks before submission and logs a `WARN` for unknown keys, type mismatches, or blocks that produce no usable constraint. The job is still submitted so that misconfigured constraints surface as a Nomad scheduler placement error rather than being silently dropped.
+- **Exit code resolution**: the plugin reads the `.command.exit` file written by the task wrapper first. If that file is absent or empty, it falls back to the exit code reported in Nomad TaskState events. If both sources are unavailable, the task is marked failed with exit code `Integer.MAX_VALUE` to ensure the Nextflow error strategy handles it correctly rather than treating it as a success.
 - If both `nomadOptions.<key>` and a legacy directive are present for the same process, `nomadOptions.<key>` wins for that key.
 - If `nomadOptions.resources.memoryMax` is not set, it defaults to the task `memory` value.
 - Global `nomad.jobs.cpuMode` controls default CPU mapping (`cores` or `cpu`) when process-level `resources.cpu/cores` is not set.
