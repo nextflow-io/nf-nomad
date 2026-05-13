@@ -101,6 +101,28 @@ To run only the rnaseq scenario and skip the default local validation set:
 ./run-all.sh --skiplocal --rnaseq
 ```
 
+### Distributed-workdir tests (non-shared-FS clusters)
+
+`start-nomad.sh` and `run-rnaseq-nf.sh` assume a **shared `scratchdir` host
+volume** mounted across the server and the single client. They exercise
+nf-nomad's default (noop) workdir provider only.
+
+For the **`DistributedWorkdirProvider` SPI path** (no shared FS;
+work-dirs live on S3), the validation harness lives in the
+[`nf-nomad-s5cmd`](https://github.com/incsteps/nf-nomad-s5cmd) plugin repo.
+It provides:
+
+- Build instructions (both plugins as `99.99.99` against this branch).
+- A canonical `nextflow.config` with `nomad.s5cmd.workDir.*` activated.
+- Pinned test runs for `nextflow-io/rnaseq-nf@v2.3` and
+  `nf-core/demo@1.1.0`, plus a verification checklist (look for
+  `Selected distributed-workdir provider: s5cmd` in `.nextflow.log`,
+  `.exitcode` markers in S3, alloc-state reconciliation signals).
+
+When you cut a release of `nf-nomad` on `feature/remoteworkdir`, run that
+harness as part of the release gate so the SPI extension point keeps
+working end-to-end.
+
 ### Test remote cluster
 
 We've created a cluster with 3 nodes in azure called `nfazure` and, if you have access to it, 

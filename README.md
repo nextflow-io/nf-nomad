@@ -72,6 +72,49 @@ If you need a different endpoint, override explicitly:
 ./gradlew test -PtestEnv=local -PnomadAddr=http://<host>:4646
 ```
 
+## Distributed workdir via SPI
+
+`nf-nomad` ships a `DistributedWorkdirProvider` SPI at
+`nextflow.nomad.executor.spi.*` for clusters without a shared filesystem
+between head node and workers. Provider plugins register via PF4J
+`@Extension`; `nf-nomad` discovers them at runtime through
+`Plugins.getExtensions(DistributedWorkdirProviderFactory.class)` and selects
+the first one whose `isEnabled(sessionConfig)` returns true. A
+`NoopDistributedWorkdirProvider` is the fallback for shared-FS clusters.
+
+Per-task lifecycle the provider owns:
+
+- **Copy strategy** — what gets staged in / out for a given `TaskRun`.
+- **Prepare** — operator-side setup before the Nomad job is submitted
+  (e.g. upload `.command.*` to remote storage).
+- **Submit command + env + lifecycle tasks** — what runs inside the Nomad
+  task container as the bootstrap script.
+- **`synchronizeCompletion`** — read the remote `.exitcode` marker once the
+  task ends; `NomadTaskHandler` reconciliation trusts `0` from this signal
+  over a Nomad alloc-state failure.
+
+Provider plugins shipped today:
+
+- **[nf-nomad-s5cmd](https://github.com/incsteps/nf-nomad-s5cmd)** —
+  S3-backed work-dir via `s5cmd`. Activate with
+  `nomad.s5cmd.enabled = true` + `nomad.s5cmd.workDir.enabled = true` +
+  `nomad.s5cmd.workDir.bucket = 's3://…'`.
+
+No rclone-specific code lives in `nf-nomad` anymore. If you want to write a
+new provider, implement `DistributedWorkdirProvider` and
+`DistributedWorkdirProviderFactory`, annotate the factory with `@Extension`,
+and pick a session-config scope key — that's the full contract.
+
+### Harness-driven Nomad job naming
+
+When an enclosing harness (e.g. `abc-cluster-cli`) wants to own Nomad
+job-id naming, set `NF_NOMAD_RUN_TAG` in the environment. nf-nomad's
+`NomadHelper.childJobName(sessionId, taskHash, processName)` builds
+`<runtag>-<8-char-taskhash>-<process>`. Without the env var, the 8-char
+prefix falls back to `take8(sessionId)` so vanilla Nextflow runs keep
+working. Solves the legacy `nf-<taskhash>-<process>` collision when two
+parallel runs of the same pipeline share a Nomad job-id namespace.
+
 ## Runtime security default
 
 Nomad Docker jobs are **not privileged by default**.
