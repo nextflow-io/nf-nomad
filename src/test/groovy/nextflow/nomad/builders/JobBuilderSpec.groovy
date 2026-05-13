@@ -99,4 +99,23 @@ class JobBuilderSpec extends Specification {
     }
 
 
+    def "test networkMode config"() {
+        given:
+        def jobOpts = Mock(NomadJobOpts){
+            getNetworkMode() >> 'test'
+        }
+        def taskRun = Mock(TaskRun)
+        def args = ["arg1", "arg2"]
+        def env = ["key": "value"]
+
+        taskRun.container >> "test-container"
+        taskRun.workDir >> new File("/test/workdir").toPath()
+        taskRun.getConfig() >> [cpus: 2, memory: "1GB"]
+
+        when:
+        def task = JobBuilder.createTask(taskRun, args, env, jobOpts)
+
+        then:
+        task.config.network_mode == "test"
+    }
 }

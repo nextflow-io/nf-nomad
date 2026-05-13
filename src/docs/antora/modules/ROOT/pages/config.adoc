@@ -28,6 +28,7 @@ nomad{
         deleteOnCompletion = false
         cleanup = 'onSuccess'             // always | never | onSuccess
         privileged = true
+        networkMode = 'test'                // optional. Can be bridge, host or a named network
         cpuMode = 'cores'                 // or 'cpu'
         acceleratorAutoDevice = true      // map Nextflow accelerator directive to Nomad resources.device
         acceleratorDeviceName = 'nvidia/gpu'
@@ -84,6 +85,7 @@ nomad{
 - `region`: The region for job submission.
 - `namespace`: The namespace to be used for all Nextflow jobs.
 - `privileged`: Run Docker tasks in privileged mode (default `true`).
+- 'networkMode' Mode of the network. This option is only supported on Linux clients. The following modes are available: none, bridge (default), host, <cni_network_name>
 - `cpuMode`: How task `cpus` maps to Nomad resources when process-level overrides are not set. Use `cores` (default) or `cpu`.
 - `acceleratorAutoDevice`: When `true` (default), map Nextflow `accelerator` requests to Nomad `resources.device` automatically.
 - `acceleratorDeviceName`: Device name to use for automatic accelerator mapping (default `nvidia/gpu`).
