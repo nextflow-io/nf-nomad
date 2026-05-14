@@ -1,6 +1,7 @@
 plugins {
     id 'io.nextflow.nextflow-plugin' version '1.0.0-beta.10'
     id 'org.antora' version '1.0.0'
+    id("maven-publish")
 }
 
 dependencies {
@@ -85,4 +86,26 @@ nextflowPlugin {
             'nextflow.nomad.secrets.NomadSecretProvider'
     ]
 
+}
+
+
+publishing {
+    publications {
+        gpr(MavenPublication) {
+            groupId = 'io.nextflow'
+            artifactId = 'nf-nomad'
+            version = project.version
+            from(components["java"])
+        }
+    }
+    repositories {
+        maven {
+            name = "GitHubPackages"
+            url = uri("https://maven.pkg.github.com/nextflow-io/nf-nomad/")
+            credentials {
+                username = project.findProperty("gpr.user") ?: System.getenv("GITHUB_USERNAME")
+                password = project.findProperty("gpr.key") ?: System.getenv("GITHUB_TOKEN")
+            }
+        }
+    }
 }

@@ -67,6 +67,11 @@ jobs:
           files: |
             ./build/distributions/*
 
+      - name: Publish to GitHub Packages
+        run: ./gradlew publish -P version=${GITHUB_REF#refs/tags/}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
       - name: publish release
         env:
           NPR_API_KEY: ${{ secrets.NPR_API_KEY }}
