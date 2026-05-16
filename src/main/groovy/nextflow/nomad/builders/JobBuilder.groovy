@@ -359,6 +359,7 @@ class JobBuilder {
                 work_dir  : workingDir,
                 command   : args.first(),
                 args      : args.tail(),
+                network_mode: (jobOpts?.networkMode != null ? jobOpts.networkMode : "bridge")
         ] as Map<String, Object>
     }
 
