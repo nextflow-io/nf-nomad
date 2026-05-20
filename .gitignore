@@ -21,3 +21,5 @@ oracle-nomad-cluster
 /.CLAUDE.md
 /results
 /validation/local-nomadlab/runs
+/docker/minio-data/
+/docker/nomad-data/
