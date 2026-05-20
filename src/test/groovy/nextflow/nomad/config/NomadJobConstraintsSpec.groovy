@@ -307,4 +307,46 @@ class NomadJobConstraintsSpec extends Specification {
         config.jobOpts.constraintsSpec.nodeSpecs[0].raws.find { it.left.endsWith("class") }.right == "linux-64bit"
         config.jobOpts.constraintsSpec.nodeSpecs[0].raws.find { it.left.endsWith("datacenter") }.right == "dc1"
     }
+
+    void "should accept volumes supplied as a Map (config-file form)"() {
+        when:
+        def config = new NomadConfig([
+                jobs: [
+                        volumes : [
+                                [type:"csi", name:"nf_scratch_volume", path:"/scratch"],
+                                [type:"docker", name:"nf_reference_volume", path:"/references", readOnly:true],
+                                [type:"csi", name:"nf_projects_volume", path:"/projects"],
+                                [type:"csi", name:"shares.isilon.ugent.be-cmgg_upload", path:"/cmgg_upload", readOnly:true]
+                        ]
+                ]
+        ])
+
+        then:
+        config.jobOpts.volumeSpec
+        config.jobOpts.volumeSpec.size() == 4
+        config.jobOpts.volumeSpec[0].type == 'csi'
+        config.jobOpts.volumeSpec[1].type == 'docker'
+        config.jobOpts.volumeSpec.last().name == "shares.isilon.ugent.be-cmgg_upload"
+    }
+
+    void "should accept volumes supplied as a Map (config-file form) or as a Closure"() {
+        when:
+        def config = new NomadConfig([
+                jobs: [
+                        volumes : [
+                                { type "csi" name "nf_scratch_volume" path "/scratch"},
+                                [type:"docker", name:"nf_reference_volume", path:"/references", readOnly:true],
+                                [type:"csi", name:"nf_projects_volume", path:"/projects"],
+                                [type:"csi", name:"shares.isilon.ugent.be-cmgg_upload", path:"/cmgg_upload", readOnly:true]
+                        ]
+                ]
+        ])
+
+        then:
+        config.jobOpts.volumeSpec
+        config.jobOpts.volumeSpec.size() == 4
+        config.jobOpts.volumeSpec[0].type == 'csi'
+        config.jobOpts.volumeSpec[1].type == 'docker'
+        config.jobOpts.volumeSpec.last().name == "shares.isilon.ugent.be-cmgg_upload"
+    }
 }

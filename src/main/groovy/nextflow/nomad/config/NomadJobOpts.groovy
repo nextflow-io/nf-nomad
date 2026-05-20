@@ -154,25 +154,34 @@ class NomadJobOpts{
 
     JobVolume[] parseVolumes(Map nomadJobOpts){
         List<JobVolume> ret = []
-        if( nomadJobOpts.volume && nomadJobOpts.volume instanceof Closure){
+        if( nomadJobOpts.volume ){
             def volumeSpec = new JobVolume()
-            def closure = (nomadJobOpts.volume as Closure)
-            def clone = closure.rehydrate(volumeSpec, closure.owner, closure.thisObject)
-            clone.resolveStrategy = Closure.DELEGATE_FIRST
-            clone()
-            volumeSpec.workDir(true)
+            if( nomadJobOpts.volume instanceof Closure) {
+                def closure = (nomadJobOpts.volume as Closure)
+                def clone = closure.rehydrate(volumeSpec, closure.owner, closure.thisObject)
+                clone.resolveStrategy = Closure.DELEGATE_FIRST
+                clone()
+                volumeSpec.workDir(true)
+            }
+            if( nomadJobOpts.volume instanceof Map) {
+                volumeSpec = JobVolume.fromMap(nomadJobOpts.volume as Map)
+            }
             ret.add volumeSpec
         }
 
         if( nomadJobOpts.volumes && nomadJobOpts.volumes instanceof List){
-            nomadJobOpts.volumes.each{ closure ->
-                if( closure instanceof Closure){
-                    def volumeSpec = new JobVolume()
+            nomadJobOpts.volumes.each{ spec ->
+                def volumeSpec = new JobVolume()
+                if( spec instanceof Closure){
+                    def closure = spec as Closure
                     def clone = closure.rehydrate(volumeSpec, closure.owner, closure.thisObject)
                     clone.resolveStrategy = Closure.DELEGATE_FIRST
                     clone()
-                    ret.add volumeSpec
                 }
+                if( spec instanceof Map){
+                    volumeSpec = JobVolume.fromMap(spec as Map)
+                }
+                ret.add volumeSpec
             }
         }
 
