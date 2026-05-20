@@ -169,9 +169,9 @@ To run and test the plugin in a development environment, configure a local Nextf
 Project uses `nf-test` to run end to end integration tests running "real" pipelines against a local nomad
 
 - compile and install a 99.99.99 version (`./gradlew clean installPlugin -Pversion=99.99.99)
-- open a terminal at `src/e2e/nomad` and execute `sudo ./start-nomad.sh` (this command will create a nomad server+client in the /tmp/nomad folder)
+- open a terminal at `docker` and execute `sudo ./start.sh` (this command will create a nomad server+client in a docker container)
 - follow terminal instructions to get the NOMAD_TOKEN (`source /mtp/nomad/nomad_temp/.env`)
-- run all tests (`nf-test test`)
+- open a terminal at 'src/e2e' and run all tests (`NXF_ASSETS=/tmp/nomad/nomad_temp/scratchdir/assets ./nf-test test`)
 
 
 
