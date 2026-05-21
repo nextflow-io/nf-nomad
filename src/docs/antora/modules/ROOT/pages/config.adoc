@@ -34,9 +34,9 @@ nomad{
         acceleratorDeviceName = 'nvidia/gpu'
 
         volumes = [
-              { type "host" name "scratchdir" },
-              { type "csi" name "nextflow-fs-volume" },
-              { type "csi" name "nextflow-fs-volume" path "/var/data" readOnly true}
+              [ type: "host". name: "scratchdir" ],
+              [ type: "csi". name: "nextflow-fs-volume" ],
+              [ type: "csi", name: "nextflow-fs-volume", path: "/var/data", readOnly: true]
             ]
 
         constraints = {

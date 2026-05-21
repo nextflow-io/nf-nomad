@@ -17,11 +17,15 @@
  */
 
 package nextflow.nomad.models
+
+import groovy.util.logging.Slf4j
+
 /**
  * Nomad Volume Spec
  *
  * @author Jorge Aguilera <jagedn@gmail.com>
  */
+@Slf4j
 class JobVolume {
 
     final static public String VOLUME_DOCKER_TYPE = "docker"
@@ -37,6 +41,8 @@ class JobVolume {
     private String path
     private boolean workDir = false
     private boolean readOnly = false
+
+    private static final Set<String> KNOWN_KEYS = ['type', 'name', 'path', 'workDir', 'readOnly'] as Set
 
     String getType() {
         return type
@@ -114,5 +120,18 @@ class JobVolume {
         if( this.workDir && this.readOnly ){
             throw new IllegalArgumentException("WorkingDir Volume can't be readOnly")
         }
+    }
+
+    static JobVolume fromMap(Map map){
+        if( !map ) return null
+        def unknown = map.keySet().findAll { !(KNOWN_KEYS.contains(it as String)) }
+        if( unknown ) {
+            log.warn "Unknown nomad constraints key(s) ${unknown} — supported: ${KNOWN_KEYS}"
+        }
+        def ret = new JobVolume()
+        KNOWN_KEYS.each{
+            ret."$it" = map[(it)]
+        }
+        ret
     }
 }
