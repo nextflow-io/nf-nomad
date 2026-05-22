@@ -23,6 +23,7 @@ class NomadTaskOptionsResolverSpec extends Specification {
                         volumes    : [[type: 'host', name: 'ref', path: '/ref', readOnly: true]],
                         resources  : [memoryMax: '4 GB'],
                         namespace  : 'process-ns',
+                        nodePool   : 'highmem',
                         meta       : [owner: 'team-b'],
                         failures   : [
                                 restart   : [attempts: 2],
@@ -47,6 +48,7 @@ class NomadTaskOptionsResolverSpec extends Specification {
         NomadTaskOptionsResolver.priority(task) == 'low'
         NomadTaskOptionsResolver.resources(task) == [memoryMax: '4 GB']
         NomadTaskOptionsResolver.namespace(task) == 'process-ns'
+        NomadTaskOptionsResolver.nodePool(task) == 'highmem'
         NomadTaskOptionsResolver.meta(task) == [owner: 'team-b']
         NomadTaskOptionsResolver.restart(task) == [attempts: 2]
         NomadTaskOptionsResolver.reschedule(task) == [attempts: 3]
@@ -272,6 +274,39 @@ class NomadTaskOptionsResolverSpec extends Specification {
 
         then:
         thrown(IllegalArgumentException)
+    }
+
+    void "should resolve nodePool from nomadOptions"() {
+        given:
+        def task = taskWithConfig([
+                (TaskDirectives.NOMAD_OPTIONS): [nodePool: 'highmem']
+        ])
+
+        expect:
+        NomadTaskOptionsResolver.nodePool(task) == 'highmem'
+    }
+
+    void "should return null nodePool when not set in nomadOptions"() {
+        given:
+        def task = taskWithConfig([
+                (TaskDirectives.NOMAD_OPTIONS): [datacenters: ['dc1']]
+        ])
+
+        expect:
+        NomadTaskOptionsResolver.nodePool(task) == null
+    }
+
+    void "should accept nodePool as a valid nomadOptions key"() {
+        given:
+        def task = taskWithConfig([
+                (TaskDirectives.NOMAD_OPTIONS): [nodePool: 'gpu-pool']
+        ])
+
+        when:
+        NomadTaskOptionsResolver.validate(task)
+
+        then:
+        notThrown(IllegalArgumentException)
     }
 
     private TaskRun taskWithConfig(Map<String, Object> configValues) {

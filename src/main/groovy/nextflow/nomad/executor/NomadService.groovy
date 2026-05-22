@@ -105,11 +105,13 @@ class NomadService implements Closeable{
                 .withDatacenters(this.config.jobOpts().datacenters)
                 .withNamespace(this.config.jobOpts().namespace)
                 .withTaskGroups([JobBuilder.createTaskGroup(task, args, env, this.config.jobOpts(), effectiveLifecycleTasks)])
+                .withNodePool(this.config.jobOpts().nodePool)
                 .build()
 
         JobBuilder.assignDatacenters(task, job)
         JobBuilder.spreads(task, job, this.config.jobOpts())
         applyNamespace(task, job)
+        applyNodePool(task, job)
         applyMeta(task, job)
 
         // Apply priority if specified in env parameter
@@ -560,6 +562,13 @@ class NomadService implements Closeable{
         def namespace = NomadTaskOptionsResolver.namespace(task)
         if( namespace ) {
             job.namespace(namespace.toString())
+        }
+    }
+
+    protected void applyNodePool(TaskRun task, Job job) {
+        def nodePool = NomadTaskOptionsResolver.nodePool(task)
+        if( nodePool ) {
+            job.nodePool(nodePool.toString())
         }
     }
 
