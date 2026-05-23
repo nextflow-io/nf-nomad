@@ -13,6 +13,7 @@ class NomadTaskOptionsResolver {
     public static final String SECRETS = "secrets"
     public static final String SECRETS_PATH = "secretsPath"
     public static final String SPREAD = "spread"
+    public static final String DRIVER = "driver"
     public static final String PRIORITY = "priority"
     public static final String RESOURCES = "resources"
     public static final String NAMESPACE = "namespace"
@@ -29,7 +30,10 @@ class NomadTaskOptionsResolver {
     private static final Set<String> SUPPORTED_AFFINITY_OPTIONS = ["attribute", "operator", "value", "weight"] as Set<String>
     private static final Set<String> SUPPORTED_VOLUME_OPTIONS = ["type", "name", "path", "workDir", "readOnly"] as Set<String>
 
+    private static final Set<String> SUPPORTED_DRIVER_VALUES = ["docker", "podman", "pbs", "slurm", "raw_exec", "exec"] as Set<String>
+
     private static final Set<String> SUPPORTED_OPTIONS = [
+            DRIVER,
             DATACENTERS,
             CONSTRAINTS,
             SECRETS,
@@ -53,6 +57,7 @@ class NomadTaskOptionsResolver {
             }
         }
 
+        driver(task)
         datacenters(task)
         constraints(task)
         secrets(task)
@@ -87,6 +92,26 @@ class NomadTaskOptionsResolver {
             return options.get(key)
         }
         return task?.processor?.config?.get(legacyDirective)
+    }
+
+    static String driver(TaskRun task) {
+        Map options = getNomadOptions(task)
+        if( !options.containsKey(DRIVER) ) {
+            return null
+        }
+        def value = options.get(DRIVER)
+        if( value == null ) {
+            return null
+        }
+        String driver = value.toString().trim()
+        if( !driver ) {
+            return null
+        }
+        if( !SUPPORTED_DRIVER_VALUES.contains(driver) ) {
+            invalidOption(task, "${TaskDirectives.NOMAD_OPTIONS}.${DRIVER}", driver,
+                    "is not a supported driver; supported values: ${SUPPORTED_DRIVER_VALUES.sort().join(', ')}")
+        }
+        return driver
     }
 
     static Object datacenters(TaskRun task) {

@@ -77,13 +77,18 @@ antora {
 }
 
 nextflowPlugin {
-    nextflowVersion = '25.10.0'
+    nextflowVersion = '25.10.4'
     description = 'An Hashicorp Nomad executor plugin'
     provider = 'nextflow-io'
     className = 'nextflow.nomad.NomadPlugin'
     extensionPoints = [
             'nextflow.nomad.executor.NomadExecutor',
             'nextflow.nomad.secrets.NomadSecretProvider'
+            // Note: nextflow.nomad.executor.spi.DistributedWorkdirProviderFactory
+            // is the SPI INTERFACE (an ExtensionPoint), not an @Extension impl,
+            // so it doesn't belong in this list. The actual implementations
+            // live in nf-nomad-s5cmd and are listed in that plugin's
+            // extensionPoints.
     ]
 
 }

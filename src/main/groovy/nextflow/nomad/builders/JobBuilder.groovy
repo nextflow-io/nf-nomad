@@ -24,6 +24,7 @@ import io.nomadproject.client.model.Job
 import io.nomadproject.client.model.Spread
 import io.nomadproject.client.model.TaskGroup
 import io.nomadproject.client.model.Task
+import io.nomadproject.client.model.TaskLifecycle
 import io.nomadproject.client.model.ReschedulePolicy
 import io.nomadproject.client.model.RestartPolicy
 import io.nomadproject.client.model.Resources
@@ -32,6 +33,8 @@ import io.nomadproject.client.model.Template
 import io.nomadproject.client.model.VolumeMount
 import io.nomadproject.client.model.VolumeRequest
 import nextflow.nomad.config.NomadJobOpts
+import nextflow.nomad.executor.NomadExecutor
+import nextflow.nomad.executor.NomadLifecycleTaskSpec
 import nextflow.nomad.executor.NomadTaskOptionsResolver
 import nextflow.nomad.executor.TaskDirectives
 import nextflow.nomad.models.ConstraintsBuilder
@@ -203,15 +206,20 @@ class JobBuilder {
         }
     }
 
-    static TaskGroup createTaskGroup(TaskRun taskRun, List<String> args, Map<String, String>env, NomadJobOpts jobOpts){
+    static TaskGroup createTaskGroup(TaskRun taskRun, List<String> args, Map<String, String>env, NomadJobOpts jobOpts, List<NomadLifecycleTaskSpec> lifecycleTasks = Collections.emptyList()){
         final ReschedulePolicy taskReschedulePolicy  = resolveReschedulePolicy(taskRun, jobOpts)
         final RestartPolicy taskRestartPolicy  = resolveRestartPolicy(taskRun, jobOpts)
         final List<JobVolume> volumeSpecs = resolveVolumeSpecs(taskRun, jobOpts)
+        final List<NomadLifecycleTaskSpec> extraTasks = lifecycleTasks ?: Collections.emptyList()
 
         def task = createTask(taskRun, args, env, jobOpts, volumeSpecs)
+        List<Task> groupTasks = [task]
+        extraTasks.each { NomadLifecycleTaskSpec spec ->
+            groupTasks.add(createLifecycleTask(spec))
+        }
         def taskGroup = new TaskGroup(
                 name: "nf-taskgroup",
-                tasks: [ task ],
+                tasks: groupTasks,
                 reschedulePolicy: taskReschedulePolicy,
                 restartPolicy: taskRestartPolicy
         )
@@ -241,30 +249,77 @@ class JobBuilder {
         return taskGroup
     }
 
+    static protected Task createLifecycleTask(NomadLifecycleTaskSpec spec) {
+        if( spec == null ) {
+            throw new IllegalArgumentException('Nomad lifecycle task spec cannot be null')
+        }
+        if( !spec.name ) {
+            throw new IllegalArgumentException('Nomad lifecycle task spec requires `name`')
+        }
+        if( !spec.hook ) {
+            throw new IllegalArgumentException("Nomad lifecycle task `${spec.name}` requires `hook`")
+        }
+        if( !spec.command || spec.command.isEmpty() ) {
+            throw new IllegalArgumentException("Nomad lifecycle task `${spec.name}` requires a non-empty command")
+        }
+
+        final Map<String, Object> config = [
+                command: spec.command.first(),
+                args   : spec.command.size() > 1 ? spec.command.tail() : Collections.emptyList()
+        ] as Map<String, Object>
+        if( spec.config ) {
+            config.putAll(spec.config)
+        }
+        final TaskLifecycle lifecycle = new TaskLifecycle()
+                .hook(spec.hook)
+                .sidecar(spec.sidecar)
+
+        // Build task meta from explicit meta + transfer manifest
+        Map<String, String> taskMeta = new LinkedHashMap<>()
+        if( spec.meta ) {
+            taskMeta.putAll(spec.meta)
+        }
+        if( spec.transferManifest ) {
+            taskMeta.put('nf.transferManifest', spec.transferManifest)
+        }
+
+        Task task = new Task(
+                name: spec.name,
+                driver: spec.driver ?: 'raw_exec',
+                config: config,
+                env: spec.env ?: Collections.emptyMap(),
+                resources: new Resources()
+                        .CPU(spec.cpu ?: 200)
+                        .memoryMB(spec.memoryMb ?: 128),
+                lifecycle: lifecycle
+        )
+        if( taskMeta ) {
+            task.meta(taskMeta)
+        }
+        if( spec.user ) {
+            task.user(spec.user)
+        }
+        return task
+    }
+
     static Task createTask(TaskRun task, List<String> args, Map<String, String>env, NomadJobOpts jobOpts) {
         return createTask(task, args, env, jobOpts, resolveVolumeSpecs(task, jobOpts))
     }
 
     static Task createTask(TaskRun task, List<String> args, Map<String, String>env, NomadJobOpts jobOpts, List<JobVolume> volumeSpecs) {
-        final DRIVER = "docker"
-
-        final imageName = task.container
+        final driver = resolveDriver(task, jobOpts)
         final workingDir = task.workDir.toAbsolutePath().toString()
         final taskResources = getResources(task, jobOpts)
 
+        def taskConfig = NomadExecutor.isTaskDriverContainerNative(driver)
+                ? buildDockerConfig(task, args, jobOpts, workingDir)
+                : buildHpcConfig(task, args, workingDir, taskResources)
 
         def taskDef = new Task(
                 name: "nf-task",
-                driver: DRIVER,
+                driver: driver,
                 resources: taskResources,
-                config: [
-                        image     : imageName,
-                        privileged: (jobOpts?.privileged != null ? jobOpts.privileged : true),
-                        work_dir  : workingDir,
-                        command   : args.first(),
-                        args      : args.tail(),
-                        network_mode: jobOpts.networkMode ?: 'bridge'
-                ] as Map<String, Object>,
+                config: taskConfig,
                 env: env,
         )
 
@@ -273,12 +328,91 @@ class JobBuilder {
             taskDef.shutdownDelay(shutdownDelay)
         }
 
-        volumes(task, taskDef, workingDir, jobOpts, volumeSpecs)
+        if( NomadExecutor.isTaskDriverContainerNative(driver) ) {
+            volumes(task, taskDef, workingDir, jobOpts, volumeSpecs)
+        }
         affinity(task, taskDef, jobOpts)
         constraint(task, taskDef, jobOpts)
         constraints(task, taskDef, jobOpts)
         secrets(task, taskDef, jobOpts)
         return taskDef
+    }
+
+    /**
+     * Resolve the Nomad driver for a task.
+     * Per-process nomadOptions.driver takes precedence over global nomad.jobs.driver.
+     */
+    static String resolveDriver(TaskRun task, NomadJobOpts jobOpts) {
+        final perProcess = NomadTaskOptionsResolver.driver(task)
+        return perProcess ?: jobOpts?.driver ?: "docker"
+    }
+
+    /**
+     * Build task config for container-native Nomad drivers (docker, podman).
+     * These drivers manage the container lifecycle: image pull, volume mounts,
+     * container creation, and process execution.
+     */
+    private static Map<String, Object> buildDockerConfig(TaskRun task, List<String> args, NomadJobOpts jobOpts, String workingDir) {
+        return [
+                image     : task.container,
+                privileged: (jobOpts?.privileged != null ? jobOpts.privileged : true),
+                work_dir  : workingDir,
+                command   : args.first(),
+                args      : args.tail(),
+                network_mode: (jobOpts?.networkMode != null ? jobOpts.networkMode : "bridge")
+        ] as Map<String, Object>
+    }
+
+    /**
+     * Build task config for HPC drivers (pbs, slurm).
+     * Sources cpus and memory from the already-computed Nomad Resources object
+     * (which respects cpuMode, memoryMax, accelerators, and nomadOptions overrides).
+     * Other scheduling fields come from standard Nextflow process directives
+     * and executor config properties, matching abc-hpc-bridge's CommonTaskConfig.
+     */
+    private static Map<String, Object> buildHpcConfig(TaskRun task, List<String> args, String workingDir, Resources taskResources) {
+        final taskCfg = task.getConfig()
+
+        def config = [
+                command     : args.first(),
+                args        : args.tail(),
+                work_dir    : workingDir,
+                stdout_file : "${workingDir}/.command.log".toString(),
+                stderr_file : "${workingDir}/.command.log".toString(),
+        ] as Map<String, Object>
+
+        // queue → PBS queue or SLURM partition
+        if (taskCfg.queue) {
+            config.queue = taskCfg.queue.toString()
+        }
+
+        // time → walltime (HH:mm:ss)
+        if (taskCfg.getTime()) {
+            config.walltime = taskCfg.getTime().format('HH:mm:ss')
+        }
+
+        // cpus_per_task and memory sourced from Nomad Resources
+        // (already resolved via getResources with cpuMode, limits, and nomadOptions)
+        if (taskResources.cores) {
+            config.cpus_per_task = taskResources.cores
+        }
+        if (taskResources.memoryMB) {
+            config.memory = taskResources.memoryMB
+        }
+
+        // executor.account → account
+        final account = task.processor?.executor?.config?.getExecConfigProp('nomad', 'account', null) as String
+        if (account) {
+            config.account = account
+        }
+
+        // clusterOptions → extra_args
+        final clusterOpts = taskCfg.getClusterOptionsAsList()
+        if (clusterOpts) {
+            config.extra_args = clusterOpts
+        }
+
+        return config
     }
 
     static protected Task volumes(TaskRun task, Task taskDef, String workingDir, NomadJobOpts jobOpts, List<JobVolume> volumeSpecs){

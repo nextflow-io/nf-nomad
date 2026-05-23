@@ -89,10 +89,14 @@ class NomadService implements Closeable{
     }
 
 
-
     String submitTask(String id, TaskRun task, List<String> args, Map<String, String> env, Path saveJsonPath = null) {
+        return submitTask(id, task, args, env, Collections.emptyList(), saveJsonPath)
+    }
+
+    String submitTask(String id, TaskRun task, List<String> args, Map<String, String> env, List<NomadLifecycleTaskSpec> lifecycleTasks, Path saveJsonPath = null) {
         long startTime = System.currentTimeMillis()
         NomadTaskOptionsResolver.validate(task)
+        final List<NomadLifecycleTaskSpec> effectiveLifecycleTasks = lifecycleTasks ?: Collections.emptyList()
 
         Job job = new JobBuilder()
                 .withId(id)
@@ -100,7 +104,7 @@ class NomadService implements Closeable{
                 .withType("batch")
                 .withDatacenters(this.config.jobOpts().datacenters)
                 .withNamespace(this.config.jobOpts().namespace)
-                .withTaskGroups([JobBuilder.createTaskGroup(task, args, env, this.config.jobOpts())])
+                .withTaskGroups([JobBuilder.createTaskGroup(task, args, env, this.config.jobOpts(), effectiveLifecycleTasks)])
                 .build()
 
         JobBuilder.assignDatacenters(task, job)
@@ -568,8 +572,60 @@ class NomadService implements Closeable{
         if( processMeta ) {
             effectiveMeta.putAll(processMeta)
         }
+        // Identity correlation meta — Nextflow + Nomad-native signals
+        // (session id, process name, task hash, head job/alloc id) plus
+        // any extra head-task env vars opted-in via
+        // `nomad.jobs.identityEnvPassthrough`. Lets Nomad alloc inspection
+        // alone tell you who/where/when without external state.
+        effectiveMeta.putAll(buildIdentityMeta(task))
         if( effectiveMeta ) {
             job.meta(effectiveMeta)
         }
+    }
+
+    /**
+     * Identity-meta map for a child Nomad job. Pulled from:
+     *   - Per-task Nextflow signals (session id/name, process name, task
+     *     hash, attempt) — Nextflow-native, always emitted.
+     *   - Head's Nomad coordinates (NOMAD_JOB_ID, NOMAD_ALLOC_ID) — emitted
+     *     under nf_head_* keys for child→head joins in logs.
+     *   - Any head-task env vars listed in
+     *     {@code nomad.jobs.identityEnvPassthrough}, mirrored as lowercased
+     *     meta keys. Empty / unavailable values are omitted.
+     *
+     * The passthrough is the extension point an enclosing harness uses to
+     * inject domain-specific identity (user/workspace/pipeline/...) without
+     * nf-nomad having to know which fields exist.
+     */
+    protected Map<String, String> buildIdentityMeta(TaskRun task) {
+        Map<String, String> m = new LinkedHashMap<>()
+        // Head's own Nomad coordinates — child→head join key in logs.
+        addIfPresent(m, 'nf_head_job_id',   System.getenv('NOMAD_JOB_ID'))
+        addIfPresent(m, 'nf_head_alloc_id', System.getenv('NOMAD_ALLOC_ID'))
+        // Per-task Nextflow signals
+        try {
+            def sess = task?.processor?.session
+            if( sess != null ) {
+                addIfPresent(m, 'nf_session_id',   sess.uniqueId?.toString())
+                addIfPresent(m, 'nf_session_name', sess.runName?.toString())
+            }
+        } catch (Throwable ignored) { /* session API drift — skip */ }
+        addIfPresent(m, 'nf_process_name', task?.processor?.name)
+        addIfPresent(m, 'nf_task_hash',    task?.hash?.toString())
+        try {
+            Object attempt = task?.config?.get('attempt')
+            if( attempt != null ) addIfPresent(m, 'nf_task_attempt', attempt.toString())
+        } catch (Throwable ignored) { /* same */ }
+        // Opt-in passthrough: harness lists env-var names; we mirror values
+        // as lowercased meta keys (HCL2 dotted-key rule + jurist/xtdb schema
+        // consistency).
+        for( String name : (config?.jobOpts()?.identityEnvPassthrough ?: []) ) {
+            addIfPresent(m, name.toLowerCase(), System.getenv(name))
+        }
+        return m
+    }
+
+    private static void addIfPresent(Map<String, String> m, String key, String value) {
+        if( value != null && !value.isEmpty() ) m.put(key, value)
     }
 }
