@@ -1,4 +1,38 @@
 {
+    "Should run a node in an specific NODE without failures": {
+        "content": [
+            {
+                "0": [
+                    "Bonjour world!\n",
+                    "Ciao world!\n",
+                    "Hello world!\n",
+                    "Hola world!\n"
+                ]
+            }
+        ],
+        "meta": {
+            "nf-test": "0.9.3",
+            "nextflow": "25.10.4"
+        },
+        "timestamp": "2026-05-24T13:16:12.945138402"
+    },
+    "Should run in an specific NODE without failures": {
+        "content": [
+            {
+                "0": [
+                    "Bonjour world!\n",
+                    "Ciao world!\n",
+                    "Hello world!\n",
+                    "Hola world!\n"
+                ]
+            }
+        ],
+        "meta": {
+            "nf-test": "0.9.3",
+            "nextflow": "25.10.4"
+        },
+        "timestamp": "2026-05-24T11:16:22.183727189"
+    },
     "Should run without failures": {
         "content": [
             {

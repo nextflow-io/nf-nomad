@@ -2,7 +2,7 @@ nextflow_workflow {
 
     name "Test Multiple vols"
     script "workflows/multiple-vols.nf"
-    config "tests/multiple-vols.config"
+    config "workflows/multiple-vols.config"
     workflow "MAIN"
 
     test("Should run without failures") {

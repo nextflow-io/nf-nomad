@@ -5,7 +5,7 @@ nextflow_pipeline {
 
     name "Test nf-core/demo"
     script "nf-core/demo"
-    config "tests/nextflow.local.config"
+    config "workflows/nextflow.local.config"
     profile "test,docker"
     options "-r dev --outdir ${demoOutDir}"
 
