@@ -1107,6 +1107,115 @@ class MockNomadServiceSpec extends Specification{
         body.Job.TaskGroups[0].Tasks[0].Resources.Devices[0].Count == 1
     }
 
+    void "submit a task with global nodePool sets NodePool on job"() {
+        given:
+        def config = new NomadConfig(
+                client: [
+                        address: "http://${mockWebServer.hostName}:${mockWebServer.port}"
+                ],
+                jobs: [
+                        nodePool: 'gpu-nodes'
+                ]
+        )
+        def service = new NomadService(config)
+
+        String id = "theId"
+        String name = "theName"
+        List<String> args = ["theCommand"]
+        Map<String, String> env = [test: "test"]
+
+        def mockTask = Mock(TaskRun) {
+            getName() >> name
+            getContainer() >> "ubuntu"
+            getConfig() >> [memory: '1 GB']
+            getWorkDirStr() >> "/a/b/c"
+            getWorkDir() >> Path.of("/a/b/c")
+            getProcessor() >> Mock(TaskProcessor) {
+                getExecutor() >> Mock(Executor) {
+                    isFusionEnabled() >> false
+                }
+                getConfig() >> Mock(ProcessConfig) {
+                    get(_ as String) >> null
+                }
+            }
+            toTaskBean() >> Mock(TaskBean) {
+                getWorkDir() >> Path.of("/a/b/c")
+                getScript() >> "theScript"
+                getShell() >> ["bash"]
+                getInputFiles() >> [:]
+            }
+        }
+
+        mockWebServer.enqueue(new MockResponse()
+                .setBody(JsonOutput.toJson(["EvalID": "test"]).toString())
+                .addHeader("Content-Type", "application/json"))
+
+        when:
+        def idJob = service.submitTask(id, mockTask, args, env)
+        def recordedRequest = mockWebServer.takeRequest()
+        def body = new JsonSlurper().parseText(recordedRequest.body.readUtf8())
+
+        then:
+        idJob
+        recordedRequest.method == "POST"
+        body.Job.NodePool == 'gpu-nodes'
+    }
+
+    void "submit a task with per-process nomadOptions nodePool overrides global"() {
+        given:
+        def config = new NomadConfig(
+                client: [
+                        address: "http://${mockWebServer.hostName}:${mockWebServer.port}"
+                ],
+                jobs: [
+                        nodePool: 'default'
+                ]
+        )
+        def service = new NomadService(config)
+
+        String id = "theId"
+        String name = "theName"
+        List<String> args = ["theCommand"]
+        Map<String, String> env = [test: "test"]
+
+        def mockTask = Mock(TaskRun) {
+            getName() >> name
+            getContainer() >> "ubuntu"
+            getConfig() >> [memory: '1 GB']
+            getWorkDirStr() >> "/a/b/c"
+            getWorkDir() >> Path.of("/a/b/c")
+            getProcessor() >> Mock(TaskProcessor) {
+                getExecutor() >> Mock(Executor) {
+                    isFusionEnabled() >> false
+                }
+                getConfig() >> Mock(ProcessConfig) {
+                    get(TaskDirectives.NOMAD_OPTIONS) >> [nodePool: 'highmem']
+                    get(_ as String) >> null
+                }
+            }
+            toTaskBean() >> Mock(TaskBean) {
+                getWorkDir() >> Path.of("/a/b/c")
+                getScript() >> "theScript"
+                getShell() >> ["bash"]
+                getInputFiles() >> [:]
+            }
+        }
+
+        mockWebServer.enqueue(new MockResponse()
+                .setBody(JsonOutput.toJson(["EvalID": "test"]).toString())
+                .addHeader("Content-Type", "application/json"))
+
+        when:
+        def idJob = service.submitTask(id, mockTask, args, env)
+        def recordedRequest = mockWebServer.takeRequest()
+        def body = new JsonSlurper().parseText(recordedRequest.body.readUtf8())
+
+        then:
+        idJob
+        recordedRequest.method == "POST"
+        body.Job.NodePool == 'highmem'
+    }
+
     void "placement failure detection should be disabled by default"() {
         given:
         def config = new NomadConfig(

@@ -1,14 +1,16 @@
 nextflow_workflow {
 
-    name "Test Spread"
+    name "Test Constraints"
     script "workflows/hello.nf"
-    config "workflows/nextflow.config"
+    config "workflows/constraints.config"
+    profile "constraints_node"
     workflow "MAIN"
 
     test("Should run without failures") {
 
         when {
             params {
+                RUN_IN_NODE = System.getenv("RUN_IN_NODE") ?: 'client_dev'
             }
             workflow {
             }
@@ -20,5 +22,4 @@ nextflow_workflow {
         }
 
     }
-
 }

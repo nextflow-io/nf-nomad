@@ -40,6 +40,9 @@ fi
 echo "Applying client policy..."
 nomad acl policy apply -description "Node policy for clients" node-policy $CLIENT_POLICY
 
+nomad namespace apply nf-nomad
+echo "namespace nf-nomad created"
+
 if [ ! -f $OUT_DIR/client-token.json ]; then
   echo "Creating new client token..."
   nomad acl token create -name="client-node-token" -policy=node-policy -type=client -json > $OUT_DIR/client-token.json 2>&1
@@ -74,6 +77,5 @@ cat <<EOF
     export NOMAD_TOKEN=$CLIENT_TOKEN
 ────────────────────────────────────────────────────────────────────────────
 EOF
-
 
 chmod -R ugoa+rw /tmp/nomad/nomad_temp/scratchdir/

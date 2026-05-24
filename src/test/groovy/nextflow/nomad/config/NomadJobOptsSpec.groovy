@@ -280,4 +280,37 @@ class NomadJobOptsSpec extends Specification {
         new NomadJobOpts([driver: 'slurm']).driver == "slurm"
     }
 
+    def "test nodePool is null by default"() {
+        expect:
+        new NomadJobOpts([:]).nodePool == null
+    }
+
+    def "test nodePool can be set from config"() {
+        expect:
+        new NomadJobOpts([nodePool: 'highmem']).nodePool == 'highmem'
+    }
+
+    def "test nodePool can be set from environment variable"() {
+        given:
+        def env = ['NOMAD_NODE_POOL': 'gpu-nodes']
+        def nomadJobOpts = new NomadJobOpts([:], env)
+
+        expect:
+        nomadJobOpts.nodePool == 'gpu-nodes'
+    }
+
+    def "test nodePool config value takes precedence over environment variable"() {
+        given:
+        def env = ['NOMAD_NODE_POOL': 'env-pool']
+        def nomadJobOpts = new NomadJobOpts([nodePool: 'config-pool'], env)
+
+        expect:
+        nomadJobOpts.nodePool == 'config-pool'
+    }
+
+    def "test nodePool trims whitespace"() {
+        expect:
+        new NomadJobOpts([nodePool: '  highmem  ']).nodePool == 'highmem'
+    }
+
 }

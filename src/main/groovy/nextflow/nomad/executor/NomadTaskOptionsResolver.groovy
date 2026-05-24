@@ -24,6 +24,7 @@ class NomadTaskOptionsResolver {
     public static final String SHUTDOWN_DELAY = "shutdownDelay"
     public static final String AFFINITY = "affinity"
     public static final String VOLUMES = "volumes"
+    public static final String NODE_POOL = "nodePool"
     public static final String CPU = "cpu"
     public static final String CORES = "cores"
     private static final Set<String> SUPPORTED_RESOURCE_OPTIONS = ["memoryMax", "device", CPU, CORES] as Set<String>
@@ -42,6 +43,7 @@ class NomadTaskOptionsResolver {
             PRIORITY,
             RESOURCES,
             NAMESPACE,
+            NODE_POOL,
             META,
             FAILURES,
             SHUTDOWN_DELAY,
@@ -66,6 +68,7 @@ class NomadTaskOptionsResolver {
         priority(task)
         resources(task)
         namespace(task)
+        nodePool(task)
         meta(task)
         restart(task)
         reschedule(task)
@@ -189,6 +192,10 @@ class NomadTaskOptionsResolver {
     }
     static Object namespace(TaskRun task) {
         return getNomadOptions(task).get(NAMESPACE)
+    }
+
+    static Object nodePool(TaskRun task) {
+        return getNomadOptions(task).get(NODE_POOL)
     }
 
     static Map meta(TaskRun task) {

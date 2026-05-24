@@ -122,6 +122,13 @@ class JobBuilder {
         return this
     }
 
+    JobBuilder withNodePool(String nodePool) {
+        if( nodePool ) {
+            job.nodePool(nodePool)
+        }
+        return this
+    }
+
     JobBuilder withTaskGroups(List<TaskGroup> taskGroups) {
         job.taskGroups = taskGroups
         return this

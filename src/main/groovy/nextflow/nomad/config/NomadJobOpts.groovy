@@ -85,6 +85,7 @@ class NomadJobOpts{
     Boolean privileged
     String networkMode
     String cpuMode
+    String nodePool
     Boolean acceleratorAutoDevice
     String acceleratorDeviceName
     Boolean failOnPlacementFailure
@@ -123,6 +124,7 @@ class NomadJobOpts{
 
         region = sanitizeOptionalString(nomadJobOpts.region) ?: sanitizeOptionalString(sysEnv.get('NOMAD_REGION'))
         namespace = sanitizeOptionalString(nomadJobOpts.namespace) ?: sanitizeOptionalString(sysEnv.get('NOMAD_NAMESPACE'))
+        nodePool = sanitizeOptionalString(nomadJobOpts.nodePool) ?: sanitizeOptionalString(sysEnv.get('NOMAD_NODE_POOL'))
         meta = parseStringMap(nomadJobOpts.meta)
         identityEnvPassthrough = parseStringList(
                 nomadJobOpts.get('identityEnvPassthrough'),

@@ -84,6 +84,7 @@ nomad{
 - `datacenters`: A list of datacenters for the job submission.
 - `region`: The region for job submission.
 - `namespace`: The namespace to be used for all Nextflow jobs.
+- `nodePool`: The Nomad node pool to assign to all Nextflow jobs. Assigns jobs to a specific pool of nodes for resource isolation or workload segmentation. Takes precedence over any `node.pool` constraint used for the same purpose. Can also be set via the `NOMAD_NODE_POOL` environment variable.
 - `privileged`: Run Docker tasks in privileged mode (default `true`).
 - 'networkMode' Mode of the network. This option is only supported on Linux clients. The following modes are available: none, bridge (default), host, <cni_network_name>
 - `cpuMode`: How task `cpus` maps to Nomad resources when process-level overrides are not set. Use `cores` (default) or `cpu`.
@@ -174,7 +175,7 @@ Node constraints match against Nomad's built-in node attributes and metadata:
 
 | `pool = '...'`
 | string
-| `${node.pool} = <value>`
+| `${node.pool} = <value>` — filters placement to nodes in the pool, but does not assign the job to the pool. Prefer `nomad.jobs.nodePool` (or `nomadOptions.nodePool`) for first-class pool assignment.
 
 | `dataCenter = '...'`
 | string
@@ -304,6 +305,7 @@ The plugin supports process-level Nomad directives in two forms:
 
 - `datacenters`: list of strings
 - `namespace`: string namespace override for the process
+- `nodePool`: string — assigns the job to a specific Nomad node pool, overriding any global `nomad.jobs.nodePool` for this process
 - `constraints`: closure using the existing constraints DSL
 - `secrets`: list of secret names
 - `secretsPath`: per-process Nomad secret path override (string)
@@ -328,6 +330,7 @@ process {
         nomadOptions = [
             datacenters: ['dc1', 'dc2'],
             namespace: 'bio',
+            nodePool: 'highmem',
             constraints: {
                 node {
                     unique = [name: params.RUN_IN_NODE]
