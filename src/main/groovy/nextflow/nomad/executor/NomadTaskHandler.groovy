@@ -389,10 +389,16 @@ class NomadTaskHandler extends TaskHandler implements FusionAwareTask {
         }
 
         // Identity correlation envs — Nextflow + Nomad-native signals plus
-        // any harness-supplied env vars (via nomad.jobs.identityEnvPassthrough).
-        // Mirrors NomadService.buildIdentityMeta so worker bootstrap log lines
-        // and child Job.Meta carry the same correlation fields.
-        ret += buildIdentityEnv(task, config?.jobOpts()?.identityEnvPassthrough ?: Collections.<String>emptyList())
+        // any harness-supplied env vars (via nomad.jobs.identityEnvPassthrough
+        // and nomad.jobs.secretEnvPassthrough). Both lists flow to task env;
+        // only identityEnvPassthrough is mirrored into Job.Meta (see
+        // NomadService.buildIdentityMeta). Use secretEnvPassthrough for
+        // secrets (AWS keys, registry creds) that must not be readable via
+        // `nomad job inspect`.
+        List<String> envOnly = new ArrayList<>()
+        envOnly.addAll(config?.jobOpts()?.identityEnvPassthrough ?: Collections.<String>emptyList())
+        envOnly.addAll(config?.jobOpts()?.secretEnvPassthrough ?: Collections.<String>emptyList())
+        ret += buildIdentityEnv(task, envOnly)
 
         return ret
     }

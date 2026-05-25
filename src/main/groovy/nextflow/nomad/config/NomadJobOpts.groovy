@@ -71,6 +71,22 @@ class NomadJobOpts{
      * or via NF_NOMAD_IDENTITY_ENV_PASSTHROUGH=COMMA,SEPARATED.
      */
     List<String> identityEnvPassthrough
+    /**
+     * Names of head-task environment variables that must flow to every
+     * spawned child task as **task env only** — never recorded as job meta.
+     * Use this for SECRETS (AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY,
+     * registry credentials, ...) that the worker needs at runtime but
+     * must never leak through `nomad job inspect` / alloc inspection /
+     * audit logs.
+     *
+     * Distinct from {@link #identityEnvPassthrough}, which intentionally
+     * mirrors the env value into Job.Meta as well (for identity
+     * correlation — user, workspace, pipeline, ...). Default empty.
+     *
+     * Configure as: {@code nomad.jobs.secretEnvPassthrough = ['AWS_ACCESS_KEY_ID', 'AWS_SECRET_ACCESS_KEY']}
+     * or via NF_NOMAD_SECRET_ENV_PASSTHROUGH=COMMA,SEPARATED.
+     */
+    List<String> secretEnvPassthrough
     Duration shutdownDelay
     Map<String, Object> restartPolicy
     Map<String, Object> reschedulePolicy
@@ -129,6 +145,9 @@ class NomadJobOpts{
         identityEnvPassthrough = parseStringList(
                 nomadJobOpts.get('identityEnvPassthrough'),
                 sysEnv.get('NF_NOMAD_IDENTITY_ENV_PASSTHROUGH'))
+        secretEnvPassthrough = parseStringList(
+                nomadJobOpts.get('secretEnvPassthrough'),
+                sysEnv.get('NF_NOMAD_SECRET_ENV_PASSTHROUGH'))
         shutdownDelay = parseOptionalDuration(nomadJobOpts.shutdownDelay)
 
         Map<String, Object> failures = nomadJobOpts.failures instanceof Map ? (nomadJobOpts.failures as Map<String, Object>) : Collections.emptyMap()
