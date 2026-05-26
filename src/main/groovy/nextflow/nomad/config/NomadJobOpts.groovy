@@ -160,7 +160,7 @@ class NomadJobOpts{
         privileged = nomadJobOpts.containsKey("privileged")
                 ? Boolean.valueOf(nomadJobOpts.privileged.toString())
                 : true
-        networkMode = nomadJobOpts.containsKey("networkMode") ?: "bridge"
+        networkMode = nomadJobOpts.containsKey("networkMode") ? nomadJobOpts.get("networkMode") : "bridge"
         cpuMode = parseCpuMode(nomadJobOpts.get('cpuMode') ?: sysEnv.get('NF_NOMAD_CPU_MODE'))
         acceleratorAutoDevice = nomadJobOpts.containsKey('acceleratorAutoDevice')
                 ? Boolean.valueOf(nomadJobOpts.get('acceleratorAutoDevice')?.toString())
