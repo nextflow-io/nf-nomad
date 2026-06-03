@@ -2,16 +2,20 @@ package nextflow.nomad.executor
 
 import dev.failsafe.Failsafe
 import dev.failsafe.RetryPolicy
+import dev.failsafe.RetryPolicyBuilder
 import dev.failsafe.event.EventListener
 import dev.failsafe.event.ExecutionAttemptedEvent
 import dev.failsafe.function.CheckedSupplier
+import groovy.transform.CompileDynamic
 import groovy.transform.CompileStatic
 import groovy.util.logging.Slf4j
 import io.nomadproject.client.ApiException
 import nextflow.nomad.config.RetryConfig
 
+import java.lang.reflect.Proxy
 import java.time.temporal.ChronoUnit
 import java.util.concurrent.TimeoutException
+import java.util.function.BiPredicate
 import java.util.function.Predicate
 
 @Slf4j
@@ -24,6 +28,37 @@ class FailsafeExecutor {
         this.config = config
     }
 
+
+    protected <T> RetryPolicyBuilder<T> builderWithHandleIf(Predicate<? extends Throwable> cond){
+        def builder = RetryPolicy.<T>builder()
+
+        // 3.1.0
+        def predicateMethod = builder.class.methods.find {
+            it.name == 'handleIf' && it.parameterCount == 1 && it.parameterTypes[0] == Predicate}
+        if (predicateMethod) {
+            return builder.handleIf(cond)
+        }
+
+        // 3.3.2
+        def checkedpredicateMethod = builder.class.methods.find {
+            it.name == 'handleIf' && it.parameterCount == 1 && it.parameterTypes[0].name.endsWith("CheckedPredicate")}
+        if (!checkedpredicateMethod) {
+            throw new IllegalStateException("No valid failsafe library detected.")
+        }
+
+        def targetParamType = checkedpredicateMethod.parameterTypes[0]
+        def proxyInstance = Proxy.newProxyInstance(
+                targetParamType.classLoader,
+                [targetParamType] as Class[],
+                { proxy, m, args ->
+                    return cond.test((Throwable)args[0])
+                }
+        )
+        checkedpredicateMethod.invoke(builder, proxyInstance)
+
+        return builder
+    }
+
     protected <T> RetryPolicy<T> retryPolicy(Predicate<? extends Throwable> cond) {
 
         final listener = new EventListener<ExecutionAttemptedEvent<T>>() {
@@ -32,8 +67,8 @@ class FailsafeExecutor {
                 log.debug("Nomad TooManyRequests response error - attempt: ${event.attemptCount}; reason: ${event.lastFailure.message}")
             }
         }
-        return RetryPolicy.<T>builder()
-                .handleIf(cond)
+        RetryPolicyBuilder<T> builder = builderWithHandleIf(cond)
+        return builder
                 .withBackoff(config.delay.toMillis(), config.maxDelay.toMillis(), ChronoUnit.MILLIS)
                 .withMaxAttempts(config.maxAttempts)
                 .withJitter(config.jitter)
