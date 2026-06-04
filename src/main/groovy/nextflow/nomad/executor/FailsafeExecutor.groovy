@@ -6,7 +6,6 @@ import dev.failsafe.RetryPolicyBuilder
 import dev.failsafe.event.EventListener
 import dev.failsafe.event.ExecutionAttemptedEvent
 import dev.failsafe.function.CheckedSupplier
-import groovy.transform.CompileDynamic
 import groovy.transform.CompileStatic
 import groovy.util.logging.Slf4j
 import io.nomadproject.client.ApiException
@@ -15,7 +14,6 @@ import nextflow.nomad.config.RetryConfig
 import java.lang.reflect.Proxy
 import java.time.temporal.ChronoUnit
 import java.util.concurrent.TimeoutException
-import java.util.function.BiPredicate
 import java.util.function.Predicate
 
 @Slf4j
