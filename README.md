@@ -14,6 +14,26 @@ The contribution roles during the development of initial plugin and testing alon
 
 Feel free to reach out to us on the `#platform-nomad` channel on Slack for discussions and feedbacks.
 
+## Get Started
+
+To use this plugin in your Nextflow pipeline, add the following to your `nextflow.config` file:
+
+```groovy
+plugins {
+    id 'nf-nomad'
+}
+
+process {
+    executor = 'nomad'
+}
+
+nomad {
+    client {
+        address = 'http://your-nomad-server:4646'
+    }
+}
+```
+
 ## Plugin Assets
 
 - `settings.gradle`
@@ -173,6 +193,32 @@ Some important considerations
 - Nomad task failures are reported as recoverable process errors so Nextflow `process.errorStrategy` / `maxRetries` remain authoritative.
 -`nomad.debug.path` can be used to dump rendered Nomad job specs to a custom file path (relative paths resolve under task work directories).
 
+## Examples
+
+The following example demonstrates how to configure a Nextflow pipeline to target a specific process to run on Nomad with customized datacenters and resource limits:
+
+```groovy
+// nextflow.config
+plugins {
+  id 'nf-nomad'
+}
+
+process {
+  executor = 'nomad'
+  
+  withName: runAlignment {
+    nomadOptions = [
+      datacenters: ['dc-analytics'],
+      priority: 'high',
+      resources: [
+        cores: 8,
+        memoryMax: '32 GB'
+      ]
+    ]
+  }
+}
+```
+
 ## Testing and debugging
 
 To run and test the plugin in a development environment, configure a local Nextflow build with the following steps:
@@ -234,3 +280,8 @@ Follow these steps to package, upload and publish the plugin:
 3. Create a pull request against [nextflow-io/plugins](https://github.com/nextflow-io/plugins/blob/main/plugins.json) to make the plugin accessible to Nextflow.
 
     Use the `json` file created in previous steps
+
+
+## License
+
+This project is licensed under the Apache License 2.0 - see the LICENSE file for details.
