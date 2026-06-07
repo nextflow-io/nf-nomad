@@ -3,7 +3,7 @@ nextflow_workflow {
     name "Test Constraints"
     script "workflows/hello.nf"
     config "workflows/constraints.config"
-    profile "constraints"
+    profile "constraints_profile"
     workflow "MAIN"
 
     test("Should run without failures") {

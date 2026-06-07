@@ -51,42 +51,7 @@ class MockScriptRunner extends ScriptRunner {
         return this
     }
 
-    MockScriptRunner invoke() {
-        execute()
-        return this
-    }
-
     BaseScript getScript() { getScriptObj() }
-
-    @Override
-    def normalizeOutput(output) {
-        if( output instanceof ChannelOut ) {
-            def list = new ArrayList(output.size())
-            for( int i=0; i<output.size(); i++ ) {
-                list.add(read0(output[i]))
-            }
-            return list.size() == 1 ? list[0] : list
-        }
-
-        if( output instanceof Object[] || output instanceof List) {
-            def result = new ArrayList<>(output.size())
-            for( def item : output ) {
-                ((List)result).add(read0(item))
-            }
-            return result
-        }
-
-        else {
-            return read0(output)
-        }
-    }
-
-
-    private read0( obj ) {
-        if( obj instanceof DataflowBroadcast )
-            return obj.createReadChannel()
-        return obj
-    }
 
 }
 

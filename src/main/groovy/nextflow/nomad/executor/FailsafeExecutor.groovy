@@ -5,6 +5,7 @@ import dev.failsafe.RetryPolicy
 import dev.failsafe.RetryPolicyBuilder
 import dev.failsafe.event.EventListener
 import dev.failsafe.event.ExecutionAttemptedEvent
+import dev.failsafe.function.CheckedPredicate
 import dev.failsafe.function.CheckedSupplier
 import groovy.transform.CompileStatic
 import groovy.util.logging.Slf4j
@@ -27,46 +28,16 @@ class FailsafeExecutor {
     }
 
 
-    protected <T> RetryPolicyBuilder<T> builderWithHandleIf(Predicate<? extends Throwable> cond){
-        def builder = RetryPolicy.<T>builder()
-
-        // 3.1.0
-        def predicateMethod = builder.class.methods.find {
-            it.name == 'handleIf' && it.parameterCount == 1 && it.parameterTypes[0] == Predicate}
-        if (predicateMethod) {
-            return builder.handleIf(cond)
-        }
-
-        // 3.3.2
-        def checkedpredicateMethod = builder.class.methods.find {
-            it.name == 'handleIf' && it.parameterCount == 1 && it.parameterTypes[0].name.endsWith("CheckedPredicate")}
-        if (!checkedpredicateMethod) {
-            throw new IllegalStateException("No valid failsafe library detected.")
-        }
-
-        def targetParamType = checkedpredicateMethod.parameterTypes[0]
-        def proxyInstance = Proxy.newProxyInstance(
-                targetParamType.classLoader,
-                [targetParamType] as Class[],
-                { proxy, m, args ->
-                    return cond.test((Throwable)args[0])
-                }
-        )
-        checkedpredicateMethod.invoke(builder, proxyInstance)
-
-        return builder
-    }
-
-    protected <T> RetryPolicy<T> retryPolicy(Predicate<? extends Throwable> cond) {
+    protected <T> RetryPolicy<T> retryPolicy(CheckedPredicate<? extends Throwable> cond) {
 
         final listener = new EventListener<ExecutionAttemptedEvent<T>>() {
             @Override
             void accept(ExecutionAttemptedEvent<T> event) throws Throwable {
-                log.debug("Nomad TooManyRequests response error - attempt: ${event.attemptCount}; reason: ${event.lastFailure.message}")
+                log.debug("Nomad TooManyRequests response error - attempt: ${event.attemptCount}; reason: ${event.lastException.message}")
             }
         }
-        RetryPolicyBuilder<T> builder = builderWithHandleIf(cond)
-        return builder
+        return RetryPolicy.<T>builder()
+                .handleIf(cond)
                 .withBackoff(config.delay.toMillis(), config.maxDelay.toMillis(), ChronoUnit.MILLIS)
                 .withMaxAttempts(config.maxAttempts)
                 .withJitter(config.jitter)
@@ -86,7 +57,7 @@ class FailsafeExecutor {
 
     protected <T> T apply(CheckedSupplier<T> action) {
         // define the retry condition
-        final cond = new Predicate<? extends Throwable>() {
+        final cond = new CheckedPredicate<? extends Throwable>() {
             @Override
             boolean test(Throwable t) {
                 if( t instanceof ApiException && t.code in RETRY_CODES )
