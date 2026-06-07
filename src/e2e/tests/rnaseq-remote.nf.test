@@ -1,13 +1,13 @@
 def localWorkDir = "/tmp/nomad/nomad_temp/scratchdir/"
 def rnaseqOutDir = "${localWorkDir}/tests/rnaseq-remote-out"
-def rnaseqRevision = "8253a586cc5a9679d37544ac54f72167cced324b"
+def rnaseqRevision = "c735b43053ab5ed813b0dc55b1407eb36d900570"
 
 nextflow_pipeline {
 
     name "Test nextflow-io/rnaseq-nf"
     script "nextflow-io/rnaseq-nf"
     profile "docker"
-    options "-r ${rnaseqRevision} --outdir ${rnaseqOutDir}"
+    options "-r ${rnaseqRevision} -o ${rnaseqOutDir}"
 
     test("Should run without failures on local Nomad cluster") {
         expect {
@@ -24,8 +24,8 @@ nextflow_pipeline {
             assert names.any { it == 'MULTIQC' }
 
             assert new File(rnaseqOutDir, 'multiqc_report.html').exists()
-            assert new File(rnaseqOutDir, 'fastqc_ggal_gut_logs/ggal_gut_1_fastqc.html').exists()
-            assert new File(rnaseqOutDir, 'fastqc_ggal_gut_logs/ggal_gut_2_fastqc.html').exists()
+            assert new File(rnaseqOutDir, 'fastqc/ggal_gut/ggal_gut_1_fastqc.html').exists()
+            assert new File(rnaseqOutDir, 'fastqc/ggal_gut/ggal_gut_2_fastqc.html').exists()
         }
     }
 
