@@ -66,7 +66,9 @@ class NomadExecutor extends Executor implements ExtensionPoint {
 
     protected void initNomadService(){
         this.nomadConfig = new NomadConfig((session.config.nomad ?: Collections.emptyMap()) as Map)
-        this.service = new NomadService(this.nomadConfig)
+        if( this.nomadConfig.enabled ) {
+            this.service = new NomadService(this.nomadConfig)
+        }
     }
 
     @Override
