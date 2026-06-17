@@ -6,6 +6,7 @@ i.e.
 
 ```
 nomad{
+    enabled = true // by default
     client{
         address = "http://localhost:4646"
         token = "YOUR_NOMAD_TOKEN"
@@ -59,6 +60,10 @@ nomad{
     }
 }
 ```
+
+== Plugin configuration
+
+- `enabled`: allow enabling/disable initial validations of the plugin
 
 === Client configuration
 
