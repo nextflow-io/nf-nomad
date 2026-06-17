@@ -32,6 +32,7 @@ import groovy.util.logging.Slf4j
 @CompileStatic
 class NomadConfig {
 
+    private boolean enabled = true
     private NomadClientOpts clientOpts
     private NomadJobOpts jobOpts
     private NomadDebug debug
@@ -45,11 +46,17 @@ class NomadConfig {
     }
 
     NomadConfig(Map nomadConfigMap, Map<String,String> env) {
-        this.clientOpts = new NomadClientOpts((nomadConfigMap?.client ?: Collections.emptyMap()) as Map, env)
-        this.jobOpts = new NomadJobOpts((nomadConfigMap?.jobs ?: Collections.emptyMap()) as Map, env)
-        this.debug = new NomadDebug((nomadConfigMap?.debug ?:  Collections.emptyMap()) as Map)
+        this.enabled = nomadConfigMap.containsKey("enabled") ? Boolean.parseBoolean(nomadConfigMap.get("enabled").toString()) : true
+        if( this.enabled ) {
+            this.clientOpts = new NomadClientOpts((nomadConfigMap?.client ?: Collections.emptyMap()) as Map, env)
+            this.jobOpts = new NomadJobOpts((nomadConfigMap?.jobs ?: Collections.emptyMap()) as Map, env)
+            this.debug = new NomadDebug((nomadConfigMap?.debug ?: Collections.emptyMap()) as Map)
+        }
     }
 
+    boolean getEnabled(){
+        return this.enabled
+    }
 
     NomadClientOpts clientOpts() { clientOpts }
 

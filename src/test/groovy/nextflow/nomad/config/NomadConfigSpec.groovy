@@ -414,4 +414,15 @@ class NomadConfigSpec extends Specification {
         config.debug.getEnabled()
         config.debug.getPath() == 'debug/job-spec.json'
     }
+
+    void "should check if enabled"() {
+        given:
+        def config = new NomadConfig([
+                enabled: false
+        ])
+
+        expect:
+        !config.enabled
+    }
+
 }
