@@ -13,6 +13,8 @@ services:
     volumes:
       - ./minio-data:/data
       - ./init-minio.sh:/usr/local/bin/init-minio.sh
+    networks:
+      - nomad-dev
 
   nomad:
     privileged: true
@@ -30,11 +32,17 @@ services:
       - type: bind
         source: /sys/fs/cgroup
         target: /sys/fs/cgroup
+
       - type: bind
         source: /var/run/docker.sock
         target: /var/run/docker.sock
-      - ./nomad-data:/data
+
       - ./init-nomad.sh:/usr/local/bin/init-nomad.sh
+      - /tmp/nomad/:/tmp/nomad/:rw
       - /tmp/nomad/nomad_temp/scratchdir/:/tmp/nomad/nomad_temp/scratchdir/:rw
+    networks:
+      - nomad-dev
 
-
+networks:
+  nomad-dev:
+    driver: bridge
