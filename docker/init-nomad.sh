@@ -2,7 +2,7 @@
 
 sleep 30
 
-OUT_DIR=/data
+OUT_DIR=/tmp/nomad/
 CLIENT_POLICY=/client-policy.hcl
 export NOMAD_ADDR=http://127.0.0.1:4646
 
@@ -42,6 +42,12 @@ nomad acl policy apply -description "Node policy for clients" node-policy $CLIEN
 
 nomad namespace apply nf-nomad
 echo "namespace nf-nomad created"
+
+nomad job run csi-hostpath-plugin.nomad
+echo "csi hostpah created"
+
+nomad volume create -namespace=nf-nomad volume-minio.hcl
+echo "csi volume created"
 
 if [ ! -f $OUT_DIR/client-token.json ]; then
   echo "Creating new client token..."

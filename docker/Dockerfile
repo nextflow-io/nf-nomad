@@ -21,6 +21,7 @@ VOLUME [ "/data" ]
 ENTRYPOINT [ "/usr/local/bin/nomad" ]
 
 COPY server.conf .
-COPY client-policy.hcl /client-policy.hcl
+COPY *.hcl /
+COPY *.nomad /
 
 CMD [ "agent", "-config=server.conf" ]
