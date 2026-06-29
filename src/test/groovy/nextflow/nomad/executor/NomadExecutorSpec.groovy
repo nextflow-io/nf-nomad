@@ -17,9 +17,12 @@
  */
 package nextflow.nomad.executor
 
+import nextflow.Session
+import nextflow.executor.ExecutorConfig
 import nextflow.nomad.builders.JobBuilder
 import nextflow.nomad.config.NomadConfig
 import nextflow.nomad.config.NomadJobOpts
+import nextflow.processor.TaskPollingMonitor
 import nextflow.processor.TaskProcessor
 import nextflow.processor.TaskRun
 import nextflow.script.ProcessConfig
@@ -71,6 +74,33 @@ class NomadExecutorSpec extends Specification {
             getProcessor() >> processor
             getName() >> "testTask"
         }
+    }
+
+    // ========================================================================
+    // createTaskMonitor — executor.queueSize must gate submission (capacity > 0)
+    // ========================================================================
+
+    @Unroll
+    def "createTaskMonitor honors executor.queueSize: #cfg → capacity #expected"() {
+        given:
+        def executor = new NomadExecutor()
+        executor.session = Mock(Session)
+        executor.name = 'nomad'
+        executor.config = new ExecutorConfig(cfg)
+
+        when:
+        def monitor = executor.createTaskMonitor()
+
+        then: 'capacity is wired from queueSize — the 4-arg overload left it 0 (unlimited)'
+        monitor instanceof TaskPollingMonitor
+        (monitor as TaskPollingMonitor).capacity == expected
+        (monitor as TaskPollingMonitor).capacity > 0
+
+        where:
+        cfg            | expected
+        [queueSize: 7] | 7    // user/abc executor.queueSize is honored
+        [queueSize: 2] | 2    // small-cluster throttle drains a deep DAG safely
+        [:]            | 100  // default mirrors AbstractGridExecutor (SLURM/PBS)
     }
 
     // ========================================================================
