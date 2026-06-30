@@ -745,7 +745,19 @@ class JobBuilder {
             effective.putAll(override)
         }
 
-        RestartPolicy policy = new RestartPolicy().attempts(parseInteger(effective.get("attempts"), jobOpts?.restartAttempts ?: 1))
+        // Default restart attempts is 0 (no in-place Nomad restart). A Nomad restart
+        // re-runs the failed attempt in the SAME allocation and SAME work dir, which
+        // still holds the previous attempt's partial outputs. With `bash -C` (noclobber,
+        // the nf-core default since 4.0) a `... 2> ${prefix}.log` redirect then fails
+        // with "cannot overwrite existing file", turning a transient first-attempt
+        // failure permanently fatal — and risks acting on stale partial outputs.
+        // Nextflow owns retries: `errorStrategy 'retry'` re-submits the task under a NEW
+        // task hash in a FRESH work dir, which is idempotent. So we default to 0 in-place
+        // restarts and let Nextflow retry cleanly. An explicit config value (per-task
+        // override, `failures.restart.attempts`, or `restartAttempts`) still wins.
+        // Reschedule is left at its default (a reschedule is a new allocation with a
+        // fresh dir, so it doesn't hit the noclobber bug — see resolveReschedulePolicy).
+        RestartPolicy policy = new RestartPolicy().attempts(parseInteger(effective.get("attempts"), jobOpts?.restartAttempts ?: 0))
         Long delay = parseDurationToMillis(effective.get("delay"))
         if( delay != null ) {
             policy.delay(delay)

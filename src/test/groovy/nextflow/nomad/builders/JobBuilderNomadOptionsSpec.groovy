@@ -480,6 +480,83 @@ class JobBuilderNomadOptionsSpec extends Specification {
         policy.getUnlimited() == true
     }
 
+    void "resolveRestartPolicy should default to zero attempts so Nextflow owns retries"() {
+        given: 'a task with no restart config and jobOpts carrying the default restartAttempts'
+        def task = taskWithConfig([:])
+        def jobOpts = Stub(NomadJobOpts) {
+            getRestartAttempts() >> 0
+            getRestartPolicy() >> [:]
+        }
+
+        when:
+        def policy = JobBuilder.resolveRestartPolicy(task, jobOpts)
+
+        then: 'no in-place Nomad restart -- avoids reusing the work dir and breaking noclobber redirects'
+        policy.getAttempts() == 0
+    }
+
+    void "resolveRestartPolicy should honour an explicit restartAttempts override over the default"() {
+        given:
+        def task = taskWithConfig([:])
+        def jobOpts = Stub(NomadJobOpts) {
+            getRestartAttempts() >> 2
+            getRestartPolicy() >> [:]
+        }
+
+        when:
+        def policy = JobBuilder.resolveRestartPolicy(task, jobOpts)
+
+        then: 'the explicit value wins -- the 0 default never clobbers a configured value'
+        policy.getAttempts() == 2
+    }
+
+    void "resolveRestartPolicy should honour an explicit failures.restart.attempts map over the default"() {
+        given:
+        def task = taskWithConfig([:])
+        def jobOpts = Stub(NomadJobOpts) {
+            getRestartAttempts() >> 0
+            getRestartPolicy() >> [attempts: 3]
+        }
+
+        when:
+        def policy = JobBuilder.resolveRestartPolicy(task, jobOpts)
+
+        then:
+        policy.getAttempts() == 3
+    }
+
+    void "resolveRestartPolicy should honour a per-task restart override over the default"() {
+        given:
+        def task = taskWithConfig([
+                (TaskDirectives.NOMAD_OPTIONS): [failures: [restart: [attempts: 4]]]
+        ])
+        def jobOpts = Stub(NomadJobOpts) {
+            getRestartAttempts() >> 0
+            getRestartPolicy() >> [:]
+        }
+
+        when:
+        def policy = JobBuilder.resolveRestartPolicy(task, jobOpts)
+
+        then:
+        policy.getAttempts() == 4
+    }
+
+    void "resolveReschedulePolicy should keep its default of one attempt"() {
+        given: 'a task with no reschedule config -- guards against accidentally moving the reschedule default'
+        def task = taskWithConfig([:])
+        def jobOpts = Stub(NomadJobOpts) {
+            getRescheduleAttempts() >> 1
+            getReschedulePolicy() >> [:]
+        }
+
+        when:
+        def policy = JobBuilder.resolveReschedulePolicy(task, jobOpts)
+
+        then: 'a reschedule is a new allocation with a fresh dir, so it does not hit the noclobber bug'
+        policy.getAttempts() == 1
+    }
+
     void "resolveShutdownDelayMillis should prefer process nomadOptions over global setting"() {
         given:
         def task = taskWithConfig([
