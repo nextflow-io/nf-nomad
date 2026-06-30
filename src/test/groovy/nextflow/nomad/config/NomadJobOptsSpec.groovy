@@ -34,7 +34,7 @@ class NomadJobOptsSpec extends Specification {
 
         expect:
         nomadJobOpts.rescheduleAttempts == 1
-        nomadJobOpts.restartAttempts == 1
+        nomadJobOpts.restartAttempts == 0
         nomadJobOpts.dockerVolume == null
         nomadJobOpts.driver == "docker"
         nomadJobOpts.cpuMode == NomadJobOpts.CPU_MODE_CORES

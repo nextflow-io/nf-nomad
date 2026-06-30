@@ -154,9 +154,12 @@ class NomadJobOpts{
         restartPolicy = failures.restart instanceof Map ? (failures.restart as Map<String, Object>) : Collections.emptyMap()
         reschedulePolicy = failures.reschedule instanceof Map ? (failures.reschedule as Map<String, Object>) : Collections.emptyMap()
 
-        //NOTE: Default to a single attempt per nomad job definition
+        //NOTE: Default reschedule to a single attempt per nomad job definition.
+        // Restart defaults to 0: an in-place Nomad restart reuses the task work dir
+        // (same alloc), breaking `bash -C` noclobber redirects and idempotent
+        // re-execution. Nextflow owns retries (fresh task-hash dir via errorStrategy).
         rescheduleAttempts = nomadJobOpts.rescheduleAttempts as Integer ?: 1
-        restartAttempts = nomadJobOpts.restartAttempts as Integer ?: 1
+        restartAttempts = nomadJobOpts.restartAttempts as Integer ?: 0
         privileged = nomadJobOpts.containsKey("privileged")
                 ? Boolean.valueOf(nomadJobOpts.privileged.toString())
                 : true
