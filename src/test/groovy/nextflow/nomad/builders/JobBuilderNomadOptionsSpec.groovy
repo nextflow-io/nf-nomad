@@ -85,6 +85,28 @@ class JobBuilderNomadOptionsSpec extends Specification {
         taskDef.constraints[0].getRtarget() == 'pinned-host'
     }
 
+    void "constraints raw(key, op, value) renders an arbitrary operator (not just '=')"() {
+        // The map/shorthand closure form — node { class = 'x' } — hardcodes the
+        // '=' operator. The raw(...) form is the only way to express any other
+        // operator (!=, >, <, regexp, ...). Guard that the operator is passed
+        // through to the rendered Nomad constraint verbatim.
+        given:
+        Closure rawConstraint = { node { raw('class', '!=', 'spot') } }
+        def task = taskWithConfig([
+                (TaskDirectives.NOMAD_OPTIONS): [constraints: rawConstraint]
+        ])
+        def taskDef = new Task()
+
+        when:
+        JobBuilder.constraints(task, taskDef, Stub(NomadJobOpts))
+
+        then:
+        taskDef.constraints.size() == 1
+        taskDef.constraints[0].getLtarget() == '${node.class}'
+        taskDef.constraints[0].getOperand() == '!='
+        taskDef.constraints[0].getRtarget() == 'spot'
+    }
+
     void "secrets should prefer nomadOptions secrets list"() {
         given:
         def task = taskWithConfig([
