@@ -73,7 +73,15 @@ class NomadExecutor extends Executor implements ExtensionPoint {
 
     @Override
     protected TaskMonitor createTaskMonitor() {
-        TaskPollingMonitor.create(session, config, name, Duration.of('5 sec'))
+        // Use the 5-arg overload (with a defQueueSize) so executor.queueSize is
+        // honored: it is the only TaskPollingMonitor.create() variant that reads
+        // config.getQueueSize(name, default) and sets capacity > 0, which gates
+        // submission via checkQueueCapacity. The 4-arg overload drops the default,
+        // leaves capacity = 0 (unlimited), and every ready task is submitted to
+        // Nomad at once — overrunning a small/contended cluster's pending queue.
+        // 100 mirrors AbstractGridExecutor (SLURM/PBS), so behaviour matches the
+        // grid executors users expect.
+        TaskPollingMonitor.create(session, config, name, 100, Duration.of('5 sec'))
     }
 
     @Override
