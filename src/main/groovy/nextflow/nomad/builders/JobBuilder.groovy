@@ -217,7 +217,7 @@ class JobBuilder {
         final ReschedulePolicy taskReschedulePolicy  = resolveReschedulePolicy(taskRun, jobOpts)
         final RestartPolicy taskRestartPolicy  = resolveRestartPolicy(taskRun, jobOpts)
         final List<JobVolume> volumeSpecs = resolveVolumeSpecs(taskRun, jobOpts)
-        final List<NomadLifecycleTaskSpec> extraTasks = lifecycleTasks ?: Collections.emptyList()
+        final List<NomadLifecycleTaskSpec> extraTasks = lifecycleTasks ?: Collections.<NomadLifecycleTaskSpec>emptyList()
 
         def task = createTask(taskRun, args, env, jobOpts, volumeSpecs)
         List<Task> groupTasks = [task]
@@ -294,7 +294,7 @@ class JobBuilder {
                 name: spec.name,
                 driver: spec.driver ?: 'raw_exec',
                 config: config,
-                env: spec.env ?: Collections.emptyMap(),
+                env: spec.env ?: Collections.<String,String>emptyMap(),
                 resources: new Resources()
                         .CPU(spec.cpu ?: 200)
                         .memoryMB(spec.memoryMb ?: 128),
@@ -318,9 +318,7 @@ class JobBuilder {
         final workingDir = task.workDir.toAbsolutePath().toString()
         final taskResources = getResources(task, jobOpts)
 
-        def taskConfig = NomadExecutor.isTaskDriverContainerNative(driver)
-                ? buildDockerConfig(task, args, jobOpts, workingDir)
-                : buildHpcConfig(task, args, workingDir, taskResources)
+        def taskConfig = buildTaskConfig(task, args, jobOpts)
 
         def taskDef = new Task(
                 name: "nf-task",
@@ -345,6 +343,20 @@ class JobBuilder {
         return taskDef
     }
 
+    static Map buildTaskConfig(TaskRun task, List<String> args, NomadJobOpts jobOpts){
+        final driver = resolveDriver(task, jobOpts)
+        final workingDir = task.workDir.toAbsolutePath().toString()
+        final taskResources = getResources(task, jobOpts)
+
+        switch( driver.toLowerCase() ){
+            case 'docker' -> buildDockerConfig(task, args, jobOpts, workingDir)
+            case 'podman' -> buildPodmanConfig(task, args, jobOpts, workingDir)
+            case 'pbs' -> buildHpcConfig(task, args, workingDir, taskResources)
+            case 'slurm' -> buildHpcConfig(task, args, workingDir, taskResources)
+            default -> throw new RuntimeException("Unknow driver for task $task.name")
+        }
+    }
+
     /**
      * Resolve the Nomad driver for a task.
      * Per-process nomadOptions.driver takes precedence over global nomad.jobs.driver.
@@ -355,7 +367,7 @@ class JobBuilder {
     }
 
     /**
-     * Build task config for container-native Nomad drivers (docker, podman).
+     * Build task config for container-native Nomad drivers (docker).
      * These drivers manage the container lifecycle: image pull, volume mounts,
      * container creation, and process execution.
      */
@@ -366,6 +378,22 @@ class JobBuilder {
                 work_dir  : workingDir,
                 command   : args.first(),
                 args      : args.tail(),
+                network_mode: (jobOpts?.networkMode != null ? jobOpts.networkMode : "bridge")
+        ] as Map<String, Object>
+    }
+
+    /**
+     * Build task config for container-native Nomad drivers (podman).
+     * These drivers manage the container lifecycle: image pull, volume mounts,
+     * container creation, and process execution.
+     */
+    private static Map<String, Object> buildPodmanConfig(TaskRun task, List<String> args, NomadJobOpts jobOpts, String workingDir) {
+        return [
+                image       : task.container,
+                privileged  : (jobOpts?.privileged != null ? jobOpts.privileged : true),
+                working_dir : workingDir,
+                command     : args.first(),
+                args        : args.tail(),
                 network_mode: (jobOpts?.networkMode != null ? jobOpts.networkMode : "bridge")
         ] as Map<String, Object>
     }
