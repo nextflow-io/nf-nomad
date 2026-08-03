@@ -4,6 +4,9 @@
 
 * fix readme to complain registry restrictions by @jagedn in https://github.com/nextflow-io/nf-nomad/pull/133
 * upgrade to nextflow 26.04.3 by @jagedn in https://github.com/nextflow-io/nf-nomad/pull/132
+* fix(executor): default task RestartPolicy attempts to 0 so Nextflow owns retries by @abhi18av in https://github.com/nextflow-io/nf-nomad/pull/140
+* bugfix podman driver by @jagedn in https://github.com/nextflow-io/nf-nomad/pull/142
+* add a summary section into readme by @jagedn in https://github.com/nextflow-io/nf-nomad/pull/144
 
 ## 0.4.x 
 
