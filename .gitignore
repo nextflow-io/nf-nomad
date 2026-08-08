@@ -23,3 +23,6 @@ oracle-nomad-cluster
 /validation/local-nomadlab/runs
 /docker/minio-data/
 /docker/nomad-data/
+
+# rendered from server.conf.in by start.sh
+/docker/server.conf

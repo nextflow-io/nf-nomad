@@ -13,7 +13,7 @@ client {
   enabled       = true
   node_pool = "dev"
   host_volume "scratchdir" {
-      path      = "/tmp/nomad/nomad_temp/scratchdir"
+      path      = "@NOMAD_SHARED_DIR@"
       read_only = false
   }
 }
