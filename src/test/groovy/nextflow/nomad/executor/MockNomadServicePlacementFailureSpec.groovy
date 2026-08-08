@@ -38,22 +38,30 @@ class MockNomadServicePlacementFailureSpec extends Specification {
         mockWebServer.shutdown()
     }
 
-    void "placement failure should trigger when no allocations exist after timeout"() {
-        given:
-        def config = new NomadConfig(
+    /** isPlacementFailure() reads evaluations first, then falls back to allocations. */
+    private void enqueueJson(Object body) {
+        mockWebServer.enqueue(new MockResponse()
+                .setBody(JsonOutput.toJson(body).toString())
+                .addHeader("Content-Type", "application/json"))
+    }
+
+    private NomadService serviceWith(String timeout) {
+        new NomadService(new NomadConfig(
                 client: [
                         address: "http://${mockWebServer.hostName}:${mockWebServer.port}"
                 ],
                 jobs: [
                         failOnPlacementFailure: true,
-                        placementFailureTimeout: '5s'
+                        placementFailureTimeout: timeout
                 ]
-        )
-        def service = new NomadService(config)
+        ))
+    }
 
-        mockWebServer.enqueue(new MockResponse()
-                .setBody(JsonOutput.toJson([]).toString())
-                .addHeader("Content-Type", "application/json"))
+    void "placement failure should trigger when no allocations exist after timeout"() {
+        given: 'no evaluation metrics, so the elapsed-time fallback decides'
+        def service = serviceWith('5s')
+        enqueueJson([])   // evaluations
+        enqueueJson([])   // allocations
 
         when:
         boolean isFailure = service.isPlacementFailure("test-job", System.currentTimeMillis() - 10_000L)
@@ -64,25 +72,77 @@ class MockNomadServicePlacementFailureSpec extends Specification {
 
     void "placement failure should not trigger when no allocations exist before timeout"() {
         given:
-        def config = new NomadConfig(
-                client: [
-                        address: "http://${mockWebServer.hostName}:${mockWebServer.port}"
-                ],
-                jobs: [
-                        failOnPlacementFailure: true,
-                        placementFailureTimeout: '2m'
-                ]
-        )
-        def service = new NomadService(config)
-
-        mockWebServer.enqueue(new MockResponse()
-                .setBody(JsonOutput.toJson([]).toString())
-                .addHeader("Content-Type", "application/json"))
+        def service = serviceWith('2m')
+        enqueueJson([])   // evaluations
+        enqueueJson([])   // allocations
 
         when:
         boolean isFailure = service.isPlacementFailure("test-job", System.currentTimeMillis() - 10_000L)
 
         then:
+        !isFailure
+    }
+
+    void "a task queued behind busy nodes is never a placement failure, however long it waits"() {
+        given: 'the scheduler reports exhausted capacity -- eligible nodes exist and are simply full'
+        def service = serviceWith('5s')
+        enqueueJson([[
+                ModifyIndex   : 42,
+                FailedTGAllocs: [
+                        'nf-task': [
+                                DimensionExhausted: ['cpu': 1],
+                                NodesEvaluated    : 1,
+                                NodesAvailable    : ['dc1': 1]
+                        ]
+                ]
+        ]])
+
+        when: 'it has been waiting far longer than the timeout'
+        boolean isFailure = service.isPlacementFailure("test-job", System.currentTimeMillis() - 600_000L)
+
+        then: 'waiting for a busy node is the normal state on a saturated cluster, not a fault'
+        !isFailure
+    }
+
+    void "a task no node can satisfy fails immediately, without waiting out the timeout"() {
+        given: 'every node was rejected on a constraint -- waiting cannot change that'
+        def service = serviceWith('30m')
+        enqueueJson([[
+                ModifyIndex   : 42,
+                FailedTGAllocs: [
+                        'nf-task': [
+                                ConstraintFiltered: ['${node.class} = gpu': 3],
+                                NodesEvaluated    : 3,
+                                NodesFiltered     : 3
+                        ]
+                ]
+        ]])
+
+        when: 'barely any time has passed'
+        boolean isFailure = service.isPlacementFailure("test-job", System.currentTimeMillis() - 1_000L)
+
+        then: 'no point waiting out a constraint that will never be satisfied'
+        isFailure
+    }
+
+    void "exhaustion wins over filtering when a cluster reports both"() {
+        given: 'some nodes were filtered, but others matched and are merely full'
+        def service = serviceWith('5s')
+        enqueueJson([[
+                ModifyIndex   : 42,
+                FailedTGAllocs: [
+                        'nf-task': [
+                                ConstraintFiltered: ['${node.class} = gpu': 1],
+                                DimensionExhausted: ['cpu': 1],
+                                NodesEvaluated    : 2
+                        ]
+                ]
+        ]])
+
+        when:
+        boolean isFailure = service.isPlacementFailure("test-job", System.currentTimeMillis() - 600_000L)
+
+        then: 'a node did match, so the task is queued behind it'
         !isFailure
     }
 }

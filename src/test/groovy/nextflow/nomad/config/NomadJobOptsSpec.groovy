@@ -228,12 +228,12 @@ class NomadJobOptsSpec extends Specification {
         nomadJobOpts.failOnPlacementFailure == true
     }
 
-    def "test placementFailureTimeout default is 60 seconds"() {
+    def "test placementFailureTimeout default is 30 minutes"() {
         given:
         def nomadJobOpts = new NomadJobOpts([:])
 
-        expect:
-        nomadJobOpts.placementFailureTimeout.millis == 60_000L
+        expect: 'a fallback long enough that ordinary queueing behind a busy node cannot trip it'
+        nomadJobOpts.placementFailureTimeout.millis == 1_800_000L
     }
 
     def "test placementFailureTimeout can be customized with Duration"() {

@@ -1256,6 +1256,12 @@ class MockNomadServiceSpec extends Specification{
             ]
         ]
 
+        // isPlacementFailure() consults evaluations first; an empty list makes it fall
+        // through to the allocation-based heuristic these cases exercise.
+        mockWebServer.enqueue(new MockResponse()
+                .setBody(JsonOutput.toJson([]).toString())
+                .addHeader("Content-Type", "application/json"))
+
         mockWebServer.enqueue(new MockResponse()
                 .setBody(JsonOutput.toJson(allocationResponse).toString())
                 .addHeader("Content-Type", "application/json"))
@@ -1291,6 +1297,12 @@ class MockNomadServiceSpec extends Specification{
             ]
         ]
 
+        // isPlacementFailure() consults evaluations first; an empty list makes it fall
+        // through to the allocation-based heuristic these cases exercise.
+        mockWebServer.enqueue(new MockResponse()
+                .setBody(JsonOutput.toJson([]).toString())
+                .addHeader("Content-Type", "application/json"))
+
         mockWebServer.enqueue(new MockResponse()
                 .setBody(JsonOutput.toJson(allocationResponse).toString())
                 .addHeader("Content-Type", "application/json"))
@@ -1325,6 +1337,12 @@ class MockNomadServiceSpec extends Specification{
                 TaskStates: [:]
             ]
         ]
+
+        // isPlacementFailure() consults evaluations first; an empty list makes it fall
+        // through to the allocation-based heuristic these cases exercise.
+        mockWebServer.enqueue(new MockResponse()
+                .setBody(JsonOutput.toJson([]).toString())
+                .addHeader("Content-Type", "application/json"))
 
         mockWebServer.enqueue(new MockResponse()
                 .setBody(JsonOutput.toJson(allocationResponse).toString())
