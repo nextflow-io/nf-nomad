@@ -180,7 +180,7 @@ Some important considerations
 - **Exit code resolution**: the plugin reads the `.command.exit` file written by the task wrapper first. If that file is absent or empty, it falls back to the exit code reported in Nomad TaskState events. If both sources are unavailable, the task is marked failed with exit code `Integer.MAX_VALUE` to ensure the Nextflow error strategy handles it correctly rather than treating it as a success.
 - If both `nomadOptions.<key>` and a legacy directive are present for the same process, `nomadOptions.<key>` wins for that key.
 - If `nomadOptions.resources.memoryMax` is not set, it defaults to the task `memory` value.
-- Global `nomad.jobs.cpuMode` controls default CPU mapping (`cores` or `cpu`) when process-level `resources.cpu/cores` is not set.
+- Global `nomad.jobs.cpuMode` controls default CPU mapping (`cores` or `cpu`) when process-level `resources.cpu/cores` is not set. This choice sets how many tasks a node can run at once — see [Sizing a run](#sizing-a-run-cpu-mode-concurrency-and-placement).
 - When `nomad.jobs.acceleratorAutoDevice=true` (default), Nextflow `accelerator` requests are translated into Nomad `resources.device` using `nomad.jobs.acceleratorDeviceName`.
 - Global `nomad.jobs.cleanup` supports `always`, `never`, and `onSuccess` policies and supersedes `deleteOnCompletion` when set.
 - When Nomad reports memory-limit/OOM task events, nf-nomad surfaces an explicit out-of-memory error message to reduce generic exit-code ambiguity.
@@ -194,6 +194,102 @@ Some important considerations
 - Process-level `nomadOptions.secretsPath` overrides `nomad.jobs.secrets.path` for that process only.
 - Nomad task failures are reported as recoverable process errors so Nextflow `process.errorStrategy` / `maxRetries` remain authoritative.
 -`nomad.debug.path` can be used to dump rendered Nomad job specs to a custom file path (relative paths resolve under task work directories).
+
+## Sizing a run: CPU mode, concurrency and placement
+
+Three settings together decide how many tasks run at once and what happens to the rest.
+Defaults that behave well on a small pipeline can stall a large one, so it is worth
+setting them deliberately before scaling up.
+
+### `cpuMode` decides how many tasks fit on a node
+
+`process.cpus` can be translated into a Nomad resource request in two ways:
+
+| `nomad.jobs.cpuMode` | Nomad request | Meaning |
+|---|---|---|
+| `cores` *(default)* | `Cores: <cpus>` | **Exclusive** physical cores, reserved for the task alone |
+| `cpu` | `CPU: <cpus * 1000>` MHz | A **share** of CPU time, oversubscribable |
+
+In the default `cores` mode a node's concurrency is fixed arithmetic:
+
+```
+max concurrent tasks  =  node cores / process.cpus
+```
+
+A 48-core node running tasks that declare `cpus = 4` holds **12 tasks**, whatever the
+tasks actually do with those cores. The reservation is exclusive, so it holds even while
+the tasks sit idle on I/O — a node can be fully reserved while running well below
+capacity.
+
+Choose per workload:
+
+- **`cores`** — predictable, isolated per-task performance. Right for benchmarking, for
+  latency-sensitive work, and where a noisy neighbour would distort results.
+- **`cpu`** — higher throughput on workloads that declare CPUs generously but spend much
+  of their time blocked on I/O, which is common for bioinformatics pipelines. Tasks share
+  cores, so individual runtimes vary more.
+
+```groovy
+nomad {
+    jobs {
+        cpuMode = 'cpu'     // oversubscribe; default is 'cores'
+    }
+}
+```
+
+`nomadOptions.resources.cpu` / `.cores` override the mode for a single process.
+
+### `queueSize` should reflect what the cluster can hold
+
+`executor.queueSize` caps how many tasks are submitted to Nomad at once. It defaults to
+`100`, matching the grid executors — a sensible number against SLURM or PBS, where the
+scheduler owns a deep queue.
+
+Against Nomad in `cores` mode that default can exceed node capacity many times over. The
+surplus jobs are submitted, find no free cores, and sit pending. Nothing is lost — they
+place as capacity frees — but the Nomad UI fills with pending jobs and genuine problems
+become harder to spot.
+
+Set it near the concurrency the cluster can actually deliver:
+
+```groovy
+executor {
+    queueSize = 12          // e.g. one 48-core node, cpus = 4, cpuMode = 'cores'
+}
+```
+
+Multi-node clusters sum across nodes. Leave headroom if other workloads share the pool.
+
+### Placement failures versus queueing
+
+A task waiting for a busy node and a task that can never be placed look identical from
+the outside: no node assigned, status `pending`. They need opposite responses.
+
+nf-nomad reads Nomad's own evaluation metrics to tell them apart, so **waiting for
+capacity is never treated as a failure**, however long it lasts. A task is reported as a
+placement failure only when no node can satisfy it as specified — an unsatisfiable
+constraint, an empty or mismatched node pool, or a resource request larger than any node.
+Those fail immediately, since waiting cannot help.
+
+`failOnPlacementFailure` is **off by default**; without it an unplaceable task waits
+indefinitely. Enable it to have such tasks surface as errors:
+
+```groovy
+nomad {
+    jobs {
+        failOnPlacementFailure = true
+        placementFailureTimeout = '30m'   // fallback only; see below
+    }
+}
+```
+
+`placementFailureTimeout` (default `30m`) applies only where evaluation metrics are
+unavailable — an older Nomad, a restricted ACL token, or an API error — and the two cases
+cannot be distinguished. It must comfortably exceed how long a task may legitimately
+queue: shortening it risks failing healthy tasks that are merely waiting their turn.
+
+Both settings also read the environment: `NOMAD_FAIL_ON_PLACEMENT_FAILURE` and
+`NF_NOMAD_PLACEMENT_FAILURE_TIMEOUT`.
 
 ## Examples
 
