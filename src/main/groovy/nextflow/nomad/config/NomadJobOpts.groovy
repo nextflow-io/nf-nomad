@@ -177,7 +177,12 @@ class NomadJobOpts{
                 Boolean.valueOf(nomadJobOpts.failOnPlacementFailure.toString()) :
                 Boolean.valueOf(sysEnv.get('NOMAD_FAIL_ON_PLACEMENT_FAILURE') ?: 'false')
 
-        // Placement failure timeout (default: 60 seconds)
+        // Placement failure timeout -- only a fallback, used when the scheduler's evaluation
+        // metrics are unavailable (older Nomad, restricted ACL token, API error) and queued
+        // cannot be told apart from unplaceable. It must therefore comfortably exceed how long
+        // a task may legitimately wait for a busy node: a task queued behind a long-running
+        // neighbour is healthy, and failing it aborts the pipeline. 60s was short enough to fire
+        // during ordinary queueing on a saturated cluster.
         // Supports Nextflow Duration format: "20s", "2m", "1h", "2d"
         // Or long milliseconds: 60000
         def timeoutValue = nomadJobOpts.get('placementFailureTimeout') ?: sysEnv.get('NF_NOMAD_PLACEMENT_FAILURE_TIMEOUT')
@@ -186,7 +191,7 @@ class NomadJobOpts{
                 (timeoutValue as Duration) :
                 Duration.of(timeoutValue.toString())
         } else {
-            placementFailureTimeout = Duration.of('60s')
+            placementFailureTimeout = Duration.of('30m')
         }
 
 

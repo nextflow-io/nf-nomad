@@ -492,12 +492,109 @@ class NomadService implements Closeable{
     }
 
     /**
-     * Check if a job has failed to be placed on any node due to resource constraints
-     * Returns true if the allocation has no node assignment and is still in a waiting state
+     * Why a job still has no running allocation.
+     *
+     * A task that is merely waiting its turn on a busy cluster and a task that can
+     * never be placed both look identical from the allocation list: no node, status
+     * `pending`. They demand opposite responses, so they must be told apart.
+     */
+    static enum PlacementState {
+        /** Nothing to report -- placed, or not yet known to be in trouble. */
+        OK,
+        /** Nodes match, but their capacity is currently consumed. Will place once capacity frees. */
+        QUEUED,
+        /** No node can ever satisfy this task as specified (constraint, node pool, oversized ask). */
+        UNPLACEABLE
+    }
+
+    /**
+     * Classify a scheduler evaluation's failure metrics.
+     *
+     * Nomad records why placement did not happen in {@code Evaluation.failedTGAllocs}, and the
+     * distinction we need is already in there:
+     *
+     * <ul>
+     *   <li><b>exhaustion</b> ({@code dimensionExhausted}, {@code resourcesExhausted},
+     *       {@code quotaExhausted}) -- eligible nodes exist, their capacity is in use.
+     *       This is a queue, not a fault. Waiting is the correct behaviour.</li>
+     *   <li><b>filtering</b> ({@code constraintFiltered}, {@code classFiltered}) with no
+     *       exhaustion -- every node was rejected on a property that will not change by
+     *       itself: a wrong node pool, an unsatisfiable constraint, a resource ask larger
+     *       than any node. Waiting cannot help.</li>
+     * </ul>
+     *
+     * Exhaustion is checked first and wins: when a cluster reports both, some nodes did match
+     * and the task is queued behind them.
+     *
+     * @param metrics failedTGAllocs metrics for a task group, or null when unavailable
+     * @return the classification; {@code OK} when there is nothing to classify
+     */
+    protected static PlacementState classifyPlacement(AllocationMetric metrics) {
+        if (!metrics)
+            return PlacementState.OK
+
+        // Capacity is in use somewhere -- eligible nodes exist, so this is queueing.
+        final exhausted = metrics.dimensionExhausted || metrics.resourcesExhausted || metrics.quotaExhausted
+        if (exhausted)
+            return PlacementState.QUEUED
+
+        // No exhaustion, but nodes were rejected on their properties -- waiting will not help.
+        final filtered = metrics.constraintFiltered || metrics.classFiltered
+        if (filtered)
+            return PlacementState.UNPLACEABLE
+
+        // Nodes were evaluated and every one was filtered out, without Nomad attributing a
+        // reason (e.g. an empty or fully-ineligible node pool).
+        if (metrics.nodesEvaluated && metrics.nodesFiltered && metrics.nodesEvaluated == metrics.nodesFiltered)
+            return PlacementState.UNPLACEABLE
+
+        return PlacementState.OK
+    }
+
+    /**
+     * Fetch the placement classification for a job from its most recent evaluation.
+     *
+     * @return the classification, or null when no evaluation data is available (the caller
+     *         then falls back to the timeout heuristic)
+     */
+    protected PlacementState evaluationPlacementState(String jobId) {
+        List<Evaluation> evaluations = safeExecutor.apply {
+            jobsApi.getJobEvaluations(jobId, config.jobOpts().region, config.jobOpts().namespace,
+                    null, null, null, null, null, null, null)
+        }
+        if (!evaluations)
+            return null
+
+        final latest = evaluations.sort { it.modifyIndex }.last()
+        final failed = latest?.failedTGAllocs
+        if (!failed)
+            return null
+
+        // A job may carry several task groups; treat the whole job as queued if any group is
+        // merely waiting, so a single unplaceable-looking group cannot abort a queued task.
+        final states = failed.values().collect { classifyPlacement(it) }
+        if (states.contains(PlacementState.QUEUED))
+            return PlacementState.QUEUED
+        if (states.contains(PlacementState.UNPLACEABLE))
+            return PlacementState.UNPLACEABLE
+        return PlacementState.OK
+    }
+
+    /**
+     * Check whether a job can never be placed as specified.
+     *
+     * Only genuinely unplaceable jobs are reported. A job waiting for busy nodes to free up is
+     * not a failure however long it waits -- on a saturated cluster that wait is the normal,
+     * desired state, and failing it would abort healthy pipelines.
+     *
+     * Where the scheduler tells us why placement failed, that verdict is used and an
+     * unplaceable job fails immediately -- no point waiting out a timeout for a constraint that
+     * will never be satisfied. Where it does not (older Nomad, restricted ACL token, API
+     * error), the previous elapsed-time heuristic still applies as a fallback.
      *
      * @param jobId The job ID
      * @param submissionTime The time the job was submitted (in milliseconds)
-     * @return true if placement failure is detected, false otherwise
+     * @return true if the job is judged unplaceable, false otherwise
      */
     boolean isPlacementFailure(String jobId, long submissionTime) {
         if (!config.jobOpts().failOnPlacementFailure) {
@@ -505,15 +602,44 @@ class NomadService implements Closeable{
         }
 
         try {
+            long elapsedTime = System.currentTimeMillis() - submissionTime
+            long timeout = config.jobOpts().placementFailureTimeout.millis
+            boolean timeoutExceeded = elapsedTime >= timeout
+
+            // Prefer the scheduler's own account of why placement did not happen.
+            PlacementState state = null
+            try {
+                state = evaluationPlacementState(jobId)
+            }
+            catch (Exception e) {
+                // Evaluations are an optimisation, not a requirement -- a restricted token or an
+                // older API must not break the check, so fall through to the timeout heuristic.
+                if (NomadLogging.isTraceEnabled()) {
+                    log.info "[NOMAD-TRACE] Could not read evaluations for $jobId " +
+                            "(${e.message}) -- falling back to the elapsed-time heuristic."
+                }
+            }
+
+            if (state == PlacementState.QUEUED) {
+                if (NomadLogging.isTraceEnabled()) {
+                    log.info "[NOMAD-TRACE] Placement check for $jobId: queued behind busy nodes " +
+                            "after ${elapsedTime}ms -- not a placement failure."
+                }
+                return false
+            }
+
+            if (state == PlacementState.UNPLACEABLE) {
+                log.warn "[NOMAD] Job $jobId cannot be placed: no node satisfies its constraints or " +
+                        "resource request. Check the node pool, any `constraints` set for this task, " +
+                        "and whether the requested cpus/memory exceed the largest node."
+                return true
+            }
+
             List<AllocationListStub> allocations = safeExecutor.apply {
                 jobsApi.getJobAllocations(jobId, config.jobOpts().region, config.jobOpts().namespace,
                         null, null, null, null, null, null,
                         null, null)
             }
-            // Check if timeout has been exceeded
-            long elapsedTime = System.currentTimeMillis() - submissionTime
-            long timeout = config.jobOpts().placementFailureTimeout.millis
-            boolean timeoutExceeded = elapsedTime >= timeout
 
             AllocationListStub lastAllocation = allocations ? allocations.sort {
                 it.modifyIndex

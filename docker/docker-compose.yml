@@ -39,7 +39,10 @@ services:
 
       - ./init-nomad.sh:/usr/local/bin/init-nomad.sh
       - /tmp/nomad/:/tmp/nomad/:rw
-      - /tmp/nomad/nomad_temp/scratchdir/:/tmp/nomad/nomad_temp/scratchdir/:rw
+      # Identity mapping is required: the Nomad client runs in this container but
+      # launches task containers on the HOST daemon via docker.sock, so a path must
+      # mean the same thing inside and outside. See start.sh for the default.
+      - ${NOMAD_SHARED_DIR}/:${NOMAD_SHARED_DIR}/:rw
     networks:
       - nomad-dev
 
