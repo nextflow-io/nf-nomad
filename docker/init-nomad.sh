@@ -84,4 +84,4 @@ cat <<EOF
 ────────────────────────────────────────────────────────────────────────────
 EOF
 
-chmod -R ugoa+rw /tmp/nomad/nomad_temp/scratchdir/
+chmod -R ugoa+rw "${NOMAD_SHARED_DIR:-/tmp/nomad/nomad_temp/scratchdir}/"

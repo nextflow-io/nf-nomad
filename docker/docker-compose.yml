@@ -24,6 +24,10 @@ services:
       - apparmor:unconfined
     build:
       context: .
+    environment:
+      # init-nomad.sh runs inside this container and needs the same path the
+      # identity bind mount below uses.
+      NOMAD_SHARED_DIR: ${NOMAD_SHARED_DIR:-/tmp/nomad/nomad_temp/scratchdir}
     ports:
       - "4646:4646"   # HTTP API + UI
       - "4647:4647"   # server RPC (single-node, mostly internal)
@@ -42,7 +46,7 @@ services:
       # Identity mapping is required: the Nomad client runs in this container but
       # launches task containers on the HOST daemon via docker.sock, so a path must
       # mean the same thing inside and outside. See start.sh for the default.
-      - ${NOMAD_SHARED_DIR}/:${NOMAD_SHARED_DIR}/:rw
+      - ${NOMAD_SHARED_DIR:-/tmp/nomad/nomad_temp/scratchdir}/:${NOMAD_SHARED_DIR:-/tmp/nomad/nomad_temp/scratchdir}/:rw
     networks:
       - nomad-dev
 
