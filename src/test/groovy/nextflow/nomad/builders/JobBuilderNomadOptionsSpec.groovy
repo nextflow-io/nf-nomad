@@ -247,8 +247,8 @@ class JobBuilderNomadOptionsSpec extends Specification {
     void "getResources should map task cpus to Nomad CPU when global cpuMode is cpu"() {
         given:
         def taskConfig = Mock(TaskConfig)
-        taskConfig.get("cpus") >> 3
-        taskConfig.get("memory") >> "2 GB"
+        taskConfig.getCpus() >> 3
+        taskConfig.getMemory() >> new nextflow.util.MemoryUnit("2 GB")
         taskConfig.getAccelerator() >> null
         def task = taskWithConfig([:], taskConfig)
         def jobOpts = Stub(NomadJobOpts) {
@@ -595,6 +595,70 @@ class JobBuilderNomadOptionsSpec extends Specification {
 
         then:
         thrown(IllegalArgumentException)
+    }
+
+    void "getResources should clamp cores to resourceLimits cpus"() {
+        given:
+        def task = taskWithConfig([:], new TaskConfig([
+                cpus          : 12,
+                memory        : '80 GB',
+                resourceLimits: [cpus: 4, memory: '15 GB']
+        ]))
+
+        when:
+        def resources = JobBuilder.getResources(task)
+
+        then:
+        resources.getCores() == 4
+        resources.getMemoryMB() == 15360
+    }
+
+    void "getResources should clamp CPU MHz to resourceLimits cpus in cpu mode"() {
+        given:
+        def task = taskWithConfig([:], new TaskConfig([
+                cpus          : 12,
+                memory        : '80 GB',
+                resourceLimits: [cpus: 4, memory: '15 GB']
+        ]))
+        def jobOpts = Stub(NomadJobOpts) {
+            getCpuMode() >> NomadJobOpts.CPU_MODE_CPU
+            getAcceleratorAutoDevice() >> false
+        }
+
+        when:
+        def resources = JobBuilder.getResources(task, jobOpts)
+
+        then:
+        resources.getCPU() == 4000
+        resources.getCores() == null
+    }
+
+    void "getResources should leave requests untouched when they are below the limits"() {
+        given:
+        def task = taskWithConfig([:], new TaskConfig([
+                cpus          : 2,
+                memory        : '4 GB',
+                resourceLimits: [cpus: 4, memory: '15 GB']
+        ]))
+
+        when:
+        def resources = JobBuilder.getResources(task)
+
+        then:
+        resources.getCores() == 2
+        resources.getMemoryMB() == 4096
+    }
+
+    void "getResources should use the declared values when no resourceLimits are set"() {
+        given:
+        def task = taskWithConfig([:], new TaskConfig([cpus: 6, memory: '36 GB']))
+
+        when:
+        def resources = JobBuilder.getResources(task)
+
+        then:
+        resources.getCores() == 6
+        resources.getMemoryMB() == 36864
     }
 
     private TaskRun taskWithConfig(Map<String, Object> configValues, Object taskConfigValues = [:]) {

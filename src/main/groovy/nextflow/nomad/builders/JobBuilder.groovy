@@ -148,10 +148,15 @@ class JobBuilder {
 
         final taskCfg = task.getConfig()
         final resourceOptions = NomadTaskOptionsResolver.resources(task)
-        final taskCores = parseInteger(taskCfg.get("cpus"), DEFAULT_CPUS)
+        // Read cpus/memory through the TaskConfig getters rather than the underlying
+        // map: the getters apply the `resourceLimits` clamp, a raw get() does not.
+        // Requesting the unclamped value is not merely wasteful here, because Nomad
+        // places a task on what it requests and `cores` is an exclusive reservation,
+        // so an over-declared request goes unplaced instead of running slowly.
+        final taskCores = taskCfg.getCpus() ?: DEFAULT_CPUS
         final optionCpu = parseIntegerOption(task, "${TaskDirectives.NOMAD_OPTIONS}.resources.cpu", resourceOptions.get("cpu"))
         final optionCores = parseIntegerOption(task, "${TaskDirectives.NOMAD_OPTIONS}.resources.cores", resourceOptions.get("cores"))
-        final taskMemory = new MemoryUnit( taskCfg.get("memory")?.toString() ?:  DEFAULT_MEMORY)
+        final taskMemory = taskCfg.getMemory() ?: new MemoryUnit(DEFAULT_MEMORY)
         final taskMemoryMb = taskMemory.toMega() as Integer
 
         final res = new Resources()
