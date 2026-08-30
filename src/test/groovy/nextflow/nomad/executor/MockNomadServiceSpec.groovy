@@ -70,10 +70,14 @@ class MockNomadServiceSpec extends Specification{
                 .setBody("[]")
                 .addHeader("Content-Type", "application/json"));
         mockWebServer.enqueue(new MockResponse()
+                .setBody("[]")
+                .addHeader("Content-Type", "application/json"));
+        mockWebServer.enqueue(new MockResponse()
                 .setBody("{}")
                 .addHeader("Content-Type", "application/json"));
 
         def state = service.getTaskState("theId")
+        mockWebServer.takeRequest();
         def recordedRequest = mockWebServer.takeRequest();
         def recordedJobRequest = mockWebServer.takeRequest();
 
@@ -88,10 +92,14 @@ class MockNomadServiceSpec extends Specification{
 
         when:
         mockWebServer.enqueue(new MockResponse()
+                .setBody("[]")
+                .addHeader("Content-Type", "application/json"));
+        mockWebServer.enqueue(new MockResponse()
                 .setBody(this.getClass().getResourceAsStream("/allocations.json").text)
                 .addHeader("Content-Type", "application/json"));
 
         state = service.getTaskState("theId")
+        mockWebServer.takeRequest()
         recordedRequest = mockWebServer.takeRequest();
 
         then:
@@ -116,11 +124,15 @@ class MockNomadServiceSpec extends Specification{
                 .setBody("[]")
                 .addHeader("Content-Type", "application/json"))
         mockWebServer.enqueue(new MockResponse()
+                .setBody("[]")
+                .addHeader("Content-Type", "application/json"))
+        mockWebServer.enqueue(new MockResponse()
                 .setBody("{}")
                 .addHeader("Content-Type", "application/json"))
 
         when:
         def state = service.getTaskState("theId")
+        mockWebServer.takeRequest()
         def recordedRequest = mockWebServer.takeRequest()
         def recordedJobRequest = mockWebServer.takeRequest()
 
