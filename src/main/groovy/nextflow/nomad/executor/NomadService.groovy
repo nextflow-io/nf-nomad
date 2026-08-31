@@ -307,6 +307,23 @@ class NomadService implements Closeable{
 
     TaskState getTaskState(String jobId){
         try {
+            List<Evaluation> evaluations = safeExecutor.apply {
+                jobsApi.getJobEvaluations(jobId, config.jobOpts().region, config.jobOpts().namespace,
+                null, null, null, null, null, null, null)
+            }
+            boolean inError = evaluations?.find{evaluation->
+                def metricError = evaluation.failedTGAllocs?.values()?.find { metric->
+                    metric.quotaExhausted?.size() > 0 || metric.resourcesExhausted?.size() > 0 || metric.dimensionExhausted?.size()>0
+                }
+                metricError != null
+            }
+            if( inError ){
+                return new TaskState(
+                        state: 'failed',
+                        failed: true,
+                        finishedAt: OffsetDateTime.now()
+                )
+            }
             List<AllocationListStub> allocations = safeExecutor.apply {
                 jobsApi.getJobAllocations(jobId, config.jobOpts().region, config.jobOpts().namespace,
                         null, null, null, null, null, null,
