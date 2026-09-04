@@ -54,6 +54,9 @@ import java.nio.file.Path
 @CompileStatic
 class NomadTaskHandler extends TaskHandler implements FusionAwareTask {
 
+    /** Nomad's event type for the task process terminating; the only one carrying a real exit code. */
+    private static final String TASK_TERMINATED_EVENT = 'Terminated'
+
     private final NomadConfig config
 
     private final NomadService nomadService
@@ -68,6 +71,9 @@ class NomadTaskHandler extends TaskHandler implements FusionAwareTask {
     private String datacenter = null
 
     private TaskState state
+
+    /** Where the value returned by {@link #defineExitCode()} came from, or null if it could not be determined. */
+    private String exitCodeSource = null
 
     private long timestamp
 
@@ -244,6 +250,11 @@ class NomadTaskHandler extends TaskHandler implements FusionAwareTask {
             // that as the error. defineExitCode returns Integer.MAX_VALUE when
             // it couldn't read any signal, which trivially fails the `== 0`
             // check, so a missing exit-file does NOT spuriously suppress.
+            //
+            // That guarantee depends on defineExitCode only accepting a code
+            // from an event that represents the task exiting. Nomad zeroes
+            // ExitCode on every other event type, so accepting any of them
+            // would turn an allocation that never ran into a reported success.
             final boolean trustWorkerSuccess =
                     (remoteExit != null && remoteExit == 0) ||
                     (remoteExit == null && task.exitStatus == 0)
@@ -251,7 +262,7 @@ class NomadTaskHandler extends TaskHandler implements FusionAwareTask {
                 if( trustWorkerSuccess ) {
                     final String src = remoteExit != null
                             ? "${workdirProvider.name()} remote .exitcode"
-                            : 'local .exitcode'
+                            : (exitCodeSource ?: 'local .exitcode')
                     log.warn "[NOMAD] task `${task.name}` reported Nomad alloc-state failure but ${src} = 0; trusting the worker exit code"
                 } else {
                     task.error = new ProcessException(failureMessage(state, task.exitStatus as Integer))
@@ -456,6 +467,7 @@ class NomadTaskHandler extends TaskHandler implements FusionAwareTask {
         try {
             def text = exitFile?.text?.trim()
             if (text) {
+                exitCodeSource = 'local .exitcode'
                 return text as Integer
             }
         }
@@ -463,13 +475,29 @@ class NomadTaskHandler extends TaskHandler implements FusionAwareTask {
             log.debug "[NOMAD] Cannot read exit status from file for task: `$task.name` | ${e.message}"
         }
 
+        // Only an event that represents the task actually exiting carries a
+        // meaningful code. Nomad leaves ExitCode at its zero value on every
+        // other event type, so an allocation that failed before the task body
+        // ran looks like this:
+        //
+        //   Received        ExitCode 0   Task received by client
+        //   Task Setup      ExitCode 0   Building Task Directory
+        //   Driver          ExitCode 0   Downloading image
+        //   Driver Failure  ExitCode 0   Failed to pull image
+        //   Not Restarting  ExitCode 0   Policy allows no restarts
+        //
+        // Taking the first integer found there returns 0 from `Received` and
+        // reports a task that never ran as a success.
         try {
             if (state) {
                 List events = readListProperty(state, 'events')
                 if (events) {
                     for (Object event : events) {
+                        if( !isTaskExitEvent(event) )
+                            continue
                         def exitCode = readStringProperty(event, 'exitCode')
                         if (exitCode != null && exitCode.isInteger()) {
+                            exitCodeSource = 'Nomad task events'
                             return exitCode as Integer
                         }
                     }
@@ -481,7 +509,17 @@ class NomadTaskHandler extends TaskHandler implements FusionAwareTask {
         }
 
         log.warn "[NOMAD] Cannot determine exit status for task: `$task.name`"
+        exitCodeSource = null
         return Integer.MAX_VALUE
+    }
+
+    /**
+     * True when the event represents the task process terminating, which is
+     * the only case where Nomad populates ExitCode with a real value.
+     */
+    protected static boolean isTaskExitEvent(Object event) {
+        final type = readStringProperty(event, 'type')
+        return type != null && type.equalsIgnoreCase(TASK_TERMINATED_EVENT)
     }
 
     protected Boolean shouldDelete(TaskState state) {

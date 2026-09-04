@@ -517,6 +517,60 @@ class NomadTaskHandlerSpec extends Specification{
         assignedError == null   // alloc-state failure suppressed by local .exitcode=0
     }
 
+    void "surfaces the Nomad failure when the allocation never ran and wrote no .exitcode"() {
+        // End-to-end counterpart to the defineExitCode reproducer: an image-pull
+        // failure. The task body never runs, so the work dir holds no .exitcode,
+        // and Nomad's events all carry ExitCode 0 because none of them is a task
+        // exit. Previously this was reported as a success, Nextflow then looked
+        // for outputs that were never produced, and the user saw
+        // MissingFileException against a process script that was correct.
+        given:
+        Throwable assignedError = null
+        Integer assignedExit = null
+        def workDir = Files.createTempDirectory("nf-never-ran")   // no .exitcode written
+        def task = Mock(TaskRun) {
+            getName() >> 'CHECK_DB'
+            getWorkDir() >> workDir
+            getConfig() >> [tag: null]
+            getProcessor() >> Mock(TaskProcessor) {
+                getExecutor() >> Mock(Executor) {
+                    isFusionEnabled() >> false
+                }
+            }
+            setError(_ as Throwable) >> { Throwable value -> assignedError = value }
+            getError() >> { assignedError }
+            setExitStatus(_ as Integer) >> { Integer value -> assignedExit = value }
+            getExitStatus() >> { assignedExit }
+        }
+        def config = configWithCleanup(NomadJobOpts.CLEANUP_NEVER, false)
+        def service = Mock(NomadService) {
+            isPlacementFailure('job-never-ran', _ as Long) >> false
+            getTaskState('job-never-ran') >> new TaskState(
+                state: 'dead',
+                failed: true,
+                events: [
+                    [type: 'Received',       exitCode: 0, displayMessage: 'Task received by client'],
+                    [type: 'Task Setup',     exitCode: 0, displayMessage: 'Building Task Directory'],
+                    [type: 'Driver',         exitCode: 0, displayMessage: 'Downloading image'],
+                    [type: 'Driver Failure', exitCode: 0, displayMessage: 'Failed to pull image'],
+                    [type: 'Not Restarting', exitCode: 0, displayMessage: 'Policy allows no restarts'],
+                ]
+            )
+        }
+        def handler = new NomadTaskHandler(task, config, service)
+        setPrivateField(handler, 'jobName', 'job-never-ran')
+        setPrivateField(handler, 'status', TaskStatus.SUBMITTED)
+
+        when:
+        def completed = handler.checkIfCompleted()
+
+        then:
+        completed
+        assignedExit == Integer.MAX_VALUE       // unknown, not success
+        assignedError != null                   // Nomad's verdict is not overridden
+        assignedError.message.contains('Failed to pull image')
+    }
+
     void "still surfaces error on vanilla path when local .exitcode is non-zero"() {
         // Vanilla path mirror of the SPI non-zero test: a real failure must
         // still raise even when the local exit-file is readable.
@@ -684,6 +738,52 @@ class NomadTaskHandlerSpec extends Specification{
 
         then:
         exitStatus == 143
+    }
+
+    void "defineExitCode must not report success when the allocation never ran"() {
+        // Reproduces the event sequence a real Nomad allocation emits when it
+        // fails before the task body runs (captured from an image-pull failure
+        // on a live cluster, Nomad 1.11.2). Every event carries ExitCode 0,
+        // because Nomad leaves the field at its zero value on any event that
+        // is not a task exit.
+        //
+        // The task never ran, so no .exitcode file exists. Scanning these
+        // events for "the first integer exitCode" yields 0 from `Received`,
+        // which the caller then treats as the worker reporting success and
+        // uses to override Nomad's own alloc-state failure.
+        given:
+        def workDir = Files.createTempDirectory('nf-nomad-test')
+        def task = Mock(TaskRun) {
+            getWorkDir() >> workDir
+            getConfig() >> [tag: null]
+            getProcessor() >> Mock(TaskProcessor)
+            getName() >> "test_task"
+        }
+        def config = configWithCleanup(NomadJobOpts.CLEANUP_NEVER, false)
+        def handler = new NomadTaskHandler(task, config, Mock(NomadService))
+
+        def state = new TaskState(
+            state: 'dead',
+            failed: true,
+            events: [
+                [type: 'Received',        exitCode: 0, displayMessage: 'Task received by client'],
+                [type: 'Task Setup',      exitCode: 0, displayMessage: 'Building Task Directory'],
+                [type: 'Driver',          exitCode: 0, displayMessage: 'Downloading image'],
+                [type: 'Driver Failure',  exitCode: 0, displayMessage: 'Failed to pull image'],
+                [type: 'Not Restarting',  exitCode: 0, displayMessage: 'Policy allows no restarts'],
+            ]
+        )
+        setPrivateField(handler, 'state', state)
+
+        when:
+        int exitStatus = handler.defineExitCode()
+
+        then:
+        // An unread exit code is UNKNOWN, not success. Reporting 0 here makes
+        // Nextflow look for outputs that were never produced and blame the
+        // process script for a failure two layers away.
+        exitStatus != 0
+        exitStatus == Integer.MAX_VALUE
     }
 
     private static class TestNomadTaskHandler extends NomadTaskHandler {
