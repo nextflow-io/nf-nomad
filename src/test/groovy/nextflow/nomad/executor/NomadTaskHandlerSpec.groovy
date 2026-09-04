@@ -686,6 +686,52 @@ class NomadTaskHandlerSpec extends Specification{
         exitStatus == 143
     }
 
+    void "defineExitCode must not report success when the allocation never ran"() {
+        // Reproduces the event sequence a real Nomad allocation emits when it
+        // fails before the task body runs (captured from an image-pull failure
+        // on a live cluster, Nomad 1.11.2). Every event carries ExitCode 0,
+        // because Nomad leaves the field at its zero value on any event that
+        // is not a task exit.
+        //
+        // The task never ran, so no .exitcode file exists. Scanning these
+        // events for "the first integer exitCode" yields 0 from `Received`,
+        // which the caller then treats as the worker reporting success and
+        // uses to override Nomad's own alloc-state failure.
+        given:
+        def workDir = Files.createTempDirectory('nf-nomad-test')
+        def task = Mock(TaskRun) {
+            getWorkDir() >> workDir
+            getConfig() >> [tag: null]
+            getProcessor() >> Mock(TaskProcessor)
+            getName() >> "test_task"
+        }
+        def config = configWithCleanup(NomadJobOpts.CLEANUP_NEVER, false)
+        def handler = new NomadTaskHandler(task, config, Mock(NomadService))
+
+        def state = new TaskState(
+            state: 'dead',
+            failed: true,
+            events: [
+                [type: 'Received',        exitCode: 0, displayMessage: 'Task received by client'],
+                [type: 'Task Setup',      exitCode: 0, displayMessage: 'Building Task Directory'],
+                [type: 'Driver',          exitCode: 0, displayMessage: 'Downloading image'],
+                [type: 'Driver Failure',  exitCode: 0, displayMessage: 'Failed to pull image'],
+                [type: 'Not Restarting',  exitCode: 0, displayMessage: 'Policy allows no restarts'],
+            ]
+        )
+        setPrivateField(handler, 'state', state)
+
+        when:
+        int exitStatus = handler.defineExitCode()
+
+        then:
+        // An unread exit code is UNKNOWN, not success. Reporting 0 here makes
+        // Nextflow look for outputs that were never produced and blame the
+        // process script for a failure two layers away.
+        exitStatus != 0
+        exitStatus == Integer.MAX_VALUE
+    }
+
     private static class TestNomadTaskHandler extends NomadTaskHandler {
 
         TestNomadTaskHandler(TaskRun task, NomadConfig config, NomadService service) {
