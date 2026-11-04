@@ -1,0 +1,116 @@
+plugins {
+    id 'io.nextflow.nextflow-plugin' version '1.0.0-beta.14'
+    id 'org.antora' version '1.0.0'
+    id("maven-publish")
+}
+
+dependencies {
+    implementation "es.edn:nomad-client-java:1.7.6"
+
+    testImplementation 'com.squareup.okhttp3:mockwebserver:4.9.3'
+}
+sourceSets {
+    test {
+        resources {
+            srcDirs += ['src/testResources']
+        }
+    }
+}
+
+// Resolve test environment: -PtestEnv=mock|oci|local  (falls back to NF_NOMAD_TEST_ENV env var)
+def testEnv = project.hasProperty('testEnv') ? project.property('testEnv') : System.getenv('NF_NOMAD_TEST_ENV') ?: ''
+def nomadAddr = project.hasProperty('nomadAddr') ? project.property('nomadAddr').toString() : null
+def nomadToken = project.hasProperty('nomadToken') ? project.property('nomadToken').toString() : null
+def nomadDc = project.hasProperty('nomadDc') ? project.property('nomadDc').toString() : null
+def nomadRegion = project.hasProperty('nomadRegion') ? project.property('nomadRegion').toString() : null
+def nomadNamespace = project.hasProperty('nomadNamespace') ? project.property('nomadNamespace').toString() : null
+def nfNomadDebug = project.hasProperty('nfNomadDebug') ? project.property('nfNomadDebug').toString() : null
+
+test {
+    useJUnitPlatform()
+    jvmArgs '--add-opens=java.base/java.lang=ALL-UNNAMED'
+
+    // Always propagate the resolved test-environment selector
+    environment 'NF_NOMAD_TEST_ENV', testEnv
+
+    if (testEnv == 'oci') {
+        // OCI integration tests: use external cluster env vars (or explicit -PnomadAddr)
+        environment 'NOMAD_ADDR',  nomadAddr ?: System.getenv('NOMAD_ADDR') ?: ''
+        environment 'NOMAD_TOKEN', nomadToken ?: System.getenv('NOMAD_TOKEN') ?: ''
+        environment 'NOMAD_DC',    nomadDc ?: System.getenv('NOMAD_DC') ?: ''
+    } else if (testEnv == 'local') {
+        // Local integration tests: default to localhost Nomad unless explicitly overridden
+        environment 'NOMAD_ADDR',  nomadAddr ?: 'http://localhost:4646'
+        environment 'NOMAD_TOKEN', nomadToken ?: System.getenv('NOMAD_TOKEN') ?: ''
+        environment 'NOMAD_DC',    nomadDc ?: System.getenv('NOMAD_DC') ?: ''
+    } else {
+        // Unit / mock tests: safe dummy values
+        environment 'NOMAD_ADDR', nomadAddr ?: 'http://test-nf-nomad'
+        environment 'NOMAD_TOKEN', nomadToken ?: ''
+        environment 'NOMAD_DC', nomadDc ?: 'dc-test'
+    }
+
+    // Optional overrides for Nomad job-level options used by config parsing
+    environment 'NOMAD_REGION', nomadRegion ?: System.getenv('NOMAD_REGION') ?: ''
+    environment 'NOMAD_NAMESPACE', nomadNamespace ?: System.getenv('NOMAD_NAMESPACE') ?: ''
+
+    // Optional override for Nomad-specific debug behavior
+    if (nfNomadDebug != null) {
+        environment 'NF_NOMAD_DEBUG', nfNomadDebug
+    }
+}
+
+node {
+    version = 'latest'
+}
+
+antora {
+    version = '3.0.3'
+    options = [
+            clean: true,
+            fetch: true,
+            stacktrace: true,
+            attributes: [product: 'Nf-Nomad Plugin']
+    ]
+    environment = [:]
+    packages = [:]
+}
+
+nextflowPlugin {
+    nextflowVersion = '26.04.3'
+    description = 'An Hashicorp Nomad executor plugin'
+    provider = 'nextflow-io'
+    className = 'nextflow.nomad.NomadPlugin'
+    extensionPoints = [
+            'nextflow.nomad.executor.NomadExecutor',
+            'nextflow.nomad.secrets.NomadSecretProvider'
+            // Note: nextflow.nomad.executor.spi.DistributedWorkdirProviderFactory
+            // is the SPI INTERFACE (an ExtensionPoint), not an @Extension impl,
+            // so it doesn't belong in this list. The actual implementations
+            // live in nf-nomad-s5cmd and are listed in that plugin's
+            // extensionPoints.
+    ]
+
+}
+
+
+publishing {
+    publications {
+        gpr(MavenPublication) {
+            groupId = 'io.nextflow'
+            artifactId = 'nf-nomad'
+            version = project.version
+            from(components["java"])
+        }
+    }
+    repositories {
+        maven {
+            name = "GitHubPackages"
+            url = uri("https://maven.pkg.github.com/nextflow-io/nf-nomad/")
+            credentials {
+                username = project.findProperty("gpr.user") ?: System.getenv("GITHUB_USERNAME")
+                password = project.findProperty("gpr.key") ?: System.getenv("GITHUB_TOKEN")
+            }
+        }
+    }
+}

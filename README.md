@@ -1,0 +1,386 @@
+# nf-nomad plugin
+
+# Summary 
+
+This plugin implements a Nextflow executor for [Hashicorp Nomad](https://www.nomadproject.io).
+
+
+# Maintainers
+
+Please note that this is a **community contributed** plugin and is a collaboration between
+
+1. Abhinav Sharma (@abhi18av) as part of his PhD work at the Stellenbosch University and Jorge Aguilera (@jagedn) as a contributor from  Evaluacion y desarrollo de negocios, Spain.
+2. Tomas (@tomiles) and his team from Center For Medical Genetics Ghent, Belgium.
+
+The contribution roles during the development of initial plugin and testing along with the long term commitments have been discussed in [development and infrastructure group](https://github.com/nextflow-io/nf-nomad/issues/2#issue-1703543034).
+
+Feel free to reach out to us on the `#platform-nomad` channel on Slack for discussions and feedbacks.
+
+## Get Started
+
+To use this plugin in your Nextflow pipeline, add the following to your `nextflow.config` file:
+
+```groovy
+plugins {
+    id 'nf-nomad'
+}
+
+process {
+    executor = 'nomad'
+}
+
+nomad {
+    client {
+        address = 'http://your-nomad-server:4646'
+    }
+}
+```
+
+## Plugin Assets
+
+- `settings.gradle`
+
+    Gradle project settings.
+
+- `plugins/nf-nomad`
+
+    The plugin implementation base directory.
+
+- `plugins/nf-nomad/build.gradle`
+
+    Plugin Gradle build file. Project dependencies should be added here.
+
+- `plugins/nf-nomad/src/resources/META-INF/MANIFEST.MF`
+
+    Manifest file defining the plugin attributes e.g. name, version, etc. The attribute `Plugin-Class` declares the plugin main class. This class should extend the base class `nextflow.plugin.BasePlugin` e.g. `nextflow.Nomad.NomadPlugin`.
+
+- `plugins/nf-nomad/src/resources/META-INF/extensions.idx`
+
+    This file declares one or more extension classes provided by the plugin. Each line should contain the fully qualified name of a Java class that implements the `org.pf4j.ExtensionPoint` interface (or a sub-interface).
+
+- `plugins/nf-nomad/src/main`
+
+    The plugin implementation sources.
+
+- `plugins/nf-nomad/src/test`
+
+    The plugin unit tests.
+
+## `ExtensionPoint`s
+
+`ExtensionPoint` is the basic interface which uses nextflow-core to integrate plugins into it. It's only a basic interface and serves as starting point for more specialized extensions.
+
+## Unit testing
+
+Run the following command in the project root directory (ie. where the file `settings.gradle` is located):
+
+```bash
+./gradlew check
+```
+
+## Test environment selection
+
+The Gradle test task supports selecting the target environment with `-PtestEnv`:
+
+- `./gradlew test` → unit tests only
+- `./gradlew test -PtestEnv=mock` → unit + mock tests
+- `./gradlew test -PtestEnv=local` → unit + local Nomad integration tests
+- `./gradlew test -PtestEnv=oci` → unit + OCI Nomad integration tests
+
+For local integration tests, the default Nomad address is `http://localhost:4646`.
+If you need a different endpoint, override explicitly:
+
+```bash
+./gradlew test -PtestEnv=local -PnomadAddr=http://<host>:4646
+```
+
+## (EXPERIMENTAL) Distributed workdir via SPI 
+
+`nf-nomad` ships a `DistributedWorkdirProvider` SPI at
+`nextflow.nomad.executor.spi.*` for clusters without a shared filesystem
+between head node and workers. Provider plugins register via PF4J
+`@Extension`; `nf-nomad` discovers them at runtime through
+`Plugins.getExtensions(DistributedWorkdirProviderFactory.class)` and selects
+the first one whose `isEnabled(sessionConfig)` returns true. A
+`NoopDistributedWorkdirProvider` is the fallback for shared-FS clusters.
+
+Per-task lifecycle the provider owns:
+
+- **Copy strategy** — what gets staged in / out for a given `TaskRun`.
+- **Prepare** — operator-side setup before the Nomad job is submitted
+  (e.g. upload `.command.*` to remote storage).
+- **Submit command + env + lifecycle tasks** — what runs inside the Nomad
+  task container as the bootstrap script.
+- **`synchronizeCompletion`** — read the remote `.exitcode` marker once the
+  task ends; `NomadTaskHandler` reconciliation trusts `0` from this signal
+  over a Nomad alloc-state failure.
+
+Provider plugin:
+
+- **[nf-nomad-s5cmd](https://github.com/incsteps/nf-nomad-s5cmd)** —
+  S3-backed work-dir via `s5cmd`. Activate with
+  `nomad.s5cmd.enabled = true` + `nomad.s5cmd.workDir.enabled = true` +
+  `nomad.s5cmd.workDir.bucket = 's3://…'`.
+
+### Custom Nomad job naming
+
+If you wish to customize the Nomad
+job-id naming, set `NF_NOMAD_RUN_TAG` in the environment. nf-nomad's
+`NomadHelper.childJobName(sessionId, taskHash, processName)` builds
+`<runtag>-<8-char-taskhash>-<process>`. Without the env var, the 8-char
+prefix falls back to `take8(sessionId)` so baseline Nextflow runs keep
+working. 
+
+## Runtime security default
+
+Nomad Docker jobs are **not privileged by default**.
+To opt in, set:
+
+```groovy
+nomad {
+  jobs {
+    privileged = true
+  }
+}
+```
+
+## Process-level Nomad options
+
+Process directives support both legacy keys (`datacenters`, `constraints`, `secret`, `spread`) and the preferred map-based `nomadOptions` directive:
+
+```groovy
+process {
+  withName: sayHello {
+    nomadOptions = [
+      datacenters: ['dc1', 'dc2'],
+      namespace: 'bio',
+      constraints: { node { unique = [name: params.RUN_IN_NODE] } },
+      affinity: [attribute: '${meta.workload}', operator: '=', value: 'batch', weight: 25],
+      meta: [owner: 'team-x', step: 'align'],
+      shutdownDelay: '15s',
+      failures: [
+        restart: [attempts: 1, delay: '5s', mode: 'fail'],
+        reschedule: [attempts: 2, delay: '10s']
+      ],
+      volumes: [[type: 'host', name: 'ref-data', path: '/ref', readOnly: true]],
+      secretsPath: 'secret/projects/team-x',
+      secrets: ['MY_ACCESS_KEY', 'MY_SECRET_KEY'],
+      spread: [name: 'node.datacenter', weight: 50, targets: ['us-east1': 70, 'us-east2': 30]],
+      priority: 'high',
+      resources: [memoryMax: '64 GB', cores: 4, device: [[name: 'nvidia/gpu', count: 1]]]
+    ]
+  }
+}
+```
+
+Some important considerations
+- **Two constraint scopes**: `nomad.jobs.constraints = { ... }` sets a global constraint applied to every task; `nomadOptions.constraints: { ... }` (inside a process selector) sets a per-process constraint that is _additive_ to the global one. The two scopes are independent — per-process constraints do not replace the global ones, they append to them.
+- **`nomadOptions.constraints` takes a Closure**: because `nomadOptions` is a Map literal (`= [...]`), the constraints value is always a Closure. The legacy `constraints` process directive (used outside `nomadOptions`) is deprecated and will be removed in the next release — migrate to `nomadOptions.constraints`.
+- **Constraint validation warnings**: the plugin validates constraint blocks before submission and logs a `WARN` for unknown keys, type mismatches, or blocks that produce no usable constraint. The job is still submitted so that misconfigured constraints surface as a Nomad scheduler placement error rather than being silently dropped.
+- **Exit code resolution**: the plugin reads the `.command.exit` file written by the task wrapper first. If that file is absent or empty, it falls back to the exit code reported in Nomad TaskState events. If both sources are unavailable, the task is marked failed with exit code `Integer.MAX_VALUE` to ensure the Nextflow error strategy handles it correctly rather than treating it as a success.
+- **Exit-state reconciliation**: the allocation's state and the task's own exit file are two independent signals that can disagree. When the allocation is marked failed but the worker recorded exit `0` — via the remote `.exitcode` where a distributed work dir is in use, or the local exit file otherwise — the plugin **trusts the worker** and completes the task, logging a `WARN` so the discrepancy stays visible. This applies to the shared-filesystem path as well as the distributed-work-dir path. It removes a class of silent failures where a task had already succeeded but the allocation lifecycle ended non-zero afterwards: an allocation reclaimed after the task exited, a first attempt lost to an image-pull race and superseded by a successful retry, or a SIGTERM during reaping. Only an exit status of exactly `0` is trusted this way — any non-zero value from either source is a genuine task failure and is surfaced as one, and a missing exit file resolves to `Integer.MAX_VALUE`, so it can never suppress an error by accident.
+- If both `nomadOptions.<key>` and a legacy directive are present for the same process, `nomadOptions.<key>` wins for that key.
+- If `nomadOptions.resources.memoryMax` is not set, it defaults to the task `memory` value.
+- Global `nomad.jobs.cpuMode` controls default CPU mapping (`cores` or `cpu`) when process-level `resources.cpu/cores` is not set. This choice sets how many tasks a node can run at once — see [Sizing a run](#sizing-a-run-cpu-mode-concurrency-and-placement).
+- When `nomad.jobs.acceleratorAutoDevice=true` (default), Nextflow `accelerator` requests are translated into Nomad `resources.device` using `nomad.jobs.acceleratorDeviceName`.
+- Global `nomad.jobs.cleanup` supports `always`, `never`, and `onSuccess` policies and supersedes `deleteOnCompletion` when set.
+- When Nomad reports memory-limit/OOM task events, nf-nomad surfaces an explicit out-of-memory error message to reduce generic exit-code ambiguity.
+- When `nomad.debug.json`/`nomad.debug.path` is enabled, Nomad metadata fields are persisted in dumped job JSON files: `nomad_job_id`, `nomad_alloc_id`, `nomad_node_id`, `nomad_node_name`, and `nomad_datacenter`.
+- Task failure messages include Nomad inspection hints (job/allocation/node identifiers and allocation API URL when available).
+- Global `nomad.client.pollInterval` controls task-state polling frequency (default `1s`) and can reduce Nomad API pressure for large workloads.
+- Global `nomad.client.submitThrottle` enforces a minimum delay between Nomad job submissions (default `0s`) to smooth API load during large bursts.
+- `nomad.client.retryConfig` and `nomad.client.submitThrottle` are complementary: retries/backoff handle failed requests, while submit throttling proactively spaces out new submissions.
+- Process-level `nomadOptions.volumes` can add additional safe volume mounts without exposing arbitrary driver config.
+- When global and process volume specs are merged, only one `workDir` volume is allowed and `readOnly` is preserved on generated task mounts.
+- Process-level `nomadOptions.secretsPath` overrides `nomad.jobs.secrets.path` for that process only.
+- Nomad task failures are reported as recoverable process errors so Nextflow `process.errorStrategy` / `maxRetries` remain authoritative.
+-`nomad.debug.path` can be used to dump rendered Nomad job specs to a custom file path (relative paths resolve under task work directories).
+
+## Sizing a run: CPU mode, concurrency and placement
+
+Three settings together decide how many tasks run at once and what happens to the rest.
+Defaults that behave well on a small pipeline can stall a large one, so it is worth
+setting them deliberately before scaling up.
+
+### `cpuMode` decides how many tasks fit on a node
+
+`process.cpus` can be translated into a Nomad resource request in two ways:
+
+| `nomad.jobs.cpuMode` | Nomad request | Meaning |
+|---|---|---|
+| `cores` *(default)* | `Cores: <cpus>` | **Exclusive** physical cores, reserved for the task alone |
+| `cpu` | `CPU: <cpus * 1000>` MHz | A **share** of CPU time, oversubscribable |
+
+In the default `cores` mode a node's concurrency is fixed arithmetic:
+
+```
+max concurrent tasks  =  node cores / process.cpus
+```
+
+A 48-core node running tasks that declare `cpus = 4` holds **12 tasks**, whatever the
+tasks actually do with those cores. The reservation is exclusive, so it holds even while
+the tasks sit idle on I/O — a node can be fully reserved while running well below
+capacity.
+
+Choose per workload:
+
+- **`cores`** — predictable, isolated per-task performance. Right for benchmarking, for
+  latency-sensitive work, and where a noisy neighbour would distort results.
+- **`cpu`** — higher throughput on workloads that declare CPUs generously but spend much
+  of their time blocked on I/O, which is common for bioinformatics pipelines. Tasks share
+  cores, so individual runtimes vary more.
+
+```groovy
+nomad {
+    jobs {
+        cpuMode = 'cpu'     // oversubscribe; default is 'cores'
+    }
+}
+```
+
+`nomadOptions.resources.cpu` / `.cores` override the mode for a single process.
+
+### `queueSize` should reflect what the cluster can hold
+
+`executor.queueSize` caps how many tasks are submitted to Nomad at once. It defaults to
+`100`, matching the grid executors — a sensible number against SLURM or PBS, where the
+scheduler owns a deep queue.
+
+Against Nomad in `cores` mode that default can exceed node capacity many times over. The
+surplus jobs are submitted, find no free cores, and sit pending. Nothing is lost — they
+place as capacity frees — but the Nomad UI fills with pending jobs and genuine problems
+become harder to spot.
+
+Set it near the concurrency the cluster can actually deliver:
+
+```groovy
+executor {
+    queueSize = 12          // e.g. one 48-core node, cpus = 4, cpuMode = 'cores'
+}
+```
+
+Multi-node clusters sum across nodes. Leave headroom if other workloads share the pool.
+
+### Placement failures versus queueing
+
+A task waiting for a busy node and a task that can never be placed look identical from
+the outside: no node assigned, status `pending`. They need opposite responses.
+
+nf-nomad reads Nomad's own evaluation metrics to tell them apart, so **waiting for
+capacity is never treated as a failure**, however long it lasts. A task is reported as a
+placement failure only when no node can satisfy it as specified — an unsatisfiable
+constraint, an empty or mismatched node pool, or a resource request larger than any node.
+Those fail immediately, since waiting cannot help.
+
+`failOnPlacementFailure` is **off by default**; without it an unplaceable task waits
+indefinitely. Enable it to have such tasks surface as errors:
+
+```groovy
+nomad {
+    jobs {
+        failOnPlacementFailure = true
+        placementFailureTimeout = '30m'   // fallback only; see below
+    }
+}
+```
+
+`placementFailureTimeout` (default `30m`) applies only where evaluation metrics are
+unavailable — an older Nomad, a restricted ACL token, or an API error — and the two cases
+cannot be distinguished. It must comfortably exceed how long a task may legitimately
+queue: shortening it risks failing healthy tasks that are merely waiting their turn.
+
+Both settings also read the environment: `NOMAD_FAIL_ON_PLACEMENT_FAILURE` and
+`NF_NOMAD_PLACEMENT_FAILURE_TIMEOUT`.
+
+## Examples
+
+The following example demonstrates how to configure a Nextflow pipeline to target a specific process to run on Nomad with customized datacenters and resource limits:
+
+```groovy
+// nextflow.config
+plugins {
+  id 'nf-nomad'
+}
+
+process {
+  executor = 'nomad'
+  
+  withName: runAlignment {
+    nomadOptions = [
+      datacenters: ['dc-analytics'],
+      priority: 'high',
+      resources: [
+        cores: 8,
+        memoryMax: '32 GB'
+      ]
+    ]
+  }
+}
+```
+
+## Testing and debugging
+
+To run and test the plugin in a development environment, configure a local Nextflow build with the following steps:
+
+1. Clone the Nextflow repository in your computer into a sibling directory:
+
+    ```bash
+    git clone --depth 1 https://github.com/nextflow-io/nextflow _resources/nextflow
+    ```
+
+2. Generate the nextflow class path
+
+    ```bash
+    cd _resources/nextflow && ./gradlew exportClasspath
+    ```
+
+3. Compile the plugin alongside the Nextflow code:
+
+    ```bash
+    cd ../../ && ./gradlew compileGroovy
+    ```
+
+4. Run Nextflow with the plugin, using `./launch.sh` as a drop-in replacement for the `nextflow` command, and adding the option `-plugins nf-nomad` to load the plugin:
+
+    ```bash
+    ./launch.sh run main.nf -plugins nf-nomad
+    ```
+
+## End 2 End test (nf-test)
+
+Project uses `nf-test` to run end to end integration tests running "real" pipelines against a local nomad
+
+- compile and install a 99.99.99 version (`./gradlew clean installPlugin -Pversion=99.99.99)
+- open a terminal at `docker` and execute `sudo ./start.sh` (this command will create a nomad server+client in a docker container)
+- follow terminal instructions to get the NOMAD_TOKEN (`source /mtp/nomad/nomad_temp/.env`)
+- open a terminal at 'src/e2e' and run all tests (`NXF_ASSETS=/tmp/nomad/nomad_temp/scratchdir/assets ./nf-test test`)
+
+
+
+## Package, upload and publish
+
+The project should be hosted in a GitHub repository whose name should match the name of the plugin, that is the name of the directory in the `plugins` folder (e.g. `nf-nomad`).
+
+Follow these steps to package, upload and publish the plugin:
+
+1. Create a file named `gradle.properties` in the project root containing the following attributes (this file should not be committed to Git):
+
+   - `github_organization`: the GitHub organisation where the plugin repository is hosted.
+
+
+2. Use the following steps to package and create a release for your plugin on GitHub:
+
+    - set the desired `version` value in `gradle.properties` and commit the change in the `master` branch
+    - tag the repo with the version
+    - push *all* changes (the tag fill fire the `release` GH action)
+
+    Once the action is finished a new release is created and all related artifacts attached to it
+
+3. Create a pull request against [nextflow-io/plugins](https://github.com/nextflow-io/plugins/blob/main/plugins.json) to make the plugin accessible to Nextflow.
+
+    Use the `json` file created in previous steps
+
+
+## License
+
+This project is licensed under the Apache License 2.0 - see the LICENSE file for details.

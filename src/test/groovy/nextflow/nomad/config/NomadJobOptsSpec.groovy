@@ -1,0 +1,316 @@
+/*
+ * Copyright 2023-, Stellenbosch University, South Africa
+ * Copyright 2024, Evaluacion y Desarrollo de Negocios, Spain
+ * Copyright 2026-, Incremental Steps Software Solutions OÜ
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package nextflow.nomad.config
+
+import spock.lang.Specification
+
+/**
+ * Unit test for NomadJobOpts
+ *
+ * @author : Abhinav Sharma <abhi18av@outlook.com>
+ */
+class NomadJobOptsSpec extends Specification {
+
+
+    def "test default values"() {
+        given:
+        def nomadJobOpts = new NomadJobOpts([:])
+
+        expect:
+        nomadJobOpts.rescheduleAttempts == 1
+        nomadJobOpts.restartAttempts == 0
+        nomadJobOpts.dockerVolume == null
+        nomadJobOpts.driver == "docker"
+        nomadJobOpts.cpuMode == NomadJobOpts.CPU_MODE_CORES
+        nomadJobOpts.acceleratorAutoDevice == true
+        nomadJobOpts.acceleratorDeviceName == 'nvidia/gpu'
+    }
+
+    def "test cpuMode can be set to cpu"() {
+        given:
+        def nomadJobOpts = new NomadJobOpts([cpuMode: 'cpu'])
+
+        expect:
+        nomadJobOpts.cpuMode == NomadJobOpts.CPU_MODE_CPU
+    }
+
+    def "test cpuMode can be set from environment variable"() {
+        given:
+        def env = ['NF_NOMAD_CPU_MODE': 'cpu']
+        def nomadJobOpts = new NomadJobOpts([:], env)
+
+        expect:
+        nomadJobOpts.cpuMode == NomadJobOpts.CPU_MODE_CPU
+    }
+
+    def "test invalid cpuMode should fail"() {
+        when:
+        new NomadJobOpts([cpuMode: 'invalid'])
+
+        then:
+        thrown(IllegalArgumentException)
+    }
+
+    def "test accelerator auto-device options can be customized"() {
+        given:
+        def nomadJobOpts = new NomadJobOpts([
+                acceleratorAutoDevice: false,
+                acceleratorDeviceName: 'custom/gpu'
+        ])
+
+        expect:
+        nomadJobOpts.acceleratorAutoDevice == false
+        nomadJobOpts.acceleratorDeviceName == 'custom/gpu'
+    }
+
+    def "test cleanup policy defaults from deleteOnCompletion"() {
+        expect:
+        new NomadJobOpts([:]).cleanup == NomadJobOpts.CLEANUP_ALWAYS
+        new NomadJobOpts([deleteOnCompletion: false]).cleanup == NomadJobOpts.CLEANUP_NEVER
+    }
+
+    def "test cleanup policy can be configured explicitly"() {
+        expect:
+        new NomadJobOpts([cleanup: 'always']).cleanup == NomadJobOpts.CLEANUP_ALWAYS
+        new NomadJobOpts([cleanup: 'never']).cleanup == NomadJobOpts.CLEANUP_NEVER
+        new NomadJobOpts([cleanup: 'onSuccess']).cleanup == NomadJobOpts.CLEANUP_ON_SUCCESS
+    }
+
+    def "test cleanup policy from environment variable"() {
+        given:
+        def env = ['NF_NOMAD_CLEANUP': 'onSuccess']
+        def nomadJobOpts = new NomadJobOpts([:], env)
+
+        expect:
+        nomadJobOpts.cleanup == NomadJobOpts.CLEANUP_ON_SUCCESS
+    }
+
+    def "test invalid cleanup policy should fail"() {
+        when:
+        new NomadJobOpts([cleanup: 'sometimes'])
+
+        then:
+        thrown(IllegalArgumentException)
+    }
+
+    def "test rescheduleAttempts and restartAttempts"() {
+        given:
+        def nomadJobOpts = new NomadJobOpts([rescheduleAttempts: 3, restartAttempts: 2])
+
+        expect:
+        nomadJobOpts.rescheduleAttempts == 3
+        nomadJobOpts.restartAttempts == 2
+    }
+
+    def "test dockerVolume"() {
+        given:
+        def nomadJobOpts = new NomadJobOpts([dockerVolume: "test-volume"])
+
+        expect:
+        nomadJobOpts.dockerVolume == "test-volume"
+    }
+
+    def "test parseVolumes with single volume"() {
+        given:
+        def volumeClosure = { type "csi" name "test" }
+        def nomadJobOpts = new NomadJobOpts([volume: volumeClosure])
+
+        when:
+        def volumes = nomadJobOpts.parseVolumes([volume: volumeClosure])
+
+        then:
+        volumes.size() == 1
+        volumes[0].workDir == true
+    }
+
+    def "test parseVolumes with multiple volumes"() {
+        given:
+        def volumeClosure1 = { type "host" name "test" path "/volume/csi"  }
+        def volumeClosure2 = { type "csi" name "test" path "/volume/host"}
+        def nomadJobOpts = new NomadJobOpts([volumes: [volumeClosure1, volumeClosure2]])
+
+        when:
+        def volumes = nomadJobOpts.parseVolumes([volumes: [volumeClosure1, volumeClosure2]])
+
+        then:
+        volumes.size() == 2
+        volumes[0].path == "/volume/csi"
+        volumes[1].path == "/volume/host"
+    }
+
+    def "test parseAffinity"() {
+        given:
+        def affinityClosure = { -> }
+        def nomadJobOpts = new NomadJobOpts([affinity: affinityClosure])
+
+        when:
+        def affinity = nomadJobOpts.parseAffinity([affinity: affinityClosure])
+
+        then:
+        affinity != null
+    }
+
+    def "test parseConstraint"() {
+        given:
+        def constraintClosure = { -> }
+        def nomadJobOpts = new NomadJobOpts([constraint: constraintClosure])
+
+        when:
+        def constraint = nomadJobOpts.parseConstraint([constraint: constraintClosure])
+
+        then:
+        constraint != null
+    }
+
+    def "test parseConstraints"() {
+        given:
+        def constraintsClosure = { -> }
+        def nomadJobOpts = new NomadJobOpts([constraints: constraintsClosure])
+
+        when:
+        def constraints = nomadJobOpts.parseConstraints([constraints: constraintsClosure])
+
+        then:
+        constraints != null
+    }
+
+
+    def "test parseSpreads"() {
+        given:
+        def spreadsClosure = { -> }
+        def nomadJobOpts = new NomadJobOpts([spreads: spreadsClosure])
+
+        when:
+        def spreads = nomadJobOpts.parseSpreads([spreads: spreadsClosure])
+
+        then:
+        spreads != null
+    }
+
+    def "test failOnPlacementFailure default is false"() {
+        given:
+        def nomadJobOpts = new NomadJobOpts([:])
+
+        expect:
+        nomadJobOpts.failOnPlacementFailure == false
+    }
+
+    def "test failOnPlacementFailure can be set to true"() {
+        given:
+        def nomadJobOpts = new NomadJobOpts([failOnPlacementFailure: true])
+
+        expect:
+        nomadJobOpts.failOnPlacementFailure == true
+    }
+
+    def "test failOnPlacementFailure from environment variable"() {
+        given:
+        def env = ['NOMAD_FAIL_ON_PLACEMENT_FAILURE': 'true']
+        def nomadJobOpts = new NomadJobOpts([:], env)
+
+        expect:
+        nomadJobOpts.failOnPlacementFailure == true
+    }
+
+    def "test placementFailureTimeout default is 30 minutes"() {
+        given:
+        def nomadJobOpts = new NomadJobOpts([:])
+
+        expect: 'a fallback long enough that ordinary queueing behind a busy node cannot trip it'
+        nomadJobOpts.placementFailureTimeout.millis == 1_800_000L
+    }
+
+    def "test placementFailureTimeout can be customized with Duration"() {
+        given:
+        def nomadJobOpts = new NomadJobOpts([placementFailureTimeout: '2m'])
+
+        expect:
+        nomadJobOpts.placementFailureTimeout.millis == 120_000L
+    }
+
+    def "test placementFailureTimeout from environment variable"() {
+        given:
+        def env = ['NF_NOMAD_PLACEMENT_FAILURE_TIMEOUT': '30s']
+        def nomadJobOpts = new NomadJobOpts([:], env)
+
+        expect:
+        nomadJobOpts.placementFailureTimeout.millis == 30_000L
+    }
+
+    def "test placementFailureTimeout supports various duration formats"() {
+        given:
+        def nomadJobOpts1 = new NomadJobOpts([placementFailureTimeout: '20s'])
+        def nomadJobOpts2 = new NomadJobOpts([placementFailureTimeout: '5m'])
+        def nomadJobOpts3 = new NomadJobOpts([placementFailureTimeout: '1h'])
+
+        expect:
+        nomadJobOpts1.placementFailureTimeout.millis == 20_000L
+        nomadJobOpts2.placementFailureTimeout.millis == 300_000L
+        nomadJobOpts3.placementFailureTimeout.millis == 3_600_000L
+    }
+
+    def "test driver defaults to docker"() {
+        expect:
+        new NomadJobOpts([:]).driver == "docker"
+    }
+
+    def "test driver can be set to pbs"() {
+        expect:
+        new NomadJobOpts([driver: 'pbs']).driver == "pbs"
+    }
+
+    def "test driver can be set to slurm"() {
+        expect:
+        new NomadJobOpts([driver: 'slurm']).driver == "slurm"
+    }
+
+    def "test nodePool is null by default"() {
+        expect:
+        new NomadJobOpts([:]).nodePool == null
+    }
+
+    def "test nodePool can be set from config"() {
+        expect:
+        new NomadJobOpts([nodePool: 'highmem']).nodePool == 'highmem'
+    }
+
+    def "test nodePool can be set from environment variable"() {
+        given:
+        def env = ['NOMAD_NODE_POOL': 'gpu-nodes']
+        def nomadJobOpts = new NomadJobOpts([:], env)
+
+        expect:
+        nomadJobOpts.nodePool == 'gpu-nodes'
+    }
+
+    def "test nodePool config value takes precedence over environment variable"() {
+        given:
+        def env = ['NOMAD_NODE_POOL': 'env-pool']
+        def nomadJobOpts = new NomadJobOpts([nodePool: 'config-pool'], env)
+
+        expect:
+        nomadJobOpts.nodePool == 'config-pool'
+    }
+
+    def "test nodePool trims whitespace"() {
+        expect:
+        new NomadJobOpts([nodePool: '  highmem  ']).nodePool == 'highmem'
+    }
+
+}

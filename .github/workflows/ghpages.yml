@@ -1,0 +1,49 @@
+name: ghpages
+on:
+  push:
+    branches:
+      - 'master'
+
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Build docu
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - name: Environment
+        run: env | sort
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # ratchet:actions/checkout@v4
+      - name: Set up JDK for x64
+        uses: actions/setup-java@e9fbacdec3bb3b6036605a3e6f7995d66773a8c6 # ratchet:actions/setup-java@v3
+        with:
+          java-version: '19'
+          distribution: 'temurin'
+          architecture: x64
+      - name: Generate
+        run: ./gradlew antora
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@56afc609e74202658d3ffba0e8f6dda462b719fa # ratchet:actions/upload-pages-artifact@v3.0.1
+        with:
+          path: ./build/site
+
+  publish-ghpages:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@d6db90164ac5ed86f2b6aed7e0febac5b3c0c03e # ratchet:actions/deploy-pages@v4

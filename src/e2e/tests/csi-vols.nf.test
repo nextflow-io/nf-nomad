@@ -1,0 +1,24 @@
+nextflow_workflow {
+
+    name "Test CSI vols"
+    script "workflows/csi-vols.nf"
+    config "workflows/nextflow.csi.config"
+    workflow "MAIN"
+
+    test("Should run without failures") {
+
+        when {
+            params {
+            }
+            workflow {
+            }
+        }
+
+        then {
+            assert workflow.success
+            assert snapshot(workflow.out).match()
+        }
+
+    }
+
+}

@@ -1,0 +1,73 @@
+name: release
+on:
+  push:
+    tags:
+      - '[0-9]+.[0-9]+.[0-9]+'
+      - '[0-9]+.[0-9]+.[0-9]+-edge[0-9]+'
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    if: ${{ github.actor == 'jagedn' || github.actor == 'abhi18av' }}
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        java_version: [19]
+
+    steps:
+      - name: Environment
+        run: env | sort
+
+      - name: Checkout
+        uses: actions/checkout@50fbc622fc4ef5163becd7fab6573eac35f8462e # ratchet:actions/checkout@v1
+        with:
+          fetch-depth: 1
+          submodules: true
+
+      - name: Setup Java ${{ matrix.java_version }}
+        uses: actions/setup-java@0f62d2ad8407a414cddd4790bed06fd9ebda0f56 # ratchet:actions/setup-java@v1
+        with:
+          java-version: ${{matrix.java_version}}
+          architecture: x64
+
+      - name: Compile
+        run: ./gradlew assemble
+
+      - name: Tests
+        run: ./gradlew check
+        env:
+          GRADLE_OPTS: '-Dorg.gradle.daemon=false'
+
+  publish-gpr:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # ratchet:actions/checkout@v4
+      - name: Set up JDK 19 for x64
+        uses: actions/setup-java@e9fbacdec3bb3b6036605a3e6f7995d66773a8c6 # ratchet:actions/setup-java@v3
+        with:
+          java-version: '19'
+          distribution: 'temurin'
+          architecture: x64
+
+      - name: build artifacts
+        run: ./gradlew clean installPlugin -x test -P version=${GITHUB_REF#refs/tags/}
+
+      - name: Upload artifact and release
+        uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # ratchet:softprops/action-gh-release@v2
+        with:
+          draft: false
+          prerelease: false
+          body_path: CHANGELOG.md
+          files: |
+            ./build/distributions/*
+
+      - name: publish release
+        env:
+          NPR_API_KEY: ${{ secrets.NPR_API_KEY }}
+        run: ./gradlew releasePlugin -x test -P version=${GITHUB_REF#refs/tags/}

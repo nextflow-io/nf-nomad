@@ -1,0 +1,30 @@
+def localWorkDir = "/tmp/nomad/nomad_temp/scratchdir/"
+def demoOutDir = "${localWorkDir}/tests/demo-remote-out"
+
+nextflow_pipeline {
+
+    name "Test nf-core/demo"
+    script "nf-core/demo"
+    config "workflows/nextflow.local.config"
+    profile "test,docker"
+    options "-r dev --outdir ${demoOutDir}"
+
+    test("Should run without failures on local Nomad cluster") {
+        expect {
+            assert workflow.success
+            assert !workflow.failed
+            assert workflow.exitStatus == 0
+            assert workflow.trace.tasksCount > 0
+            assert workflow.trace.tasksFailed == 0
+
+            def names = workflow.trace.succeeded()*.name
+            assert names.any { it.contains('NFCORE_DEMO:DEMO:SEQTK_TRIM') }
+            assert names.any { it.contains('NFCORE_DEMO:DEMO:FASTQC') }
+            assert names.any { it.contains('NFCORE_DEMO:DEMO:MULTIQC') }
+
+            assert new File(demoOutDir, 'multiqc/multiqc_report.html').exists()
+            assert new File(demoOutDir, 'pipeline_info').isDirectory()
+        }
+    }
+
+}

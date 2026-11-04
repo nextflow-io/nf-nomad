@@ -1,0 +1,55 @@
+version: '3.9'
+
+services:
+  minio:
+    image: minio/minio:latest
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - ./minio-data:/data
+      - ./init-minio.sh:/usr/local/bin/init-minio.sh
+    networks:
+      - nomad-dev
+
+  nomad:
+    privileged: true
+    cgroup: host
+    security_opt:
+      - seccomp:unconfined
+      - apparmor:unconfined
+    build:
+      context: .
+    environment:
+      # init-nomad.sh runs inside this container and needs the same path the
+      # identity bind mount below uses.
+      NOMAD_SHARED_DIR: ${NOMAD_SHARED_DIR:-/tmp/nomad/nomad_temp/scratchdir}
+    ports:
+      - "4646:4646"   # HTTP API + UI
+      - "4647:4647"   # server RPC (single-node, mostly internal)
+      - "4648:4648"   # serf (single-node, mostly internal)
+    volumes:
+      - type: bind
+        source: /sys/fs/cgroup
+        target: /sys/fs/cgroup
+
+      - type: bind
+        source: /var/run/docker.sock
+        target: /var/run/docker.sock
+
+      - ./init-nomad.sh:/usr/local/bin/init-nomad.sh
+      - /tmp/nomad/:/tmp/nomad/:rw
+      # Identity mapping is required: the Nomad client runs in this container but
+      # launches task containers on the HOST daemon via docker.sock, so a path must
+      # mean the same thing inside and outside. See start.sh for the default.
+      - ${NOMAD_SHARED_DIR:-/tmp/nomad/nomad_temp/scratchdir}/:${NOMAD_SHARED_DIR:-/tmp/nomad/nomad_temp/scratchdir}/:rw
+    networks:
+      - nomad-dev
+
+networks:
+  nomad-dev:
+    driver: bridge

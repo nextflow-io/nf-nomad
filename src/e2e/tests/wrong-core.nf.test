@@ -1,0 +1,22 @@
+nextflow_workflow {
+
+    name "Test Wrong Allocation"
+    script "workflows/wrong-cores.nf"
+    workflow "MAIN"
+
+    test("Should fail") {
+
+        when {
+            params {
+            }
+            workflow {
+            }
+        }
+
+        then {
+            assert workflow.failed
+        }
+
+    }
+
+}

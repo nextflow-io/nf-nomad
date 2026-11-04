@@ -1,0 +1,25 @@
+nextflow_workflow {
+
+    name "Test Constraints"
+    script "workflows/hello.nf"
+    config "workflows/constraints.config"
+    profile "constraints_node"
+    workflow "MAIN"
+
+    test("Should run without failures") {
+
+        when {
+            params {
+                RUN_IN_NODE = System.getenv("RUN_IN_NODE") ?: 'client_dev'
+            }
+            workflow {
+            }
+        }
+
+        then {
+            assert workflow.success
+            assert snapshot(workflow.out).match()
+        }
+
+    }
+}

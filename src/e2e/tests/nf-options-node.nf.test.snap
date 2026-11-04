@@ -1,0 +1,19 @@
+{
+    "Should run without failures": {
+        "content": [
+            {
+                "0": [
+                    "Bonjour world!\n",
+                    "Ciao world!\n",
+                    "Hello world!\n",
+                    "Hola world!\n"
+                ]
+            }
+        ],
+        "meta": {
+            "nf-test": "0.9.3",
+            "nextflow": "25.10.4"
+        },
+        "timestamp": "2026-05-24T17:24:02.116792698"
+    }
+}

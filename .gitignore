@@ -1,0 +1,28 @@
+# Ignore Gradle project-specific cache directory
+.gradle
+.idea
+.nextflow*
+
+# Ignore Gradle build output directory
+build
+work
+out
+
+_resources
+oracle-nomad-cluster
+
+.project
+.classpath
+.settings
+/validation/nomad_temp/**
+/validation/nomad
+**/*.tsv
+/src/e2e/.nf-test.log
+/.CLAUDE.md
+/results
+/validation/local-nomadlab/runs
+/docker/minio-data/
+/docker/nomad-data/
+
+# rendered from server.conf.in by start.sh
+/docker/server.conf

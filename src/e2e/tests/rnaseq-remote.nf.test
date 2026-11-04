@@ -1,0 +1,32 @@
+def localWorkDir = "/tmp/nomad/nomad_temp/scratchdir/"
+def rnaseqOutDir = "${localWorkDir}/tests/rnaseq-remote-out"
+def rnaseqRevision = "c735b43053ab5ed813b0dc55b1407eb36d900570"
+
+nextflow_pipeline {
+
+    name "Test nextflow-io/rnaseq-nf"
+    script "nextflow-io/rnaseq-nf"
+    profile "docker"
+    options "-r ${rnaseqRevision} -o ${rnaseqOutDir}"
+
+    test("Should run without failures on local Nomad cluster") {
+        expect {
+            assert workflow.success
+            assert !workflow.failed
+            assert workflow.exitStatus == 0
+            assert workflow.trace.tasksCount > 0
+            assert workflow.trace.tasksFailed == 0
+
+            def names = workflow.trace.succeeded()*.name
+            assert names.any { it.contains('RNASEQ:INDEX') }
+            assert names.any { it.contains('RNASEQ:FASTQC') }
+            assert names.any { it.contains('RNASEQ:QUANT') }
+            assert names.any { it == 'MULTIQC' }
+
+            assert new File(rnaseqOutDir, 'multiqc_report.html').exists()
+            assert new File(rnaseqOutDir, 'fastqc/ggal_gut/ggal_gut_1_fastqc.html').exists()
+            assert new File(rnaseqOutDir, 'fastqc/ggal_gut/ggal_gut_2_fastqc.html').exists()
+        }
+    }
+
+}

@@ -1,0 +1,14 @@
+site:
+  title: Nextflow Nomad executor
+  start_page: main:ROOT:index.adoc
+content:
+  sources:
+    - url: .
+      start_path: ./src/docs/antora
+      edit_url: false
+      branches: HEAD
+
+ui:
+  bundle:
+    url: ./src/docs/antora/ui
+    snapshot: true

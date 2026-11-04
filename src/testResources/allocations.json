@@ -1,0 +1,132 @@
+[
+  {
+    "ID": "ed344e0a-7290-d117-41d3-a64f853ca3c2",
+    "EvalID": "a9c5effc-2242-51b2-f1fe-054ee11ab189",
+    "Name": "example.cache[0]",
+    "NodeID": "cb1f6030-a220-4f92-57dc-7baaabdc3823",
+    "PreviousAllocation": "516d2753-0513-cfc7-57ac-2d6fac18b9dc",
+    "NextAllocation": "cd13d9b9-4f97-7184-c88b-7b451981616b",
+    "RescheduleTracker": {
+      "Events": [
+        {
+          "PrevAllocID": "516d2753-0513-cfc7-57ac-2d6fac18b9dc",
+          "PrevNodeID": "9230cd3b-3bda-9a3f-82f9-b2ea8dedb20e",
+          "RescheduleTime": 1517434161192946200,
+          "Delay": 5000000000
+        }
+      ]
+    },
+    "JobID": "example",
+    "TaskGroup": "cache",
+    "DesiredStatus": "run",
+    "DesiredDescription": "",
+    "ClientStatus": "running",
+    "ClientDescription": "",
+    "TaskStates": {
+      "redis": {
+        "State": "running",
+        "Failed": false,
+        "StartedAt": "2017-05-25T23:41:23.240184101Z",
+        "FinishedAt": "0001-01-01T00:00:00Z",
+        "Events": [
+          {
+            "Type": "Received",
+            "Time": 1495755675956923000,
+            "FailsTask": false,
+            "RestartReason": "",
+            "SetupError": "",
+            "DriverError": "",
+            "ExitCode": 0,
+            "Signal": 0,
+            "Message": "",
+            "KillTimeout": 0,
+            "KillError": "",
+            "KillReason": "",
+            "StartDelay": 0,
+            "DownloadError": "",
+            "ValidationError": "",
+            "DiskLimit": 0,
+            "FailedSibling": "",
+            "VaultError": "",
+            "TaskSignalReason": "",
+            "TaskSignal": "",
+            "DriverMessage": ""
+          },
+          {
+            "Type": "Task Setup",
+            "Time": 1495755675957466400,
+            "FailsTask": false,
+            "RestartReason": "",
+            "SetupError": "",
+            "DriverError": "",
+            "ExitCode": 0,
+            "Signal": 0,
+            "Message": "Building Task Directory",
+            "KillTimeout": 0,
+            "KillError": "",
+            "KillReason": "",
+            "StartDelay": 0,
+            "DownloadError": "",
+            "ValidationError": "",
+            "DiskLimit": 0,
+            "FailedSibling": "",
+            "VaultError": "",
+            "TaskSignalReason": "",
+            "TaskSignal": "",
+            "DriverMessage": ""
+          },
+          {
+            "Type": "Driver",
+            "Time": 1495755675970286800,
+            "FailsTask": false,
+            "RestartReason": "",
+            "SetupError": "",
+            "DriverError": "",
+            "ExitCode": 0,
+            "Signal": 0,
+            "Message": "",
+            "KillTimeout": 0,
+            "KillError": "",
+            "KillReason": "",
+            "StartDelay": 0,
+            "DownloadError": "",
+            "ValidationError": "",
+            "DiskLimit": 0,
+            "FailedSibling": "",
+            "VaultError": "",
+            "TaskSignalReason": "",
+            "TaskSignal": "",
+            "DriverMessage": "Downloading image redis:7"
+          },
+          {
+            "Type": "Started",
+            "Time": 1495755683227522000,
+            "FailsTask": false,
+            "RestartReason": "",
+            "SetupError": "",
+            "DriverError": "",
+            "ExitCode": 0,
+            "Signal": 0,
+            "Message": "",
+            "KillTimeout": 0,
+            "KillError": "",
+            "KillReason": "",
+            "StartDelay": 0,
+            "DownloadError": "",
+            "ValidationError": "",
+            "DiskLimit": 0,
+            "FailedSibling": "",
+            "VaultError": "",
+            "TaskSignalReason": "",
+            "TaskSignal": "",
+            "DriverMessage": ""
+          }
+        ]
+      }
+    },
+    "CreateIndex": 9,
+    "ModifyIndex": 13,
+    "CreateTime": 1495755675944527600,
+    "ModifyTime": 1495755675944527600
+  }
+]

@@ -1,0 +1,27 @@
+---
+kind: nomad
+dry_run: true
+configs:
+  experiments:
+    - node
+
+  # Optional: Node drain deadline in seconds, default 10
+  node_drain_deadline_seconds: 20
+
+  # Optional: Skip nodes in these classes
+  # node_class_skiplist:
+  #   - storage
+
+  # Optional: Skip nodes with these names
+  node_skiplist:
+    - nomad02
+    - nomad03
+
+  # Optional: Wait for this amount of seconds before set node to be eligible again, default 60
+  node_wait_for: 20
+
+  # Optional: Also drain system jobs, default false
+  node_drain_system_jobs: false
+
+  # Optional: Drain multiple nodes in one run in percent, fallback 1 node
+  node_drain_amount_in_percent: 30

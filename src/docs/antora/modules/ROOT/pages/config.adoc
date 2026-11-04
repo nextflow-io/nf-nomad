@@ -1,0 +1,378 @@
+== Configuration
+
+Most of the basic configuration is in a `nomad` closure in the `nextflow.config` file
+
+i.e.
+
+```
+nomad{
+    enabled = true // by default
+    client{
+        address = "http://localhost:4646"
+        token = "YOUR_NOMAD_TOKEN"
+        connectionTimeout = 6000
+        readTimeout = 6000
+        writeTimeout = 6000
+        pollInterval = '1s'
+        submitThrottle = '100ms'
+        retryConfig = {
+            delay = 500
+            maxDelay = 90
+            maxAttempts = 10
+            jitter = 0.25
+        }
+    }
+
+    jobs{
+
+        namespace = 'nf-nomad'
+        deleteOnCompletion = false
+        cleanup = 'onSuccess'             // always | never | onSuccess
+        privileged = true
+        networkMode = 'test'                // optional. Can be bridge, host or a named network
+        cpuMode = 'cores'                 // or 'cpu'
+        acceleratorAutoDevice = true      // map Nextflow accelerator directive to Nomad resources.device
+        acceleratorDeviceName = 'nvidia/gpu'
+
+        volumes = [
+              [ type: "host". name: "scratchdir" ],
+              [ type: "csi". name: "nextflow-fs-volume" ],
+              [ type: "csi", name: "nextflow-fs-volume", path: "/var/data", readOnly: true]
+            ]
+
+        constraints = {
+            node {
+                unique = [ name: 'nomad01' ]
+            }
+        }
+
+
+        spreads = {
+            spread = [ name:'node.datacenter', weight: 50 ]
+        }
+
+        secrets = [enabled: true]
+
+        // Fail jobs that cannot be placed due to insufficient resources
+        failOnPlacementFailure = true
+        placementFailureTimeout = '2m'  // Wait 2 minutes before failing
+
+    }
+}
+```
+
+== Plugin configuration
+
+- `enabled`: allow enabling/disable initial validations of the plugin
+
+=== Client configuration
+
+- `address`: The URL for the nomad server node.
+- `token`: If the cluster is protected you must to provide a token.
+- `connectionTimeout`: The maximum time to wait before giving up on establishing a connection with the cluster (default `6000` ms).
+- `readTimeout`: The maximum time to wait before indicating inability to read from the connection (default `6000` ms).
+- `writeTimeout`: The maximum time to wait before indicating inability to write to the connection (default `6000` ms).
+- `pollInterval`: Frequency for polling Nomad task state updates (default `1s`). Can also be set via `NF_NOMAD_POLL_INTERVAL`.
+- `submitThrottle`: Minimum delay between Nomad job submissions (default `0s`). Can be set via `NF_NOMAD_SUBMIT_THROTTLE` to reduce API bursts.
+- `retryConfig.delay`:  Delay when retrying failed API requests (default: 500ms).
+- `retryConfig.jitter`: Jitter value when retrying failed API requests (default: 0.25)
+- `retryConfig.maxAttempts`: Max attempts when retrying failed API requests (default: 10)
+- `retryConfig.maxDelay`: Max delay when retrying failed API requests (default: 90s)
+- Retries apply to transient failures (`408`, `429`, `5xx`, IO errors, and timeouts).
+- `retryConfig` and `submitThrottle` are complementary: `retryConfig` applies after request failures, while `submitThrottle` proactively spaces out new submissions.
+
+
+=== Jobs configuration
+
+- `deleteOnCompletion`: A boolean indicating if the job will be removed once completed
+- `cleanup`: Cleanup policy for completed jobs. Allowed values are `always`, `never`, and `onSuccess`. If omitted, it derives from `deleteOnCompletion` for backward compatibility.
+- `datacenters`: A list of datacenters for the job submission.
+- `region`: The region for job submission.
+- `namespace`: The namespace to be used for all Nextflow jobs.
+- `nodePool`: The Nomad node pool to assign to all Nextflow jobs. Assigns jobs to a specific pool of nodes for resource isolation or workload segmentation. Takes precedence over any `node.pool` constraint used for the same purpose. Can also be set via the `NOMAD_NODE_POOL` environment variable.
+- `privileged`: Run Docker tasks in privileged mode (default `true`).
+- 'networkMode' Mode of the network. This option is only supported on Linux clients. The following modes are available: none, bridge (default), host, <cni_network_name>
+- `cpuMode`: How task `cpus` maps to Nomad resources when process-level overrides are not set. Use `cores` (default) or `cpu`.
+- `acceleratorAutoDevice`: When `true` (default), map Nextflow `accelerator` requests to Nomad `resources.device` automatically.
+- `acceleratorDeviceName`: Device name to use for automatic accelerator mapping (default `nvidia/gpu`).
+- `volumeSpec`: The volumes which should be accessible to the jobs.
+- `affinitiesSpec`: The affinities which should be attached to the job spec.
+- `constraintsSpec`: The constraints which should be attached to the job spec. Accepts either Closure (inline) or Map (config-file block) syntax — see <<constraints-syntax,Constraints syntax>> below.
+- `spreadsSpec`: The spreads spec which should be used with all generated jobs.
+- `rescheduleAttempts`: Number of rescheduling (to a different node) attempts for the generated jobs.
+- `restartAttempts`: Number of restart (on the same node) attempts for the generated jobs.
+- `failOnPlacementFailure`: A boolean flag to automatically fail jobs that cannot be placed on any node due to insufficient resources (default `false`). When enabled, jobs that remain unscheduled (have no node assignment) beyond the `placementFailureTimeout` threshold will be marked as failed instead of indefinitely waiting.
+- `placementFailureTimeout`: The time to wait before considering a job as failed due to placement failure (default `60s`). Supports Nextflow duration format: `20s`, `2m`, `5m`, `1h`, `2d`, etc. Can also be set via the `NF_NOMAD_PLACEMENT_FAILURE_TIMEOUT` environment variable.
+- Failed tasks include enriched Nomad state messages; memory/OOM signals from Nomad task events are surfaced explicitly when available.
+- When debug JSON dumping is enabled (`nomad.debug.json` or `nomad.debug.path`), dumped job JSON files include Nomad metadata fields: `nomad_job_id`, `nomad_alloc_id`, `nomad_node_id`, `nomad_node_name`, and `nomad_datacenter`.
+- Failure messages include Nomad inspection hints (job/allocation/node identifiers and allocation API URL when available).
+- `secretOpts`: The configuration for Nomad Secret Store.
+- `dockerVolume`, DEPRECATED
+- `affinitySpec`, DEPRECATED
+- `constraintSpec`, DEPRECATED
+
+[[constraints-syntax]]
+=== Constraints syntax
+
+There are two independent scopes for constraints, and they work differently.
+
+==== Global constraints (`nomad.jobs.constraints`)
+
+Applies to every task in the pipeline. Set in `nextflow.config` using assignment form
+(`= { ... }`), which Nextflow preserves as a Closure:
+
+[source,groovy]
+----
+nomad {
+    jobs {
+        // All jobs must land on a node in the cape-town datacenter
+        constraints = {
+            node {
+                dataCenter = 'cape-town'
+            }
+        }
+    }
+}
+----
+
+NOTE: Writing `constraints { ... }` without `=` at this scope is also accepted — Nextflow's
+config parser converts the block to a Map, and the plugin handles both shapes. Prefer the
+`= { ... }` form to make the intent explicit.
+
+==== Per-process constraints (`nomadOptions.constraints`)
+
+Set per process (or process selector) inside `nomadOptions = [ ... ]`. The value must be
+a Closure. Per-process constraints are _additive_ — they are appended to any global
+constraints already set.
+
+[source,groovy]
+----
+process {
+    withName: 'BWA_MEM' {
+        nomadOptions = [
+            constraints: {
+                node {
+                    pool = 'highmem'          // only schedule on high-memory node pool
+                }
+            }
+        ]
+    }
+}
+----
+
+NOTE: The legacy `constraints` process directive (used outside `nomadOptions`) is
+deprecated and will be removed in the next release. Migrate to `nomadOptions.constraints`.
+
+==== Node constraint keys
+
+Node constraints match against Nomad's built-in node attributes and metadata:
+
+|===
+| Key | Value type | Nomad constraint generated
+
+| `unique = [name: '...']`
+| Map with key `name` and/or `id`
+| `${node.unique.name} = <name>` and/or `${node.unique.id} = <id>`
+
+| `clazz = '...'`
+| string
+| `${node.class} = <value>` (use `clazz` — `class` is a Groovy reserved word)
+
+| `pool = '...'`
+| string
+| `${node.pool} = <value>` — filters placement to nodes in the pool, but does not assign the job to the pool. Prefer `nomad.jobs.nodePool` (or `nomadOptions.nodePool`) for first-class pool assignment.
+
+| `dataCenter = '...'`
+| string
+| `${node.datacenter} = <value>`
+
+| `region = '...'`
+| string
+| `${node.region} = <value>`
+|===
+
+==== Attr constraint keys
+
+Attr constraints match against Nomad's `attr.*` intrinsic attributes:
+
+|===
+| Key | Sub-keys | Nomad constraint generated
+
+| `cpu = [...]`
+| `arch`: string, `numcores`: int, `reservablecores`: int, `totalcompute`: string
+| `${attr.cpu.arch} = <arch>`, `${attr.cpu.numcores} >= <n>`, etc.
+
+| `unique = [...]`
+| `hostname`: string, `ip-address`: string
+| `${attr.unique.hostname} = <hostname>`, `${attr.unique.network.ip-address} = <ip>`
+
+| `kernel = [...]`
+| `name`: string, `arch`: string, `version`: string
+| `${attr.kernel.name} = <name>`, etc.
+|===
+
+==== Examples
+
+**Pin all jobs to a specific datacenter and all alignment jobs to high-core nodes:**
+
+[source,groovy]
+----
+nomad {
+    jobs {
+        constraints = {
+            node { dataCenter = 'dc-nairobi' }   // global: every job stays in this DC
+        }
+    }
+}
+
+process {
+    withName: 'BWA_MEM' {
+        nomadOptions = [
+            constraints: {
+                attr { cpu = [numcores: 16] }     // additionally: at least 16 cores
+            }
+        ]
+    }
+}
+----
+
+**Route GPU-accelerated inference to a dedicated node class:**
+
+[source,groovy]
+----
+process {
+    withName: 'DEEPVARIANT' {
+        nomadOptions = [
+            constraints: {
+                node { clazz = 'gpu' }
+            }
+        ]
+    }
+}
+----
+
+**Route different pipeline stages to separate named nodes:**
+
+[source,groovy]
+----
+process {
+    withName: 'FASTQC' {
+        nomadOptions = [
+            constraints: {
+                node { unique = [name: 'compute-01'] }
+            }
+        ]
+    }
+    withName: 'MULTIQC' {
+        nomadOptions = [
+            constraints: {
+                node { unique = [name: 'compute-02'] }
+            }
+        ]
+    }
+}
+----
+
+**Restrict all jobs to Linux nodes with at least 8 reservable CPU cores:**
+
+[source,groovy]
+----
+nomad {
+    jobs {
+        constraints = {
+            attr { kernel = [name: 'linux'] }
+            attr { cpu    = [reservablecores: 8] }
+        }
+    }
+}
+----
+
+**Validation warnings:**
+
+The plugin validates constraint blocks before submission and logs a `WARN` for unknown keys,
+type mismatches, or blocks that produce no usable constraint. The job is still submitted so
+that misconfigured constraints surface as a Nomad scheduler placement error rather than
+being silently dropped.
+
+=== Process directives
+
+The plugin supports process-level Nomad directives in two forms:
+
+- Legacy directives:
+  - `datacenters`
+  - `constraints`
+  - `secret`
+  - `spread`
+- Preferred map-based directive:
+  - `nomadOptions`
+
+`nomadOptions` accepts a map and currently supports:
+
+- `datacenters`: list of strings
+- `namespace`: string namespace override for the process
+- `nodePool`: string — assigns the job to a specific Nomad node pool, overriding any global `nomad.jobs.nodePool` for this process
+- `constraints`: closure using the existing constraints DSL
+- `secrets`: list of secret names
+- `secretsPath`: per-process Nomad secret path override (string)
+- `spread`: spread map (`name`, `weight`, optional `targets`)
+- `affinity`: affinity map (`attribute`, optional `operator`, `value`, optional `weight`)
+- `volumes`: list of safe volume maps (`type`, `name`, optional `path`, optional `workDir`, optional `readOnly`)
+- `priority`: priority alias or number (`critical`, `high`, `normal`, `low`, `min`, or `0..100`)
+- `meta`: map of metadata merged with global `nomad.jobs.meta` (process keys override)
+- `shutdownDelay`: duration string (e.g. `15s`, `2m`)
+- `failures`: map with optional `restart` and `reschedule` maps
+- `resources`: map of resource options
+  - `memoryMax`: memory limit for Nomad `memory_max` (defaults to task `memory` when not set)
+  - `cpu`: Nomad CPU shares (MHz) override
+  - `cores`: Nomad CPU cores override
+  - `device`: list of Nomad requested devices (e.g. GPUs)
+  - when `resources.device` is not set and `acceleratorAutoDevice` is enabled, Nextflow `accelerator` is mapped automatically
+
+[source,groovy]
+----
+process {
+    withName: sayHello {
+        nomadOptions = [
+            datacenters: ['dc1', 'dc2'],
+            namespace: 'bio',
+            nodePool: 'highmem',
+            constraints: {
+                node {
+                    unique = [name: params.RUN_IN_NODE]
+                }
+            },
+            affinity: [attribute: '${meta.workload}', operator: '=', value: 'batch', weight: 25],
+            meta: [owner: 'team-x', step: 'align'],
+            shutdownDelay: '15s',
+            failures: [
+                restart: [attempts: 1, delay: '5s', mode: 'fail'],
+                reschedule: [attempts: 2, delay: '10s']
+            ],
+            secretsPath: 'secret/projects/team-x',
+            secrets: ['MY_ACCESS_KEY', 'MY_SECRET_KEY'],
+            spread: [name: 'node.datacenter', weight: 50, targets: ['us-east1': 70, 'us-east2': 30]],
+            priority: 'high',
+            volumes: [[type: 'host', name: 'ref-data', path: '/ref', readOnly: true]],
+            resources: [memoryMax: '64 GB', cores: 4, device: [[name: 'nvidia/gpu', count: 1]]]
+        ]
+    }
+}
+----
+
+When both `nomadOptions.<key>` and a legacy directive are set for the same process, `nomadOptions.<key>` takes precedence for that key only.
+For list-valued options such as datacenters, global and process values are concatenated in order (global first, then process) and deduplicated.
+`nomadOptions` values are validated strictly before submission; invalid shapes or conflicting options (for example, setting both `resources.cpu` and `resources.cores`) fail fast.
+When `nomadOptions.secretsPath` is set, it overrides `nomad.jobs.secrets.path` for that process only.
+When global and process volume specs are merged, only one `workDir` volume is allowed and `readOnly` flags are preserved on generated task mounts.
+Nomad task failures are surfaced as recoverable process errors so Nextflow `errorStrategy` and `maxRetries` policies remain in control.
+
+
+
+=== Debug configuration
+- `debug.json`: Enable rendered job-spec dumps for troubleshooting.
+- `debug.path`: Optional output path for rendered job specs. Relative paths resolve under each task work directory; absolute paths are used as provided.
+
+=== Secrets configuration
+
+- `enabled`: A boolean flag to indicate the usage of Nomad secrets store.
+- `path`: Path of the nomad secret to be used.
