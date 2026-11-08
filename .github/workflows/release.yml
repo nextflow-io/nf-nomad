@@ -32,6 +32,7 @@ jobs:
       - name: Setup Java ${{ matrix.java_version }}
         uses: actions/setup-java@77dd5b2ce225ea11469928ac317850245a74ae78 # ratchet:actions/setup-java@v6.2.0
         with:
+          distribution: 'temurin'
           java-version: ${{matrix.java_version}}
           architecture: x64
 
