@@ -25,6 +25,9 @@ echo "Shared work-dir volume (host == container): $NOMAD_SHARED_DIR"
 
 echo Creating a nomad dev environment:
 
+sudo mkdir -p minio-data/
+sudo chmod ugoa+rw minio-data/
+
 docker compose build
 docker compose up -d
 docker compose exec minio sh /usr/local/bin/init-minio.sh

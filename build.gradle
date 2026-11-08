@@ -77,7 +77,7 @@ antora {
 }
 
 nextflowPlugin {
-    nextflowVersion = '26.04.3'
+    nextflowVersion = '26.10.5'
     description = 'An Hashicorp Nomad executor plugin'
     provider = 'nextflow-io'
     className = 'nextflow.nomad.NomadPlugin'
