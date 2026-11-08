@@ -96,7 +96,7 @@ class NomadService implements Closeable{
     String submitTask(String id, TaskRun task, List<String> args, Map<String, String> env, List<NomadLifecycleTaskSpec> lifecycleTasks, Path saveJsonPath = null) {
         long startTime = System.currentTimeMillis()
         NomadTaskOptionsResolver.validate(task)
-        final List<NomadLifecycleTaskSpec> effectiveLifecycleTasks = lifecycleTasks ?: Collections.emptyList()
+        final List<NomadLifecycleTaskSpec> effectiveLifecycleTasks = lifecycleTasks ?: Collections.emptyList() as List<NomadLifecycleTaskSpec>
 
         Job job = new JobBuilder()
                 .withId(id)
@@ -144,7 +144,7 @@ class NomadService implements Closeable{
                     task_name       : task.name,
                     generated_at    : OffsetDateTime.now().toString(),
                     job_spec        : job.toString()
-            ])
+            ] as Map<String, Object>)
         }
 
         try {

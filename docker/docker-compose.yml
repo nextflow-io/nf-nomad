@@ -2,7 +2,7 @@ version: '3.9'
 
 services:
   minio:
-    image: minio/minio:latest
+    image: reg.mini.dev/minio
     command: server /data --console-address ":9001"
     environment:
       MINIO_ROOT_USER: minioadmin
@@ -11,7 +11,7 @@ services:
       - "9000:9000"
       - "9001:9001"
     volumes:
-      - ./minio-data:/data
+      - ./minio-data:/data:rw
       - ./init-minio.sh:/usr/local/bin/init-minio.sh
     networks:
       - nomad-dev
